@@ -11,6 +11,19 @@ import type { Route } from "./+types/root";
 import { appContext } from "./context";
 import "./app.css";
 
+const requestLogger: Route.MiddlewareFunction = async function (
+  { request, context },
+  next,
+) {
+  context.set(appContext, {
+    x: "asdf",
+  });
+  console.log(request.method, request.url);
+  return await next();
+};
+
+export const middleware: Route.MiddlewareFunction[] = [requestLogger];
+
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {

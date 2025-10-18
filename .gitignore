@@ -5,3 +5,12 @@
 # React Router
 /.react-router/
 /build/
+
+# Lambda deployment
+/lambda-package/
+/lambda.zip
+
+# Terraform (no longer used - using CDK)
+/infrastructure/
+
+cdk.out
