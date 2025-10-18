@@ -7,6 +7,7 @@ import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
@@ -15,6 +16,81 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export class CdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // Create Cognito User Pool with Passkey support
+    const userPool = new cognito.UserPool(this, "UserPool", {
+      userPoolName: "inside-amelia-rescue-users",
+      selfSignUpEnabled: true,
+      signInAliases: {
+        email: true,
+      },
+      autoVerify: {
+        email: true,
+      },
+      standardAttributes: {
+        email: {
+          required: true,
+          mutable: true,
+        },
+        givenName: {
+          required: true,
+          mutable: true,
+        },
+        familyName: {
+          required: true,
+          mutable: true,
+        },
+      },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: false,
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Create User Pool Client with OIDC configuration
+    // Note: Callback URLs initially set to localhost only to avoid circular dependency
+    // Update the callback URLs in AWS Console after first deployment with CloudFront domain
+    const userPoolClient = new cognito.UserPoolClient(this, "UserPoolClient", {
+      userPool,
+      userPoolClientName: "inside-amelia-rescue-client",
+      authFlows: {
+        userPassword: true,
+        userSrp: true,
+      },
+      oAuth: {
+        flows: {
+          authorizationCodeGrant: true,
+        },
+        scopes: [
+          cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.PROFILE,
+        ],
+        callbackUrls: [
+          "http://localhost:5173/auth/callback",
+          // Production callback URL needs to be added manually after deployment
+          // Format: https://CLOUDFRONT_DOMAIN/auth/callback
+        ],
+        logoutUrls: [
+          "http://localhost:5173/",
+          // Production logout URL needs to be added manually after deployment
+        ],
+      },
+      generateSecret: false, // Public client for web apps
+      preventUserExistenceErrors: true,
+    });
+
+    // Create Cognito Domain for hosted UI
+    const userPoolDomain = userPool.addDomain("UserPoolDomain", {
+      cognitoDomain: {
+        domainPrefix: `inside-amelia-rescue-${cdk.Stack.of(this).account}`,
+      },
+    });
 
     // Create CloudWatch log group for Lambda function
     const logGroup = new logs.LogGroup(this, "ReactRouterHandlerLogs", {
@@ -47,6 +123,11 @@ export class CdkStack extends cdk.Stack {
         },
         environment: {
           NODE_ENV: "production",
+          COGNITO_USER_POOL_ID: userPool.userPoolId,
+          COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
+          COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPool.userPoolId}`,
+          COGNITO_DOMAIN: userPoolDomain.domainName,
+          SESSION_SECRET: `session-secret-${cdk.Stack.of(this).account}`,
         },
       },
     );
@@ -65,7 +146,7 @@ export class CdkStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    // Create CloudFront distribution
+    // Create CloudFront distribution (needs to be created before User Pool Client for callback URLs)
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
         origin: new origins.FunctionUrlOrigin(functionUrl),
@@ -104,8 +185,34 @@ export class CdkStack extends cdk.Stack {
       distributionPaths: ["/assets/*"],
     });
 
+    // Note: APP_URL is determined at runtime from request headers
+    // to avoid circular dependency with CloudFront distribution
+
+    // Outputs
     new cdk.CfnOutput(this, "DistributionDomainName", {
       value: distribution.domainName,
+    });
+
+    new cdk.CfnOutput(this, "UserPoolId", {
+      value: userPool.userPoolId,
+    });
+
+    new cdk.CfnOutput(this, "UserPoolClientId", {
+      value: userPoolClient.userPoolClientId,
+    });
+
+    new cdk.CfnOutput(this, "CognitoHostedUIUrl", {
+      value: `https://${userPoolDomain.domainName}.auth.${cdk.Stack.of(this).region}.amazoncognito.com`,
+    });
+
+    new cdk.CfnOutput(this, "ProductionCallbackUrl", {
+      description: "Add this URL to Cognito User Pool Client callback URLs",
+      value: `https://${distribution.domainName}/auth/callback`,
+    });
+
+    new cdk.CfnOutput(this, "ProductionLogoutUrl", {
+      description: "Add this URL to Cognito User Pool Client logout URLs",
+      value: `https://${distribution.domainName}/`,
     });
   }
 }
