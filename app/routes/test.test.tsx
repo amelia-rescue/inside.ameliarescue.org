@@ -44,6 +44,7 @@ describe("Test Route", () => {
         context: {} as any,
         params: {},
         request: new Request("http://localhost/test"),
+        unstable_pattern: "/test",
       });
 
       expect(result).toEqual({
@@ -64,6 +65,7 @@ describe("Test Route", () => {
         request,
         context: {} as any,
         params: {},
+        unstable_pattern: "/test",
       });
 
       expect(response).toBeDefined();
@@ -90,6 +92,7 @@ describe("Test Route", () => {
         request,
         context: {} as any,
         params: {},
+        unstable_pattern: "/test",
       });
 
       expect(response).toBeUndefined();

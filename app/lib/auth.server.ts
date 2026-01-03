@@ -5,9 +5,9 @@ const COGNITO_ISSUER = process.env.COGNITO_ISSUER!;
 const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID!;
 const COGNITO_DOMAIN = process.env.COGNITO_DOMAIN!;
 // AWS_REGION is automatically set in Lambda, extract from issuer URL for local dev
-const COGNITO_REGION = 
-  process.env.AWS_REGION || 
-  COGNITO_ISSUER?.match(/\.([^.]+)\.amazonaws\.com/)?.[1] || 
+const COGNITO_REGION =
+  process.env.AWS_REGION ||
+  COGNITO_ISSUER?.match(/\.([^.]+)\.amazonaws\.com/)?.[1] ||
   "us-east-2";
 
 /**
@@ -26,21 +26,41 @@ interface TokenResponse {
   token_type: string;
 }
 
+let authorizationServer: oauth.AuthorizationServer | undefined = undefined;
+
+export async function getAuthorizationServer() {
+  if (!authorizationServer) {
+    const discoveryResponse = await oauth.discoveryRequest(issuer);
+    authorizationServer = await oauth.processDiscoveryResponse(
+      issuer,
+      discoveryResponse,
+    );
+  }
+  return authorizationServer;
+}
+const issuer = new URL(COGNITO_ISSUER);
+const client = {
+  client_id: COGNITO_CLIENT_ID,
+} as const;
+
 /**
  * Generate authorization URL for login with PKCE
  */
 export async function getLoginUrl(
   request: Request,
   redirectPath: string = "/auth/callback",
-): Promise<string> {
+) {
   const appUrl = getAppUrl(request);
   const redirectUri = `${appUrl}${redirectPath}`;
   const codeVerifier = oauth.generateRandomCodeVerifier();
   const codeChallenge = await oauth.calculatePKCECodeChallenge(codeVerifier);
+  const as = await getAuthorizationServer();
 
-  const authorizationUrl = `https://${COGNITO_DOMAIN}.auth.${COGNITO_REGION}.amazoncognito.com/oauth2/authorize`;
-  const url = new URL(authorizationUrl);
-  
+  if (!as.authorization_endpoint) {
+    throw new Error("Authorization endpoint not found");
+  }
+  const url = new URL(as.authorization_endpoint);
+
   url.searchParams.set("client_id", COGNITO_CLIENT_ID);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
@@ -48,10 +68,41 @@ export async function getLoginUrl(
   url.searchParams.set("code_challenge", codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
 
-  return JSON.stringify({
+  return {
     url: url.toString(),
     codeVerifier,
-  });
+  };
+}
+
+export async function getPasskeyAddUrl(
+  request: Request,
+  redirectPath: string = "/auth/callback",
+) {
+  const appUrl = getAppUrl(request);
+  const redirectUri = `${appUrl}${redirectPath}`;
+  const codeVerifier = oauth.generateRandomCodeVerifier();
+  const codeChallenge = await oauth.calculatePKCECodeChallenge(codeVerifier);
+  const as = await getAuthorizationServer();
+
+  if (!as.authorization_endpoint) {
+    throw new Error("Authorization endpoint not found");
+  }
+
+  const url = new URL(as.authorization_endpoint);
+  url.pathname = "/passkeys/add";
+  url.search = "";
+
+  url.searchParams.set("client_id", COGNITO_CLIENT_ID);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", "openid email profile");
+  url.searchParams.set("code_challenge", codeChallenge);
+  url.searchParams.set("code_challenge_method", "S256");
+
+  return {
+    url: url.toString(),
+    codeVerifier,
+  };
 }
 
 /**
@@ -62,7 +113,10 @@ export async function exchangeCodeForTokens(
   codeVerifier: string,
   redirectUri: string,
 ): Promise<TokenResponse> {
-  const tokenEndpoint = `https://${COGNITO_DOMAIN}.auth.${COGNITO_REGION}.amazoncognito.com/oauth2/token`;
+  const as = await getAuthorizationServer();
+  if (!as.token_endpoint) {
+    throw new Error("Token endpoint not found");
+  }
 
   const params = new URLSearchParams({
     grant_type: "authorization_code",
@@ -72,7 +126,7 @@ export async function exchangeCodeForTokens(
     code_verifier: codeVerifier,
   });
 
-  const response = await fetch(tokenEndpoint, {
+  const response = await fetch(as.token_endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -94,13 +148,17 @@ export async function exchangeCodeForTokens(
 export async function getUserInfo(
   accessToken: string,
 ): Promise<Record<string, unknown>> {
-  const userInfoEndpoint = `https://${COGNITO_DOMAIN}.auth.${COGNITO_REGION}.amazoncognito.com/oauth2/userInfo`;
+  // const userInfoEndpoint = `https://${COGNITO_DOMAIN}.auth.${COGNITO_REGION}.amazoncognito.com/oauth2/userInfo`;
 
-  const response = await fetch(userInfoEndpoint, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  // // const response = await fetch(userInfoEndpoint, {
+  // //   headers: {
+  // //     Authorization: `Bearer ${accessToken}`,
+  // //   },
+  // // });
+
+  const as = await getAuthorizationServer();
+
+  const response = await oauth.userInfoRequest(as, client, accessToken);
 
   if (!response.ok) {
     const error = await response.text();

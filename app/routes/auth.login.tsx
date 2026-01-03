@@ -14,7 +14,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // Generate login URL with PKCE
   const loginData = await getLoginUrl(request);
-  const { url: loginUrl, codeVerifier } = JSON.parse(loginData);
+  const { url: loginUrl, codeVerifier } = loginData;
 
   // Store code verifier and redirect path in session
   const sessionHeaders = await setSessionData(request, {

@@ -3,10 +3,7 @@ import { getLogoutUrl } from "~/lib/auth.server";
 import { logout } from "~/lib/session.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  // Destroy local session
-  await logout(request);
-
-  // Redirect to Cognito logout
+  // Redirect to Cognito logout while also destroying local session
   const logoutUrl = getLogoutUrl(request);
-  return redirect(logoutUrl);
+  return logout(request, logoutUrl);
 }

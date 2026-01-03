@@ -56,14 +56,3 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect("/auth/login?error=authentication_failed");
   }
 }
-
-export default function AuthCallback() {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold">Authenticating...</h1>
-        <p className="mt-2 text-gray-600">Please wait while we log you in.</p>
-      </div>
-    </div>
-  );
-}

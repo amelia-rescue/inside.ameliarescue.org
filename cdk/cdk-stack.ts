@@ -61,6 +61,7 @@ export class CdkStack extends cdk.Stack {
       authFlows: {
         userPassword: true,
         userSrp: true,
+        user: true,
       },
       oAuth: {
         flows: {
@@ -77,7 +78,7 @@ export class CdkStack extends cdk.Stack {
           // Format: https://CLOUDFRONT_DOMAIN/auth/callback
         ],
         logoutUrls: [
-          "http://localhost:5173/",
+          "http://localhost:5173",
           // Production logout URL needs to be added manually after deployment
         ],
       },
