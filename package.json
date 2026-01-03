@@ -43,6 +43,7 @@
     "aws-cdk": "^2.1100.1",
     "aws-cdk-lib": "^2.233.0",
     "constructs": "^10.4.2",
+    "daisyui": "^5.5.14",
     "happy-dom": "^20.0.5",
     "jsdom": "^27.0.1",
     "prettier": "^3.3.3",

@@ -124,7 +124,7 @@ export class CdkStack extends cdk.Stack {
       "ReactRouterHandler",
       {
         functionName: "inside-amelia-rescue",
-        runtime: lambda.Runtime.NODEJS_22_X,
+        runtime: lambda.Runtime.NODEJS_24_X,
         handler: "handler",
         entry,
         memorySize: 1024,

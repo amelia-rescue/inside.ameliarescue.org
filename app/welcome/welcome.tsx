@@ -3,46 +3,107 @@ import logoLight from "./logo-light.svg";
 
 export function Welcome() {
   return (
-    <main className="flex items-center justify-center pt-16 pb-4">
-      <div className="flex min-h-0 flex-1 flex-col items-center gap-16">
-        <header className="flex flex-col items-center gap-9">
-          <div className="w-[500px] max-w-[100vw] p-4">
-            <img
-              src={logoLight}
-              alt="React Router"
-              className="block w-full dark:hidden"
-            />
-            <img
-              src={logoDark}
-              alt="React Router"
-              className="hidden w-full dark:block"
-            />
+    <div className="drawer drawer-end">
+      <input id="welcome-drawer" type="checkbox" className="drawer-toggle" />
+      <div className="drawer-content">
+        <main className="flex items-center justify-center pt-16 pb-4">
+          <div className="flex min-h-0 flex-1 flex-col items-center gap-16">
+            <header className="flex flex-col items-center gap-9">
+              <div className="w-[500px] max-w-[100vw] p-4">
+                <img
+                  src={logoLight}
+                  alt="React Router"
+                  className="block w-full dark:hidden"
+                />
+                <img
+                  src={logoDark}
+                  alt="React Router"
+                  className="hidden w-full dark:block"
+                />
+              </div>
+              <label htmlFor="welcome-drawer" className="btn btn-ghost btn-sm">
+                Open panel
+              </label>
+            </header>
+            <div className="w-full max-w-[300px] space-y-6 px-4">
+              <div className="card bg-base-100 shadow">
+                <div className="card-body">
+                  <h2 className="card-title">DaisyUI is working</h2>
+                  <p className="text-sm opacity-70">
+                    This card and button use DaisyUI classes.
+                  </p>
+                  <div className="card-actions justify-end">
+                    <a
+                      className="btn btn-primary btn-sm"
+                      href="https://daisyui.com/components/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View components
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <nav className="space-y-4 rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
+                <p className="text-center leading-6 text-gray-700 dark:text-gray-200">
+                  What&apos;s next?
+                </p>
+                <ul>
+                  {resources.map(({ href, text, icon }) => (
+                    <li key={href}>
+                      <a
+                        className="group flex items-center gap-3 self-stretch p-3 leading-normal text-blue-700 hover:underline dark:text-blue-500"
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {icon}
+                        {text}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </div>
           </div>
-        </header>
-        <div className="w-full max-w-[300px] space-y-6 px-4">
-          <nav className="space-y-4 rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
-            <p className="text-center leading-6 text-gray-700 dark:text-gray-200">
-              What&apos;s next?
-            </p>
-            <ul>
-              {resources.map(({ href, text, icon }) => (
-                <li key={href}>
-                  <a
-                    className="group flex items-center gap-3 self-stretch p-3 leading-normal text-blue-700 hover:underline dark:text-blue-500"
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {icon}
-                    {text}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
+        </main>
       </div>
-    </main>
+      <div className="drawer-side">
+        <label
+          htmlFor="welcome-drawer"
+          aria-label="close sidebar"
+          className="drawer-overlay"
+        />
+        <aside className="menu bg-base-200 text-base-content min-h-full w-80 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Side Panel</h2>
+            <label
+              htmlFor="welcome-drawer"
+              className="btn btn-square btn-ghost btn-sm"
+            >
+              ✕
+            </label>
+          </div>
+          <ul>
+            <li>
+              <a href="/" className="font-medium">
+                Home
+              </a>
+            </li>
+            <li>
+              <a href="/protected" className="font-medium">
+                Protected
+              </a>
+            </li>
+            <li>
+              <a href="/account/security" className="font-medium">
+                Security
+              </a>
+            </li>
+          </ul>
+        </aside>
+      </div>
+    </div>
   );
 }
 
