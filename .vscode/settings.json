@@ -15,5 +15,7 @@
   },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
-  }
+  },
+  "vitest.enable": true,
+  "vitest.commandLine": "npm run test"
 }

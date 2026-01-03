@@ -13,4 +13,8 @@
 # Terraform (no longer used - using CDK)
 /infrastructure/
 
+# CDK
 cdk.out
+
+# Test coverage
+coverage/

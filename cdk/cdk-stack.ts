@@ -20,7 +20,7 @@ export class CdkStack extends cdk.Stack {
     // Create Cognito User Pool with Passkey support
     const userPool = new cognito.UserPool(this, "UserPool", {
       userPoolName: "inside-amelia-rescue-users",
-      selfSignUpEnabled: true,
+      selfSignUpEnabled: false,
       signInAliases: {
         email: true,
       },
@@ -43,9 +43,9 @@ export class CdkStack extends cdk.Stack {
       },
       passwordPolicy: {
         minLength: 8,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireDigits: true,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireDigits: false,
         requireSymbols: false,
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
@@ -90,7 +90,22 @@ export class CdkStack extends cdk.Stack {
       cognitoDomain: {
         domainPrefix: `inside-amelia-rescue-${cdk.Stack.of(this).account}`,
       },
+      managedLoginVersion: cognito.ManagedLoginVersion.NEWER_MANAGED_LOGIN,
     });
+
+    const managedLoginBranding = new cognito.CfnManagedLoginBranding(
+      this,
+      "ManagedLoginBranding",
+      {
+        userPoolId: userPool.userPoolId,
+        clientId: userPoolClient.userPoolClientId,
+        useCognitoProvidedValues: true,
+      },
+    );
+
+    managedLoginBranding.addDependency(
+      userPoolDomain.node.defaultChild as cognito.CfnUserPoolDomain,
+    );
 
     // Create CloudWatch log group for Lambda function
     const logGroup = new logs.LogGroup(this, "ReactRouterHandlerLogs", {
