@@ -9,6 +9,15 @@ const requestLogger: Route.MiddlewareFunction = async function (
 
   try {
     response = await next();
+    console.log(
+      JSON.stringify({
+        status: response.status,
+        time: performance.now() - start,
+        method: request.method,
+        url: request.url,
+        headers: Object.fromEntries(request.headers),
+      }),
+    );
     return response;
   } catch (error) {
     let response = Response.json(

@@ -74,6 +74,7 @@ export class CdkStack extends cdk.Stack {
         ],
         callbackUrls: [
           "http://localhost:5173/auth/callback",
+          "https://d1r7lchdx94dyz.cloudfront.net/auth/callback",
           // Production callback URL needs to be added manually after deployment
           // Format: https://CLOUDFRONT_DOMAIN/auth/callback
         ],
@@ -132,6 +133,7 @@ export class CdkStack extends cdk.Stack {
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup,
         bundling: {
+          // so react-router/architect wants aws-sdk v2? so stupid
           externalModules: ["@aws-sdk/*", "aws-sdk"],
           minify: true,
           sourceMap: true,
@@ -144,6 +146,9 @@ export class CdkStack extends cdk.Stack {
           COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPool.userPoolId}`,
           COGNITO_DOMAIN: userPoolDomain.domainName,
           SESSION_SECRET: `session-secret-${cdk.Stack.of(this).account}`,
+          // APP_URL needs to be added manually after deployment since there would be a circular dependency
+          // between the distribution and the lambda function
+          APP_URL: "https://d1r7lchdx94dyz.cloudfront.net",
         },
       },
     );

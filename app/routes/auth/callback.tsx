@@ -27,7 +27,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Determine callback URL from request
-    const callbackUrl = `${url.protocol}//${url.host}/auth/callback`;
+    const callbackUrl = process.env.APP_URL
+      ? `${process.env.APP_URL}/auth/callback`
+      : `${url.protocol}//${url.host}/auth/callback`;
 
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code, codeVerifier, callbackUrl);

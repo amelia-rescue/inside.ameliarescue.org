@@ -14,6 +14,9 @@ const COGNITO_REGION =
  * Get the application URL from the request
  */
 function getAppUrl(request: Request): string {
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
   const url = new URL(request.url);
   return `${url.protocol}//${url.host}`;
 }

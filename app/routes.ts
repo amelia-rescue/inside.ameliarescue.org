@@ -17,10 +17,10 @@ export default [
   route("sops", "./routes/sops.tsx"),
   route("truck-check", "./routes/truck-check.tsx"),
   ...prefix("auth", [
-    route("login", "./routes/auth.login.tsx"),
-    route("logout", "./routes/auth.logout.tsx"),
-    route("callback", "./routes/auth.callback.tsx"),
-    route("passkeys/add", "./routes/auth.passkeys.add.tsx"),
+    route("login", "./routes/auth/login.tsx"),
+    route("logout", "./routes/auth/logout.tsx"),
+    route("callback", "./routes/auth/callback.tsx"),
+    route("passkeys/add", "./routes/auth/passkeys.add.tsx"),
   ]),
   route("test", "./routes/test.tsx"),
 ] satisfies RouteConfig;
