@@ -15,7 +15,8 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "react-router typegen && tsc",
     "cdk": "cdk",
-    "deploy": "npm run build && npm run cdk deploy -- --profile aes",
+    "deploy:dns": "npm run cdk deploy InsideAmeliaRescueDnsStack -- --profile aes",
+    "deploy:app": "npm run build && npm run cdk deploy InsideAmeliaRescueStack -- --profile aes",
     "destroy": "npm run cdk destroy -- --profile aes",
     "diff": "npm run cdk diff -- --profile aes"
   },

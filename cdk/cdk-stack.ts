@@ -7,15 +7,34 @@ import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as targets from "aws-cdk-lib/aws-route53-targets";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+export interface CdkStackProps extends cdk.StackProps {
+  appDomainName: string;
+  authDomainName: string;
+  hostedZone: route53.IHostedZone;
+  appCertificate: acm.ICertificate;
+  authCertificate: acm.ICertificate;
+}
+
 export class CdkStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: CdkStackProps) {
     super(scope, id, props);
+
+    const {
+      appDomainName,
+      authDomainName,
+      hostedZone,
+      appCertificate,
+      authCertificate,
+    } = props;
 
     // Create Cognito User Pool with Passkey support
     const userPool = new cognito.UserPool(this, "UserPool", {
@@ -74,14 +93,9 @@ export class CdkStack extends cdk.Stack {
         ],
         callbackUrls: [
           "http://localhost:5173/auth/callback",
-          "https://d1r7lchdx94dyz.cloudfront.net/auth/callback",
-          // Production callback URL needs to be added manually after deployment
-          // Format: https://CLOUDFRONT_DOMAIN/auth/callback
+          `https://${appDomainName}/auth/callback`,
         ],
-        logoutUrls: [
-          "http://localhost:5173",
-          // Production logout URL needs to be added manually after deployment
-        ],
+        logoutUrls: ["http://localhost:5173", `https://${appDomainName}/`],
       },
       generateSecret: false, // Public client for web apps
       preventUserExistenceErrors: true,
@@ -89,8 +103,9 @@ export class CdkStack extends cdk.Stack {
 
     // Create Cognito Domain for hosted UI
     const userPoolDomain = userPool.addDomain("UserPoolDomain", {
-      cognitoDomain: {
-        domainPrefix: `inside-amelia-rescue-${cdk.Stack.of(this).account}`,
+      customDomain: {
+        domainName: authDomainName,
+        certificate: authCertificate,
       },
       managedLoginVersion: cognito.ManagedLoginVersion.NEWER_MANAGED_LOGIN,
     });
@@ -144,11 +159,9 @@ export class CdkStack extends cdk.Stack {
           COGNITO_USER_POOL_ID: userPool.userPoolId,
           COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
           COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPool.userPoolId}`,
-          COGNITO_DOMAIN: userPoolDomain.domainName,
+          COGNITO_DOMAIN: authDomainName,
           SESSION_SECRET: `session-secret-${cdk.Stack.of(this).account}`,
-          // APP_URL needs to be added manually after deployment since there would be a circular dependency
-          // between the distribution and the lambda function
-          APP_URL: "https://d1r7lchdx94dyz.cloudfront.net",
+          APP_URL: `https://${appDomainName}`,
         },
       },
     );
@@ -193,6 +206,39 @@ export class CdkStack extends cdk.Stack {
           cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         },
       },
+      domainNames: [appDomainName],
+      certificate: appCertificate,
+    });
+
+    const appAliasRecord = new route53.ARecord(this, "AppAliasRecord", {
+      zone: hostedZone,
+      recordName: "",
+      target: route53.RecordTarget.fromAlias(
+        new targets.CloudFrontTarget(distribution),
+      ),
+    });
+
+    const appAliasRecordAAAA = new route53.AaaaRecord(
+      this,
+      "AppAliasRecordAAAA",
+      {
+        zone: hostedZone,
+        recordName: "",
+        target: route53.RecordTarget.fromAlias(
+          new targets.CloudFrontTarget(distribution),
+        ),
+      },
+    );
+
+    userPoolDomain.node.addDependency(appAliasRecord);
+    userPoolDomain.node.addDependency(appAliasRecordAAAA);
+
+    new route53.ARecord(this, "AuthAliasRecord", {
+      zone: hostedZone,
+      recordName: "auth",
+      target: route53.RecordTarget.fromAlias(
+        new targets.UserPoolDomainTarget(userPoolDomain),
+      ),
     });
 
     // Deploy static assets to S3
@@ -223,17 +269,17 @@ export class CdkStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "CognitoHostedUIUrl", {
-      value: `https://${userPoolDomain.domainName}.auth.${cdk.Stack.of(this).region}.amazoncognito.com`,
+      value: `https://${authDomainName}`,
     });
 
     new cdk.CfnOutput(this, "ProductionCallbackUrl", {
       description: "Add this URL to Cognito User Pool Client callback URLs",
-      value: `https://${distribution.domainName}/auth/callback`,
+      value: `https://${appDomainName}/auth/callback`,
     });
 
     new cdk.CfnOutput(this, "ProductionLogoutUrl", {
       description: "Add this URL to Cognito User Pool Client logout URLs",
-      value: `https://${distribution.domainName}/`,
+      value: `https://${appDomainName}/`,
     });
   }
 }
