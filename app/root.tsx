@@ -8,21 +8,22 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
-import { appContext } from "./context";
 import "./app.css";
+import { authMiddleware } from "./middleware/auth";
+import { requestLogger } from "./middleware/logger";
 
-const requestLogger: Route.MiddlewareFunction = async function (
-  { request, context },
-  next,
-) {
-  context.set(appContext, {
-    x: "asdf",
-  });
-  console.log(request.method, request.url);
-  return await next();
-};
+// const requestLogger: Route.MiddlewareFunction = async function (
+//   { request, context },
+//   next,
+// ) {
+//   console.log(request.method, request.url);
+//   return await next();
+// };
 
-export const middleware: Route.MiddlewareFunction[] = [requestLogger];
+export const middleware: Route.MiddlewareFunction[] = [
+  requestLogger,
+  authMiddleware,
+];
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },

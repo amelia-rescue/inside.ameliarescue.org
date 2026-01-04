@@ -1,5 +1,10 @@
 import { Link } from "react-router";
 
+export async function loader() {
+  throw new Error("fuck");
+  return {};
+}
+
 export default function SOPs() {
   return (
     <div className="bg-base-200 min-h-screen">

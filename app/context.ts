@@ -1,7 +1,8 @@
 import { createContext } from "react-router";
+import type { SessionUser } from "./lib/session.server";
 
 export interface Context {
-  x: string;
+  user: SessionUser;
 }
 
 export const appContext = createContext<Context | undefined>(undefined);
