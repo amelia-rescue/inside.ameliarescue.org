@@ -16,6 +16,7 @@ export default [
   route("constitution", "./routes/constitution.tsx"),
   route("sops", "./routes/sops.tsx"),
   route("truck-check", "./routes/truck-check.tsx"),
+  route("profile", "./routes/profile.tsx"),
   ...prefix("auth", [
     route("login", "./routes/auth/login.tsx"),
     route("logout", "./routes/auth/logout.tsx"),

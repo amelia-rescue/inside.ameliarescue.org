@@ -1,6 +1,7 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || "default-secret-change-in-production";
+const SESSION_SECRET =
+  process.env.SESSION_SECRET || "default-secret-change-in-production";
 
 // Create session storage
 export const sessionStorage = createCookieSessionStorage({
@@ -18,8 +19,8 @@ export const sessionStorage = createCookieSessionStorage({
 export interface SessionUser {
   id: string;
   email: string;
-  givenName?: string;
-  familyName?: string;
+  givenName: string;
+  familyName: string;
   accessToken: string;
   idToken: string;
   expiresAt: number;

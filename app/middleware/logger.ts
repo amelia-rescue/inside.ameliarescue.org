@@ -15,7 +15,7 @@ const requestLogger: Route.MiddlewareFunction = async function (
         time: performance.now() - start,
         method: request.method,
         url: request.url,
-        headers: Object.fromEntries(request.headers),
+        // headers: Object.fromEntries(request.headers),
       }),
     );
     return response;

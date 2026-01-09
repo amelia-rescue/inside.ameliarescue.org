@@ -1,3 +1,4 @@
+import { appContext } from "~/context";
 import type { Route } from "./+types/_index";
 import { Link } from "react-router";
 
@@ -11,7 +12,16 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function Index() {
+export async function loader({ context }: Route.LoaderArgs) {
+  const c = context.get(appContext);
+  if (!c) {
+    throw new Error("App context not found");
+  }
+  return c;
+}
+
+export default function Index({ loaderData }: Route.ComponentProps) {
+  const { user } = loaderData;
   return (
     <div className="bg-base-200 min-h-screen">
       <div className="navbar bg-base-100 shadow">
@@ -19,9 +29,14 @@ export default function Index() {
           <div className="flex w-full items-center justify-between">
             <div className="text-xl font-semibold">Inside Amelia Rescue</div>
             <div className="flex items-center gap-2">
-              <Link to="/auth/login" className="btn btn-sm btn-primary">
-                Sign in
+              <Link to="/profile">
+                <div className="avatar avatar-placeholder">
+                  <div className="bg-neutral text-neutral-content w-10 rounded-full">
+                    <span className="text-xl">{user.givenName.charAt(0)}</span>
+                  </div>
+                </div>
               </Link>
+
               <Link to="/welcome" className="btn btn-sm btn-ghost">
                 Demo
               </Link>
