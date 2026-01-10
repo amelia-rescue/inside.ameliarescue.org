@@ -7,7 +7,7 @@ import {
 
 export default [
   index("./routes/_index.tsx"),
-  route("welcome", "./routes/welcome.tsx"),
+  route("admin", "./routes/admin.tsx"),
   route("protected", "./routes/protected.tsx"),
   route("account/security", "./routes/account.security.tsx"),
   route("roster", "./routes/roster.tsx"),

@@ -1,10 +1,17 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
+  DeleteCommand,
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import type { DynaliteEndpoint } from "./util";
+import {
+  AdminCreateUserCommand,
+  CognitoIdentityProviderClient,
+} from "@aws-sdk/client-cognito-identity-provider";
+import { randomBytes } from "crypto";
 
 interface User {
   id: string;
@@ -13,11 +20,18 @@ interface User {
   phone?: string;
   membership_status?: "provider" | "driver_only" | "junior";
   provider_level?: "cpr" | "basic" | "advanced" | "paramedic";
+  role: "admin" | "user";
   cpr_certification_url?: string;
   provider_certification_url?: string;
   evoc_certification_url?: string;
   certifications?: string[];
   recentActivity?: string[];
+}
+
+interface DocumentUser extends User {
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
 }
 
 export class UserNotFound extends Error {
@@ -27,6 +41,8 @@ export class UserNotFound extends Error {
 }
 
 /**
+ * todo: correct this comment - it's technically not a singleton
+ *
  * This thing is a singleton which could potentially screw up
  * tests because you can only have one instance of the client
  * with a single endpoint. If you were to use multiple instances
@@ -34,7 +50,9 @@ export class UserNotFound extends Error {
  */
 export class UserStore {
   private static client: DynamoDBDocumentClient;
-  private tableName = "aes_users";
+  private static cognito: CognitoIdentityProviderClient;
+  private readonly tableName = "aes_users";
+  private readonly cognitoUserPoolId = process.env.COGNITO_USER_POOL_ID!;
 
   private constructor() {}
 
@@ -54,14 +72,13 @@ export class UserStore {
       );
       UserStore.client = DynamoDBDocumentClient.from(dynamoDbClient);
     }
+    if (!UserStore.cognito) {
+      UserStore.cognito = new CognitoIdentityProviderClient();
+    }
     return new UserStore();
   }
 
-  public static reset() {
-    UserStore.client = undefined as unknown as DynamoDBDocumentClient;
-  }
-
-  public async getUser(id: string): Promise<User> {
+  public async getUser(id: string): Promise<DocumentUser> {
     const command = new GetCommand({
       TableName: this.tableName,
       Key: {
@@ -72,14 +89,122 @@ export class UserStore {
     if (!response.Item) {
       throw new UserNotFound();
     }
-    return response.Item as unknown as User;
+    return response.Item as unknown as DocumentUser;
   }
 
-  public async createUser(user: User): Promise<void> {
+  public async createUser(
+    user: User,
+  ): Promise<DocumentUser & { temporary_password: string }> {
+    const temporary_password = this.generatePassword();
+    await UserStore.cognito.send(
+      new AdminCreateUserCommand({
+        UserPoolId: this.cognitoUserPoolId,
+        Username: user.id,
+        TemporaryPassword: temporary_password,
+      }),
+    );
+
+    const documentUser = {
+      ...user,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
     const command = new PutCommand({
       TableName: this.tableName,
-      Item: user,
+      Item: documentUser,
     });
     await UserStore.client.send(command);
+    return {
+      ...documentUser,
+      temporary_password,
+    };
+  }
+
+  public async listUsers(includeDeleted = false): Promise<DocumentUser[]> {
+    const command = new ScanCommand(
+      includeDeleted
+        ? {
+            TableName: this.tableName,
+          }
+        : {
+            TableName: this.tableName,
+            FilterExpression: "attribute_not_exists(deleted_at)",
+          },
+    );
+    const response = await UserStore.client.send(command);
+    return response.Items as unknown as DocumentUser[];
+  }
+
+  public async updateUser(
+    user: Partial<User> & Pick<User, "id">,
+  ): Promise<void> {
+    const existingUser = await this.getUser(user.id);
+    const updatedUser: DocumentUser = {
+      ...existingUser,
+      ...user,
+      id: existingUser.id,
+      created_at: existingUser.created_at,
+      updated_at: new Date().toISOString(),
+    };
+
+    const command = new PutCommand({
+      TableName: this.tableName,
+      Item: updatedUser,
+      ConditionExpression: "attribute_exists(id)",
+    });
+    await UserStore.client.send(command);
+  }
+
+  public async deleteUser(id: string) {
+    const existingUser = await this.getUser(id);
+    const now = new Date().toISOString();
+    const deletedUser: DocumentUser = {
+      ...existingUser,
+      id: existingUser.id,
+      created_at: existingUser.created_at,
+      updated_at: now,
+      deleted_at: now,
+    };
+
+    const command = new PutCommand({
+      TableName: this.tableName,
+      Item: deletedUser,
+      ConditionExpression: "attribute_exists(id)",
+    });
+    await UserStore.client.send(command);
+  }
+
+  public async deletePermanently(id: string) {
+    const command = new DeleteCommand({
+      TableName: this.tableName,
+      Key: {
+        id,
+      },
+    });
+    await UserStore.client.send(command);
+  }
+
+  private generatePassword(): string {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    const length = 10;
+
+    const chars: string[] = [];
+    while (chars.length < length) {
+      const bytes = randomBytes(length);
+      for (const b of bytes) {
+        const maxUnbiased = 256 - (256 % alphabet.length);
+        if (b >= maxUnbiased) {
+          continue;
+        }
+
+        chars.push(alphabet[b % alphabet.length]);
+        if (chars.length === length) {
+          break;
+        }
+      }
+    }
+
+    return chars.join("");
   }
 }

@@ -138,6 +138,19 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               </div>
             </div>
           </Link>
+
+          <Link
+            to="/admin"
+            className="card bg-error-content shadow hover:shadow-md"
+          >
+            <div className="card-body text-primary">
+              <h2 className="card-title">Admin</h2>
+              <p className="text-sm opacity-70">Manage users and certs.</p>
+              <div className="card-actions justify-end">
+                <span className="btn btn-sm btn-ghost">Open</span>
+              </div>
+            </div>
+          </Link>
         </div>
       </main>
     </div>

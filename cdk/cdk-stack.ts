@@ -9,6 +9,7 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
 import * as path from "path";
@@ -124,6 +125,13 @@ export class CdkStack extends cdk.Stack {
       userPoolDomain.node.defaultChild as cognito.CfnUserPoolDomain,
     );
 
+    const usersTable = new dynamodb.Table(this, "UsersTable", {
+      tableName: "aes_users",
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Create CloudWatch log group for Lambda function
     const logGroup = new logs.LogGroup(this, "ReactRouterHandlerLogs", {
       logGroupName: "/aws/lambda/inside-amelia-rescue",
@@ -162,9 +170,12 @@ export class CdkStack extends cdk.Stack {
           COGNITO_DOMAIN: authDomainName,
           SESSION_SECRET: `session-secret-${cdk.Stack.of(this).account}`,
           APP_URL: `https://${appDomainName}`,
+          USERS_TABLE_NAME: usersTable.tableName,
         },
       },
     );
+
+    usersTable.grantReadWriteData(lambdaFunction);
 
     // Create Function URL for the Lambda
     const functionUrl = lambdaFunction.addFunctionUrl({
@@ -266,6 +277,10 @@ export class CdkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "UserPoolClientId", {
       value: userPoolClient.userPoolClientId,
+    });
+
+    new cdk.CfnOutput(this, "UsersTableName", {
+      value: usersTable.tableName,
     });
 
     new cdk.CfnOutput(this, "CognitoHostedUIUrl", {
