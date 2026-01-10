@@ -1,6 +1,8 @@
-import { Link } from "react-router";
+import { data, Link, useActionData, useFetcher } from "react-router";
 import type { Route } from "./+types/create-user";
 import { appContext } from "~/context";
+import { userSchema, UserStore } from "~/lib/user-store";
+import { type } from "arktype";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -23,30 +25,46 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
-  const data = {
+  const formValues = {
     email: formData.get("email"),
-    givenName: formData.get("givenName"),
-    familyName: formData.get("familyName"),
+    first_name: formData.get("first_name"),
+    last_name: formData.get("last_name"),
     role: formData.get("role"),
-    membershipStatus: formData.get("membershipStatus"),
-    certificationLevel: formData.get("certificationLevel"),
+    membership_status: formData.get("membership_status"),
+    certification_level: formData.get("certification_level"),
   };
 
-  console.log("Form submitted:", data);
-  console.log("HELLO!?");
+  const user = userSchema({
+    user_id: crypto.randomUUID(),
+    ...formValues,
+  });
+  if (user instanceof type.errors) {
+    return data({ error: user.summary, formValues }, { status: 400 });
+  }
+
+  const store = UserStore.make();
+  await store.createUser(user);
 
   return { success: true };
 }
 
 export default function CreateUser({ loaderData }: Route.ComponentProps) {
+  const actionData = useActionData<typeof action>();
   const { user } = loaderData;
+  const fetcher = useFetcher();
   return (
     <div className="mx-auto w-full max-w-2xl">
       <div className="card bg-base-100 shadow-lg">
         <div className="card-body">
           <h2 className="card-title mb-4">New User Information</h2>
 
-          <form method="post" className="space-y-6">
+          {actionData && "error" in actionData && (
+            <div className="alert alert-error mb-4">
+              <span>{actionData.error}</span>
+            </div>
+          )}
+
+          <fetcher.Form method="post" className="space-y-6">
             <div className="form-control w-full">
               <label className="label">
                 <span className="label-text">Email</span>
@@ -58,6 +76,11 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                 className="input input-bordered w-full"
                 autoComplete="off"
                 required
+                // defaultValue={
+                //   actionData && "formValues" in actionData
+                //     ? (actionData.formValues.email as string)
+                //     : ""
+                // }
               />
             </div>
 
@@ -67,11 +90,16 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
               </label>
               <input
                 type="text"
-                name="givenName"
+                name="first_name"
                 placeholder="John"
                 className="input input-bordered w-full"
                 autoComplete="off"
                 required
+                // defaultValue={
+                //   actionData && "formValues" in actionData
+                //     ? (actionData.formValues.first_name as string)
+                //     : ""
+                // }
               />
             </div>
 
@@ -81,11 +109,16 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
               </label>
               <input
                 type="text"
-                name="familyName"
+                name="last_name"
                 placeholder="Doe"
                 className="input input-bordered w-full"
                 autoComplete="off"
                 required
+                // defaultValue={
+                //   actionData && "formValues" in actionData
+                //     ? (actionData.formValues.last_name as string)
+                //     : ""
+                // }
               />
             </div>
 
@@ -97,6 +130,11 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                 name="role"
                 className="select select-bordered w-full"
                 required
+                // defaultValue={
+                //   actionData && "formValues" in actionData
+                //     ? (actionData.formValues.role as string)
+                //     : ""
+                // }
               >
                 <option value="">Select a role</option>
                 <option value="user">User</option>
@@ -109,9 +147,14 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                 <span className="label-text">Membership Status</span>
               </label>
               <select
-                name="membershipStatus"
+                name="membership_status"
                 className="select select-bordered w-full"
                 required
+                // defaultValue={
+                //   actionData && "formValues" in actionData
+                //     ? (actionData.formValues.membership_status as string)
+                //     : ""
+                // }
               >
                 <option value="">Select membership status</option>
                 <option value="provider">Provider</option>
@@ -125,9 +168,14 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                 <span className="label-text">Certification Level</span>
               </label>
               <select
-                name="certificationLevel"
+                name="certification_level"
                 className="select select-bordered w-full"
                 required
+                // defaultValue={
+                //   actionData && "formValues" in actionData
+                //     ? (actionData.formValues.certification_level as string)
+                //     : ""
+                // }
               >
                 <option value="">Select certification level</option>
                 <option value="cpr">CPR</option>
@@ -146,7 +194,7 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                 Create User
               </button>
             </div>
-          </form>
+          </fetcher.Form>
         </div>
       </div>
     </div>

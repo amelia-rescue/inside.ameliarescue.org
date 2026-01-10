@@ -39,13 +39,13 @@ export async function setupDynamo(schema: {
       TableName: schema.tableName,
       KeySchema: [
         {
-          AttributeName: "id",
+          AttributeName: "user_id",
           KeyType: "HASH",
         },
       ],
       AttributeDefinitions: [
         {
-          AttributeName: "id",
+          AttributeName: "user_id",
           AttributeType: "S",
         },
       ],

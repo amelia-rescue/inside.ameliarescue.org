@@ -153,7 +153,10 @@ export class CdkStack extends cdk.Stack {
         entry,
         memorySize: 1024,
         timeout: cdk.Duration.seconds(15),
-        architecture: cdk.aws_lambda.Architecture.ARM_64,
+        // for some reason ARM64 is throwing
+        // Error: No native build was found for platform=linux arch=arm64 runtime=node abi=137 uv=1 armv=8 libc=glibc node=24.11.
+        // no idea what library is the root cause
+        architecture: cdk.aws_lambda.Architecture.X86_64,
         logGroup,
         bundling: {
           // so react-router/architect wants aws-sdk v2? so stupid

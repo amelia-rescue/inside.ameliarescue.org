@@ -17,5 +17,12 @@
     "editor.defaultFormatter": "vscode.json-language-features"
   },
   "vitest.enable": true,
-  "vitest.commandLine": "npm run test"
+  "vitest.commandLine": "npm run test",
+  "editor.quickSuggestions": {
+	"strings": "on"
+  },
+  // prioritize ArkType's "type" for autoimports
+  "typescript.preferences.autoImportSpecifierExcludeRegexes": [
+    "^(node:)?os$"
+  ],
 }

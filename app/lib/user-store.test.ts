@@ -8,7 +8,7 @@ import {
   vi,
 } from "vitest";
 import type { DynaliteServer } from "dynalite";
-import { DYNALITE_ENDPOINT, setupDynamo, teardownDynamo } from "./util";
+import { setupDynamo, teardownDynamo } from "./util";
 
 const cognitoSendSpy = vi.fn().mockResolvedValue({});
 const cognitoClientCtorSpy = vi.fn().mockImplementation(() => {
@@ -47,30 +47,31 @@ describe("user store test", () => {
   });
 
   it("should be able to create and get a user", async () => {
-    const store = UserStore.make(DYNALITE_ENDPOINT);
+    const store = UserStore.make();
 
-    const { temporary_password } = await store.createUser({
-      id: "test-user",
-      name: "Test User",
+    const { temporary_password, user_id } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
       email: "test@example.com",
       role: "admin",
     });
 
-    const user = await store.getUser("test-user");
+    const user = await store.getUser(user_id);
     expect(cognitoSendSpy).toHaveBeenCalledTimes(1);
     expect(cognitoSendSpy).toHaveBeenCalledWith({
       input: {
         TemporaryPassword: expect.any(String),
-        Username: "test-user",
+        Username: expect.any(String),
         UserPoolId: "test-user-pool",
       },
     });
 
     expect(user).toMatchObject({
-      id: "test-user",
+      user_id: expect.any(String),
       created_at: expect.any(String),
       updated_at: expect.any(String),
-      name: "Test User",
+      first_name: "Test",
+      last_name: "User",
       email: "test@example.com",
       role: "admin",
     });
@@ -80,26 +81,27 @@ describe("user store test", () => {
   });
 
   it("should be able to create and get a user 2", async () => {
-    const store = UserStore.make(DYNALITE_ENDPOINT);
+    const store = UserStore.make();
 
-    await store.createUser({
-      id: "test-user",
-      name: "Test User",
+    const { user_id } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
       email: "test@example.com",
       role: "admin",
     });
-    const user = await store.getUser("test-user");
-    expect(user.id).toBe("test-user");
-    expect(user.name).toBe("Test User");
+    const user = await store.getUser(user_id);
+    expect(user.user_id).toBe(user_id);
+    expect(user.first_name).toBe("Test");
+    expect(user.last_name).toBe("User");
     expect(user.email).toBe("test@example.com");
   });
 
   it("should be able to list users", async () => {
-    const store = UserStore.make(DYNALITE_ENDPOINT);
+    const store = UserStore.make();
 
     const usersToCreate = Array.from({ length: 10 }, (_, i) => ({
-      id: `test-user-${i}`,
-      name: `Test User ${i}`,
+      first_name: "Test",
+      last_name: `User${i}`,
       email: `test-${i}@example.com`,
       role: "user" as const,
     }));
@@ -111,76 +113,83 @@ describe("user store test", () => {
   });
 
   it("should be able to update users", async () => {
-    const store = UserStore.make(DYNALITE_ENDPOINT);
-    const id = crypto.randomUUID();
-    await store.createUser({
-      id,
-      name: "Test User",
+    const store = UserStore.make();
+    const { user_id } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
       email: "test@example.com",
       role: "admin",
     });
     await store.updateUser({
-      id,
-      name: "Updated User",
+      user_id,
+      first_name: "Updated",
+      last_name: "User",
     });
-    const user = await store.getUser(id);
-    expect(user.name).toBe("Updated User");
+    const user = await store.getUser(user_id);
+    expect(user.first_name).toBe("Updated");
   });
 
   it("should throw a UserNotFound error when trying to update a usser that does not exist", async () => {
-    const store = UserStore.make(DYNALITE_ENDPOINT);
+    const store = UserStore.make();
     await expect(
-      store.updateUser({ id: "non-existent-user", name: "Updated User" }),
+      store.updateUser({
+        user_id: "non-existent-user",
+        first_name: "Updated",
+        last_name: "User",
+      }),
     ).rejects.toBeInstanceOf(UserNotFound);
   });
 
   it("should be able to soft delete users and list them out if includeDeleted is true", async () => {
-    const store = UserStore.make(DYNALITE_ENDPOINT);
+    const store = UserStore.make();
 
     const activeId = crypto.randomUUID();
     const deletedId = crypto.randomUUID();
 
-    await Promise.all([
+    const [activeUser, deletedUser] = await Promise.all([
       store.createUser({
-        id: activeId,
-        name: "Active User",
+        first_name: "Active",
+        last_name: "User",
         email: "active@example.com",
         role: "user",
       }),
       store.createUser({
-        id: deletedId,
-        name: "Deleted User",
+        first_name: "Deleted",
+        last_name: "User",
         email: "deleted@example.com",
         role: "user",
       }),
     ]);
+    const actualActiveId = activeUser.user_id;
+    const actualDeletedId = deletedUser.user_id;
 
-    await store.deleteUser(deletedId);
+    await store.deleteUser(actualDeletedId);
 
     const withoutDeleted = await store.listUsers();
-    expect(withoutDeleted.map((u) => u.id)).toEqual([activeId]);
+    expect(withoutDeleted.map((u) => u.user_id)).toEqual([actualActiveId]);
 
     const withDeleted = await store.listUsers(true);
-    expect(withDeleted.map((u) => u.id).sort()).toEqual(
-      [activeId, deletedId].sort(),
+    expect(withDeleted.map((u) => u.user_id).sort()).toEqual(
+      [actualActiveId, actualDeletedId].sort(),
     );
 
-    const deletedUser = withDeleted.find((u) => u.id === deletedId);
-    expect(deletedUser?.deleted_at).toBeTruthy();
+    const deletedUserFromList = withDeleted.find(
+      (u) => u.user_id === actualDeletedId,
+    );
+    expect(deletedUserFromList?.deleted_at).toBeTruthy();
   });
 
   it("should be able to delete users permanently", async () => {
-    const store = UserStore.make(DYNALITE_ENDPOINT);
-    const id = crypto.randomUUID();
+    const store = UserStore.make();
 
-    await store.createUser({
-      id,
-      name: "Test User",
+    const { user_id } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
       email: "test@example.com",
       role: "admin",
     });
 
-    await store.deletePermanently(id);
-    await expect(store.getUser(id)).rejects.toBeInstanceOf(UserNotFound);
+    await store.deletePermanently(user_id);
+    await expect(store.getUser(user_id)).rejects.toBeInstanceOf(UserNotFound);
   });
 });

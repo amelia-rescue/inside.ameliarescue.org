@@ -6,32 +6,32 @@ import {
   PutCommand,
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
-import type { DynaliteEndpoint } from "./util";
+import { DYNALITE_ENDPOINT, type DynaliteEndpoint } from "./util";
 import {
   AdminCreateUserCommand,
   CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { randomBytes } from "crypto";
+import { type } from "arktype";
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  membership_status?: "provider" | "driver_only" | "junior";
-  certification_level?:
-    | "cpr"
-    | "basic"
-    | "advanced"
-    | "intermediate"
-    | "paramedic";
-  role: "admin" | "user";
-  cpr_certification_url?: string;
-  provider_certification_url?: string;
-  evoc_certification_url?: string;
-  certifications?: string[];
-  recentActivity?: string[];
-}
+export const userSchema = type({
+  user_id: "string",
+  first_name: "string",
+  last_name: "string",
+  email: "string",
+  role: "'admin' | 'user'",
+  "phone?": "string",
+  "membership_status?": "'provider' | 'driver_only' | 'junior'",
+  "certification_level?":
+    "'cpr' | 'basic' | 'advanced' | 'intermediate' | 'paramedic'",
+  "cpr_certification_url?": "string",
+  "provider_certification_url?": "string",
+  "evoc_certification_url?": "string",
+  "certifications?": "string[]",
+  "recentActivity?": "string[]",
+});
+
+export type User = typeof userSchema.infer;
 
 interface DocumentUser extends User {
   created_at: string;
@@ -61,12 +61,12 @@ export class UserStore {
 
   private constructor() {}
 
-  public static make(endpoint?: DynaliteEndpoint) {
+  public static make() {
     if (!UserStore.client) {
       const dynamoDbClient = new DynamoDBClient(
-        endpoint
+        import.meta.env.MODE === "test"
           ? {
-              endpoint,
+              endpoint: DYNALITE_ENDPOINT,
               region: "local",
               credentials: {
                 accessKeyId: "local",
@@ -83,11 +83,11 @@ export class UserStore {
     return new UserStore();
   }
 
-  public async getUser(id: string): Promise<DocumentUser> {
+  public async getUser(user_id: string): Promise<DocumentUser> {
     const command = new GetCommand({
       TableName: this.tableName,
       Key: {
-        id,
+        user_id,
       },
     });
     const response = await UserStore.client.send(command);
@@ -98,19 +98,35 @@ export class UserStore {
   }
 
   public async createUser(
-    user: User,
+    user: Omit<User, "user_id">,
   ): Promise<DocumentUser & { temporary_password: string }> {
     const temporary_password = this.generatePassword();
+    const user_id = crypto.randomUUID();
     await UserStore.cognito.send(
       new AdminCreateUserCommand({
         UserPoolId: this.cognitoUserPoolId,
-        Username: user.id,
+        Username: user_id,
+        UserAttributes: [
+          {
+            Name: "email",
+            Value: user.email,
+          },
+          {
+            Name: "given_name",
+            Value: user.first_name,
+          },
+          {
+            Name: "family_name",
+            Value: user.last_name,
+          },
+        ],
         TemporaryPassword: temporary_password,
       }),
     );
 
     const documentUser = {
       ...user,
+      user_id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -122,6 +138,7 @@ export class UserStore {
     await UserStore.client.send(command);
     return {
       ...documentUser,
+      // hopefully an email will be sent automatically and I can remove this
       temporary_password,
     };
   }
@@ -142,13 +159,13 @@ export class UserStore {
   }
 
   public async updateUser(
-    user: Partial<User> & Pick<User, "id">,
+    user: Partial<User> & Pick<User, "user_id">,
   ): Promise<void> {
-    const existingUser = await this.getUser(user.id);
+    const existingUser = await this.getUser(user.user_id);
     const updatedUser: DocumentUser = {
       ...existingUser,
       ...user,
-      id: existingUser.id,
+      user_id: existingUser.user_id,
       created_at: existingUser.created_at,
       updated_at: new Date().toISOString(),
     };
@@ -156,17 +173,17 @@ export class UserStore {
     const command = new PutCommand({
       TableName: this.tableName,
       Item: updatedUser,
-      ConditionExpression: "attribute_exists(id)",
+      ConditionExpression: "attribute_exists(user_id)",
     });
     await UserStore.client.send(command);
   }
 
-  public async deleteUser(id: string) {
-    const existingUser = await this.getUser(id);
+  public async deleteUser(user_id: string) {
+    const existingUser = await this.getUser(user_id);
     const now = new Date().toISOString();
     const deletedUser: DocumentUser = {
       ...existingUser,
-      id: existingUser.id,
+      user_id: existingUser.user_id,
       created_at: existingUser.created_at,
       updated_at: now,
       deleted_at: now,
@@ -175,16 +192,16 @@ export class UserStore {
     const command = new PutCommand({
       TableName: this.tableName,
       Item: deletedUser,
-      ConditionExpression: "attribute_exists(id)",
+      ConditionExpression: "attribute_exists(user_id)",
     });
     await UserStore.client.send(command);
   }
 
-  public async deletePermanently(id: string) {
+  public async deletePermanently(user_id: string) {
     const command = new DeleteCommand({
       TableName: this.tableName,
       Key: {
-        id,
+        user_id,
       },
     });
     await UserStore.client.send(command);
