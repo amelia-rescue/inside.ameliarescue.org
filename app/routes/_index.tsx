@@ -120,7 +120,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               Swag
               <FiExternalLink className="h-4 w-4" />
             </h2>
-            <p className="text-sm opacity-70">Shop for squad merchandise.</p>
+            <p className="text-sm opacity-70">Stay fresh.</p>
             <div className="card-actions justify-end">
               <span className="btn btn-sm btn-ghost">Open</span>
             </div>
