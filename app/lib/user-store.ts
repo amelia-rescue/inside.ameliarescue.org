@@ -19,7 +19,12 @@ interface User {
   email: string;
   phone?: string;
   membership_status?: "provider" | "driver_only" | "junior";
-  provider_level?: "cpr" | "basic" | "advanced" | "paramedic";
+  certification_level?:
+    | "cpr"
+    | "basic"
+    | "advanced"
+    | "intermediate"
+    | "paramedic";
   role: "admin" | "user";
   cpr_certification_url?: string;
   provider_certification_url?: string;

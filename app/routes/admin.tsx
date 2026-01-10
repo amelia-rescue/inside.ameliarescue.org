@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/admin";
+import { appContext } from "~/context";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -8,7 +9,20 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function Admin() {
+export const handle = {
+  breadcrumb: "Admin",
+};
+
+export async function loader({ context }: Route.LoaderArgs) {
+  const c = context.get(appContext);
+  if (!c) {
+    throw new Error("App context not found");
+  }
+  return c;
+}
+
+export default function Admin({ loaderData }: Route.ComponentProps) {
+  const { user } = loaderData;
   const placeholderUsers = [
     { id: "1", email: "admin@ameliarescue.org", role: "admin" },
     { id: "2", email: "user1@ameliarescue.org", role: "user" },
@@ -16,7 +30,7 @@ export default function Admin() {
   ];
 
   return (
-    <div className="container mx-auto p-6">
+    <>
       <h1 className="mb-6 text-3xl font-bold">User Administration</h1>
 
       <div className="mb-6">
@@ -43,6 +57,6 @@ export default function Admin() {
           ))}
         </ul>
       </div>
-    </div>
+    </>
   );
 }

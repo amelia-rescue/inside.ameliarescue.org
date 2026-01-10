@@ -1,16 +1,20 @@
 import {
   isRouteErrorResponse,
+  Link,
   Links,
   Meta,
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteError,
+  useRouteLoaderData,
 } from "react-router";
 
 import type { Route } from "./+types/root";
 import "./app.css";
 import { authMiddleware } from "./middleware/auth";
 import { requestLogger } from "./middleware/logger";
+import { appContext } from "./context";
 
 // const requestLogger: Route.MiddlewareFunction = async function (
 //   { request, context },
@@ -38,13 +42,16 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-// export async function loader({ context }: Route.LoaderArgs) {
-//   // Set up the context with some default value
-//   context.set(appContext, { x: "Hello from context!" });
-//   return {};
-// }
+export async function loader({ context }: Route.LoaderArgs) {
+  const appCtx = context.get(appContext);
+  return {
+    user: appCtx?.user,
+  };
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const data = useRouteLoaderData<typeof loader>("root");
+  const error = useRouteError();
   return (
     <html lang="en" data-theme="retro">
       <head>
@@ -54,7 +61,43 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        {children}
+        <div className="bg-base-200 flex min-h-screen flex-col">
+          <div className="navbar bg-base-100 shadow">
+            <div className="mx-auto w-full max-w-5xl px-4">
+              <div className="flex w-full items-center justify-between">
+                <Link to="/" className="text-xl font-semibold">
+                  Inside Amelia Rescue
+                </Link>
+                <div className="flex items-center gap-2">
+                  {data?.user && (
+                    <Link to="/profile">
+                      <div className="avatar placeholder">
+                        <div className="bg-neutral text-neutral-content flex w-10 items-center justify-center rounded-full">
+                          <span className="text-xl">
+                            {data.user.givenName.charAt(0)}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
+            {children}
+          </main>
+
+          <footer className="footer footer-center bg-base-300 text-base-content p-4">
+            <aside>
+              <p>
+                {new Date().getFullYear()} Amelia Emergency Squad. All rights
+                reserved.
+              </p>
+            </aside>
+          </footer>
+        </div>
         <ScrollRestoration />
         <Scripts />
       </body>
