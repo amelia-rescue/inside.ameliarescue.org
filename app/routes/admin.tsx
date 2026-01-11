@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/admin";
 import { appContext } from "~/context";
+import { UserStore } from "~/lib/user-store";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -14,21 +15,13 @@ export const handle = {
 };
 
 export async function loader({ context }: Route.LoaderArgs) {
-  const c = context.get(appContext);
-  if (!c) {
-    throw new Error("App context not found");
-  }
-  return c;
+  const userStore = UserStore.make();
+  const users = await userStore.listUsers();
+  return { users };
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
-  const { user } = loaderData;
-  const placeholderUsers = [
-    { id: "1", email: "admin@ameliarescue.org", role: "admin" },
-    { id: "2", email: "user1@ameliarescue.org", role: "user" },
-    { id: "3", email: "user2@ameliarescue.org", role: "user" },
-  ];
-
+  const { users } = loaderData;
   return (
     <>
       <h1 className="mb-6 text-3xl font-bold">User Administration</h1>
@@ -42,9 +35,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
       <div className="bg-base-200 rounded-lg p-6 shadow">
         <h2 className="mb-4 text-xl font-semibold">Users</h2>
         <ul className="divide-base-300 divide-y">
-          {placeholderUsers.map((user) => (
+          {users.map((user) => (
             <li
-              key={user.id}
+              key={user.user_id}
               className="flex items-center justify-between py-3"
             >
               <div>

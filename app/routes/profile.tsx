@@ -6,9 +6,12 @@
  * event log of the stuff that you've done lately?
  */
 
-import { Link, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import type { Route } from "./+types/profile";
 import { appContext } from "~/context";
+import { useEffect, useState, useRef } from "react";
+import { ArkErrors, type } from "arktype";
+import { UserStore } from "~/lib/user-store";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
@@ -18,8 +21,44 @@ export async function loader({ context }: Route.LoaderArgs) {
   return { user: ctx.user };
 }
 
+export async function action({ request, context }: Route.ActionArgs) {
+  const ctx = context.get(appContext);
+  if (!ctx) {
+    throw new Error("No user found");
+  }
+  const formData = await request.formData();
+  const contactUpdateSchema = type({
+    phone: /^[\d\s\-\(\)\+]{1,20}$/,
+  });
+  const contact = contactUpdateSchema(Object.fromEntries(formData));
+  if (contact instanceof ArkErrors) {
+    return {
+      errors: contact.summary,
+    };
+  }
+
+  const store = UserStore.make();
+  await store.updateUser({
+    user_id: ctx.user.user_id,
+    phone: contact.phone,
+  });
+
+  return { success: true };
+}
+
 export default function Profile() {
   const { user } = useLoaderData<typeof loader>();
+  const ref = useRef<HTMLDialogElement>(null);
+  const contactFetcher = useFetcher<typeof action>();
+  const { success, errors } = contactFetcher.data || {};
+  // const [closeModal, setCloseModal] = useState(contactFetcher.state);
+
+  useEffect(() => {
+    if (success === true) {
+      ref.current?.close();
+    }
+  }, [success, errors]);
+
   return (
     <>
       <div className="card bg-base-100 shadow">
@@ -28,21 +67,23 @@ export default function Profile() {
             <div className="flex items-center gap-4">
               <div className="avatar avatar-placeholder">
                 <div className="bg-neutral text-neutral-content w-20 rounded-full">
-                  <span className="text-3xl">AR</span>
+                  <span className="text-3xl">
+                    {user.first_name[0]}
+                    {user.last_name[0]}
+                  </span>
                 </div>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
                   {user.first_name} {user.last_name}
                 </h1>
-                <p className="opacity-70">Member ID: 000123</p>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <span className="badge badge-primary">Provider</span>
-              <span className="badge">Driver Only</span>
-              <span className="badge badge-outline">Something else</span>
+              <span className="badge badge-primary">
+                {user.membership_status}
+              </span>
             </div>
           </div>
 
@@ -51,12 +92,21 @@ export default function Profile() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="card bg-base-200">
               <div className="card-body">
-                <h2 className="card-title text-base">Contact</h2>
+                <div className="flex items-center justify-between gap-4">
+                  <h2 className="card-title text-base">Contact</h2>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={() => ref.current?.showModal()}
+                  >
+                    Update Contact
+                  </button>
+                </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <dt className="opacity-70">Phone</dt>
-                  <dd className="font-medium">(555) 123-4567</dd>
+                  <dd className="font-medium">{user.phone}</dd>
                   <dt className="opacity-70">Email</dt>
-                  <dd className="font-medium">alex@example.com</dd>
+                  <dd className="font-medium">{user.email}</dd>
                   <dt className="opacity-70">Preferred</dt>
                   <dd className="font-medium">Text</dd>
                 </dl>
@@ -77,6 +127,55 @@ export default function Profile() {
               </div>
             </div>
           </div>
+
+          <dialog
+            ref={ref}
+            id="update_contact_modal"
+            className="modal modal-bottom sm:modal-middle"
+          >
+            <div className="modal-box">
+              <h3 className="text-lg font-bold">Update Contact Information</h3>
+
+              {errors && (
+                <div className="alert alert-error mt-4">
+                  <span>{errors}</span>
+                </div>
+              )}
+
+              <contactFetcher.Form method="post" className="space-y-4 py-4">
+                <div className="form-control w-full">
+                  <label className="label">
+                    <span className="label-text">Phone Number</span>
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    defaultValue={user.phone}
+                    className="input input-bordered w-full"
+                    placeholder="(555) 123-4567"
+                    required
+                  />
+                </div>
+
+                <div className="modal-action">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => ref.current?.close()}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={contactFetcher.state === "submitting"}
+                    type="submit"
+                    className="btn btn-primary"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </contactFetcher.Form>
+            </div>
+          </dialog>
         </div>
       </div>
 

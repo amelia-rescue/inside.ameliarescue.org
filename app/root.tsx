@@ -16,14 +16,6 @@ import { authMiddleware } from "./middleware/auth";
 import { requestLogger } from "./middleware/logger";
 import { appContext } from "./context";
 
-// const requestLogger: Route.MiddlewareFunction = async function (
-//   { request, context },
-//   next,
-// ) {
-//   console.log(request.method, request.url);
-//   return await next();
-// };
-
 export const middleware: Route.MiddlewareFunction[] = [
   requestLogger,
   authMiddleware,
@@ -53,7 +45,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const data = useRouteLoaderData<typeof loader>("root");
   const error = useRouteError();
   return (
-    <html lang="en" data-theme="retro">
+    <html lang="en" data-theme="forest">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
