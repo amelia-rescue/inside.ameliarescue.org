@@ -1,16 +1,39 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authMiddleware } from "./auth";
 import { appContext } from "~/context";
+import { setupDynamo, teardownDynamo } from "~/lib/dynamo-local";
+import { afterEach } from "node:test";
+import type { SessionUser } from "~/lib/session.server";
+import { UserStore, type User } from "~/lib/user-store";
 
 vi.mock("~/lib/session.server", () => ({
   requireUser: vi.fn(),
 }));
 
+const testUser: User = {
+  user_id: crypto.randomUUID(),
+  email: "test@example.com",
+  first_name: "Test",
+  last_name: "User",
+  role: "admin",
+};
+
+vi.mock("~/lib/user-store", () => ({
+  UserStore: {
+    make: vi.fn(() => {
+      return {
+        getUser: vi.fn(async () => testUser),
+      };
+    }),
+  },
+}));
+
 describe("authMiddleware", () => {
   it("get's the user from the session", async () => {
     const { requireUser } = await import("~/lib/session.server");
-    const user = { id: "user_1" } as any;
-    vi.mocked(requireUser).mockResolvedValue(user);
+    vi.mocked(requireUser).mockResolvedValue({
+      user_id: testUser.user_id,
+    } as SessionUser);
 
     const context = {
       set: vi.fn(),
@@ -27,6 +50,6 @@ describe("authMiddleware", () => {
     expect(result).toBeDefined();
 
     expect(requireUser).toHaveBeenCalledWith(expect.any(Request));
-    expect(context.set).toHaveBeenCalledWith(appContext, { user });
+    expect(context.set).toHaveBeenCalledWith(appContext, { user: testUser });
   });
 });

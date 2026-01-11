@@ -1,6 +1,7 @@
 import { requireUser } from "~/lib/session.server";
 import type { Route } from "../+types/root";
 import { appContext } from "~/context";
+import { UserStore } from "~/lib/user-store";
 
 export const authMiddleware: Route.MiddlewareFunction = async function (
   { request, context },
@@ -10,7 +11,9 @@ export const authMiddleware: Route.MiddlewareFunction = async function (
   if (excludedPaths.includes(new URL(request.url).pathname)) {
     return await next();
   }
-  const user = await requireUser(request);
+  const sessionUser = await requireUser(request);
+  const userStore = UserStore.make();
+  const user = await userStore.getUser(sessionUser.user_id);
   context.set(appContext, {
     user,
   });

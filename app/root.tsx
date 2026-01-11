@@ -74,7 +74,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <div className="avatar placeholder">
                         <div className="bg-neutral text-neutral-content flex w-10 items-center justify-center rounded-full">
                           <span className="text-xl">
-                            {data.user.givenName.charAt(0)}
+                            {data.user.first_name.charAt(0)}
                           </span>
                         </div>
                       </div>

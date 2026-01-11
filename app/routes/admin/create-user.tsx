@@ -42,27 +42,41 @@ export async function action({ request }: Route.ActionArgs) {
     return data({ error: user.summary, formValues }, { status: 400 });
   }
 
-  const store = UserStore.make();
-  await store.createUser(user);
+  try {
+    const store = UserStore.make();
+    await store.createUser(user);
+  } catch (error) {
+    if (error instanceof Error) {
+      return data({ error: error.message, formValues }, { status: 500 });
+    }
+    throw error;
+  }
 
   return { success: true };
 }
 
 export default function CreateUser({ loaderData }: Route.ComponentProps) {
-  const actionData = useActionData<typeof action>();
   const { user } = loaderData;
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<typeof action>();
   return (
     <div className="mx-auto w-full max-w-2xl">
       <div className="card bg-base-100 shadow-lg">
         <div className="card-body">
           <h2 className="card-title mb-4">New User Information</h2>
 
-          {actionData && "error" in actionData && (
+          {fetcher.data && "error" in fetcher.data && (
             <div className="alert alert-error mb-4">
-              <span>{actionData.error}</span>
+              <span>{fetcher.data.error}</span>
             </div>
           )}
+
+          {fetcher.data &&
+            "success" in fetcher.data &&
+            fetcher.data.success && (
+              <div className="alert alert-success mb-4">
+                <span>User created successfully!</span>
+              </div>
+            )}
 
           <fetcher.Form method="post" className="space-y-6">
             <div className="form-control w-full">

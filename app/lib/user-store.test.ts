@@ -10,7 +10,13 @@ import {
 import type { DynaliteServer } from "dynalite";
 import { setupDynamo, teardownDynamo } from "./dynamo-local";
 
-const cognitoSendSpy = vi.fn().mockResolvedValue({});
+const cognitoSendSpy = vi.fn().mockImplementation(async () => {
+  return {
+    User: {
+      Username: crypto.randomUUID(),
+    },
+  };
+});
 const cognitoClientCtorSpy = vi.fn().mockImplementation(() => {
   return {
     send: cognitoSendSpy,
@@ -49,7 +55,7 @@ describe("user store test", () => {
   it("should be able to create and get a user", async () => {
     const store = UserStore.make();
 
-    const { temporary_password, user_id } = await store.createUser({
+    const { user_id } = await store.createUser({
       first_name: "Test",
       last_name: "User",
       email: "test@example.com",
@@ -61,8 +67,22 @@ describe("user store test", () => {
     expect(cognitoSendSpy).toHaveBeenCalledWith({
       input: {
         TemporaryPassword: expect.any(String),
-        Username: expect.any(String),
+        Username: "test@example.com",
         UserPoolId: "test-user-pool",
+        UserAttributes: [
+          {
+            Name: "email",
+            Value: "test@example.com",
+          },
+          {
+            Name: "given_name",
+            Value: "Test",
+          },
+          {
+            Name: "family_name",
+            Value: "User",
+          },
+        ],
       },
     });
 
@@ -75,9 +95,6 @@ describe("user store test", () => {
       email: "test@example.com",
       role: "admin",
     });
-
-    expect((user as any).temporary_password).toBeUndefined();
-    expect(temporary_password).toHaveLength(10);
   });
 
   it("should be able to create and get a user 2", async () => {

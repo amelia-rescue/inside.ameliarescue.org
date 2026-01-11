@@ -6,9 +6,20 @@
  * event log of the stuff that you've done lately?
  */
 
-import { Link } from "react-router";
+import { Link, useLoaderData } from "react-router";
+import type { Route } from "./+types/profile";
+import { appContext } from "~/context";
+
+export async function loader({ context }: Route.LoaderArgs) {
+  const ctx = context.get(appContext);
+  if (!ctx) {
+    throw new Error("No user found");
+  }
+  return { user: ctx.user };
+}
 
 export default function Profile() {
+  const { user } = useLoaderData<typeof loader>();
   return (
     <>
       <div className="card bg-base-100 shadow">
@@ -21,7 +32,9 @@ export default function Profile() {
                 </div>
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Alex Rescuer</h1>
+                <h1 className="text-2xl font-bold">
+                  {user.first_name} {user.last_name}
+                </h1>
                 <p className="opacity-70">Member ID: 000123</p>
               </div>
             </div>

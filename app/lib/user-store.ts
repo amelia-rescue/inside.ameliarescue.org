@@ -97,15 +97,13 @@ export class UserStore {
     return response.Item as unknown as DocumentUser;
   }
 
-  public async createUser(
-    user: Omit<User, "user_id">,
-  ): Promise<DocumentUser & { temporary_password: string }> {
+  public async createUser(user: Omit<User, "user_id">): Promise<DocumentUser> {
     const temporary_password = this.generatePassword();
-    const user_id = crypto.randomUUID();
-    await UserStore.cognito.send(
+
+    const cognitoResponse = await UserStore.cognito.send(
       new AdminCreateUserCommand({
         UserPoolId: this.cognitoUserPoolId,
-        Username: user_id,
+        Username: user.email,
         UserAttributes: [
           {
             Name: "email",
@@ -124,7 +122,16 @@ export class UserStore {
       }),
     );
 
-    const documentUser = {
+    if (!cognitoResponse.User?.Username) {
+      throw new Error("Failed to create user in Cognito");
+    }
+
+    // when creating a user the username must be an email
+    // when retrieving a user the username is the user_id
+    // nice job AWS...
+    const user_id = cognitoResponse.User.Username;
+
+    const documentUser: DocumentUser = {
       ...user,
       user_id,
       created_at: new Date().toISOString(),
@@ -136,11 +143,7 @@ export class UserStore {
       Item: documentUser,
     });
     await UserStore.client.send(command);
-    return {
-      ...documentUser,
-      // hopefully an email will be sent automatically and I can remove this
-      temporary_password,
-    };
+    return documentUser;
   }
 
   public async listUsers(includeDeleted = false): Promise<DocumentUser[]> {

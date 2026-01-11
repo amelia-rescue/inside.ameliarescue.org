@@ -17,12 +17,8 @@ export const sessionStorage = createCookieSessionStorage({
 });
 
 export interface SessionUser {
-  id: string;
-  email: string;
-  givenName: string;
-  familyName: string;
+  user_id: string;
   accessToken: string;
-  idToken: string;
   expiresAt: number;
 }
 

@@ -6,6 +6,8 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
+import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
+import * as apigatewayv2Integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cognito from "aws-cdk-lib/aws-cognito";
@@ -177,9 +179,43 @@ export class CdkStack extends cdk.Stack {
 
     usersTable.grantReadWriteData(lambdaFunction);
 
-    // Create Function URL for the Lambda
-    const functionUrl = lambdaFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
+    // Grant Lambda permissions to manage Cognito users
+    userPool.grant(
+      lambdaFunction,
+      "cognito-idp:AdminCreateUser",
+      "cognito-idp:AdminSetUserPassword",
+      "cognito-idp:AdminUpdateUserAttributes",
+      "cognito-idp:AdminGetUser",
+      "cognito-idp:AdminDeleteUser",
+    );
+
+    // Create API Gateway HTTP API
+    // Note: No CORS configuration needed since CloudFront sits in front
+    const httpApi = new apigatewayv2.HttpApi(this, "HttpApi", {
+      apiName: "inside-amelia-rescue-api",
+      description: "API Gateway for React Router Lambda",
+    });
+
+    // Create Lambda integration
+    const lambdaIntegration =
+      new apigatewayv2Integrations.HttpLambdaIntegration(
+        "LambdaIntegration",
+        lambdaFunction,
+      );
+
+    // Add default catch-all route to API Gateway
+    // This single route handles all paths and methods
+    httpApi.addRoutes({
+      path: "/{proxy+}",
+      methods: [apigatewayv2.HttpMethod.ANY],
+      integration: lambdaIntegration,
+    });
+
+    // Add root path route (/{proxy+} doesn't match root)
+    httpApi.addRoutes({
+      path: "/",
+      methods: [apigatewayv2.HttpMethod.ANY],
+      integration: lambdaIntegration,
     });
 
     // Create S3 bucket for static assets
@@ -194,7 +230,15 @@ export class CdkStack extends cdk.Stack {
     // Create CloudFront distribution (needs to be created before User Pool Client for callback URLs)
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
-        origin: new origins.FunctionUrlOrigin(functionUrl),
+        origin: new origins.HttpOrigin(
+          cdk.Fn.select(2, cdk.Fn.split("/", httpApi.apiEndpoint)),
+          {
+            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+            customHeaders: {
+              "X-Forwarded-Host": appDomainName,
+            },
+          },
+        ),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
@@ -267,6 +311,10 @@ export class CdkStack extends cdk.Stack {
     // to avoid circular dependency with CloudFront distribution
 
     // Outputs
+    new cdk.CfnOutput(this, "ApiGatewayEndpoint", {
+      value: httpApi.apiEndpoint,
+    });
+
     new cdk.CfnOutput(this, "DistributionDomainName", {
       value: distribution.domainName,
     });

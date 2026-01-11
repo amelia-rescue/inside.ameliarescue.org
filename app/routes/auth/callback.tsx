@@ -43,12 +43,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // Create user session
     return createUserSession(
       {
-        id: (userInfo.sub as string) || "",
-        email: (userInfo.email as string) || "",
-        givenName: (userInfo.given_name as string) || "",
-        familyName: (userInfo.family_name as string) || "",
+        user_id: userInfo.sub as string,
         accessToken: tokens.access_token,
-        idToken: tokens.id_token || "",
         expiresAt,
       },
       redirectTo,
