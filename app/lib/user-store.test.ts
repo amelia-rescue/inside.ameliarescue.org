@@ -45,6 +45,7 @@ describe("user store test", () => {
     cognitoClientCtorSpy.mockClear();
     dynamo = await setupDynamo({
       tableName: "aes_users",
+      partitionKey: "user_id",
     });
   });
 

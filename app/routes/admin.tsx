@@ -26,9 +26,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     <>
       <h1 className="mb-6 text-3xl font-bold">User Administration</h1>
 
-      <div className="mb-6">
+      <div className="mb-6 flex gap-4">
         <Link to="/admin/create-user" className="btn btn-primary">
           Create New User
+        </Link>
+        <Link
+          to="/admin/create-certification-type"
+          className="btn btn-secondary"
+        >
+          Create Certification Type
         </Link>
       </div>
 

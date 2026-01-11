@@ -51,7 +51,23 @@ export default function Profile() {
   const ref = useRef<HTMLDialogElement>(null);
   const contactFetcher = useFetcher<typeof action>();
   const { success, errors } = contactFetcher.data || {};
-  // const [closeModal, setCloseModal] = useState(contactFetcher.state);
+  const [phoneValue, setPhoneValue] = useState(user.phone);
+
+  const formatPhoneNumber = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length <= 3) {
+      return numbers;
+    }
+    if (numbers.length <= 6) {
+      return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    }
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6, 10)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setPhoneValue(formatted);
+  };
 
   useEffect(() => {
     if (success === true) {
@@ -150,9 +166,10 @@ export default function Profile() {
                   <input
                     type="tel"
                     name="phone"
-                    defaultValue={user.phone}
+                    value={phoneValue}
+                    onChange={handlePhoneChange}
                     className="input input-bordered w-full"
-                    placeholder="(555) 123-4567"
+                    placeholder="555-123-4567"
                     required
                   />
                 </div>

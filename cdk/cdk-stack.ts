@@ -134,6 +134,40 @@ export class CdkStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const certificationTypesTable = new dynamodb.Table(
+      this,
+      "CertificationTypesTable",
+      {
+        tableName: "aes_certification_types",
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        partitionKey: {
+          name: "name",
+          type: dynamodb.AttributeType.STRING,
+        },
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    const userCertificationsTable = new dynamodb.Table(
+      this,
+      "UserCertificationsTable",
+      {
+        tableName: "aes_user_certifications",
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        partitionKey: {
+          name: "certification_id",
+          type: dynamodb.AttributeType.STRING,
+        },
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    userCertificationsTable.addGlobalSecondaryIndex({
+      indexName: "UserIdIndex",
+      partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "uploaded_at", type: dynamodb.AttributeType.STRING },
+    });
+
     // Create CloudWatch log group for Lambda function
     const logGroup = new logs.LogGroup(this, "ReactRouterHandlerLogs", {
       logGroupName: "/aws/lambda/inside-amelia-rescue",
@@ -173,11 +207,15 @@ export class CdkStack extends cdk.Stack {
           SESSION_SECRET: `session-secret-${cdk.Stack.of(this).account}`,
           APP_URL: `https://${appDomainName}`,
           USERS_TABLE_NAME: usersTable.tableName,
+          CERTIFICATION_TYPES_TABLE_NAME: certificationTypesTable.tableName,
+          USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
         },
       },
     );
 
     usersTable.grantReadWriteData(lambdaFunction);
+    certificationTypesTable.grantReadWriteData(lambdaFunction);
+    userCertificationsTable.grantReadWriteData(lambdaFunction);
 
     // Grant Lambda permissions to manage Cognito users
     userPool.grant(
@@ -329,6 +367,14 @@ export class CdkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "UsersTableName", {
       value: usersTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "CertificationTypesTableName", {
+      value: certificationTypesTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "UserCertificationsTableName", {
+      value: userCertificationsTable.tableName,
     });
 
     new cdk.CfnOutput(this, "CognitoHostedUIUrl", {

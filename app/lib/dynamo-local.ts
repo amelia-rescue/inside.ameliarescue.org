@@ -6,9 +6,18 @@ import {
 import dynalite, { type DynaliteServer } from "dynalite";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
-export async function setupDynamo(schema: {
-  tableName: string;
-}): Promise<DynaliteServer> {
+export async function setupDynamo(
+  ...schemas: Array<{
+    tableName: string;
+    partitionKey: string;
+    sortKey?: string;
+    gsi?: Array<{
+      indexName: string;
+      partitionKey: string;
+      sortKey?: string;
+    }>;
+  }>
+): Promise<DynaliteServer> {
   let dynaliteServer: DynaliteServer;
 
   dynaliteServer = dynalite({
@@ -31,54 +40,117 @@ export async function setupDynamo(schema: {
     },
   });
 
-  // will this throw if the table already exists?
-  await dynamoDbClient.send(
-    new CreateTableCommand({
-      TableName: schema.tableName,
-      KeySchema: [
-        {
-          AttributeName: "user_id",
-          KeyType: "HASH",
-        },
-      ],
-      AttributeDefinitions: [
-        {
-          AttributeName: "user_id",
-          AttributeType: "S",
-        },
-      ],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
+  for (const schema of schemas) {
+    const attributeDefinitions = [
+      {
+        AttributeName: schema.partitionKey,
+        AttributeType: "S",
+      },
+    ];
 
-  await Promise.race([
-    // 500 ms timeout to create the table
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Table creation timeout")), 500);
-    }),
+    const keySchema = [
+      {
+        AttributeName: schema.partitionKey,
+        KeyType: "HASH",
+      },
+    ];
 
-    // poll for table creation every 25ms for 20 attempts (500ms total)
-    new Promise(async (resolve) => {
-      for (let attempt = 0; attempt < 20; attempt++) {
-        try {
-          const res = await dynamoDbClient.send(
-            new DescribeTableCommand({ TableName: schema.tableName }),
-          );
-          if (
-            res.Table?.TableStatus === "ACTIVE" ||
-            res.Table?.TableStatus == null
-          ) {
-            resolve(undefined);
-            break;
-          }
-        } catch {
-          // ignore until table exists
+    if (schema.sortKey) {
+      attributeDefinitions.push({
+        AttributeName: schema.sortKey,
+        AttributeType: "S",
+      });
+      keySchema.push({
+        AttributeName: schema.sortKey,
+        KeyType: "RANGE",
+      });
+    }
+
+    if (schema.gsi) {
+      for (const gsi of schema.gsi) {
+        if (
+          !attributeDefinitions.find(
+            (a) => a.AttributeName === gsi.partitionKey,
+          )
+        ) {
+          attributeDefinitions.push({
+            AttributeName: gsi.partitionKey,
+            AttributeType: "S",
+          });
         }
-
-        await new Promise((r) => setTimeout(r, 25));
+        if (
+          gsi.sortKey &&
+          !attributeDefinitions.find((a) => a.AttributeName === gsi.sortKey)
+        ) {
+          attributeDefinitions.push({
+            AttributeName: gsi.sortKey,
+            AttributeType: "S",
+          });
+        }
       }
-    }),
-  ]);
+    }
+
+    const createTableCommand: any = {
+      TableName: schema.tableName,
+      KeySchema: keySchema,
+      AttributeDefinitions: attributeDefinitions,
+      BillingMode: "PAY_PER_REQUEST",
+    };
+
+    if (schema.gsi) {
+      createTableCommand.GlobalSecondaryIndexes = schema.gsi.map((gsi) => ({
+        IndexName: gsi.indexName,
+        KeySchema: [
+          {
+            AttributeName: gsi.partitionKey,
+            KeyType: "HASH",
+          },
+          ...(gsi.sortKey
+            ? [
+                {
+                  AttributeName: gsi.sortKey,
+                  KeyType: "RANGE",
+                },
+              ]
+            : []),
+        ],
+        Projection: {
+          ProjectionType: "ALL",
+        },
+      }));
+    }
+
+    await dynamoDbClient.send(new CreateTableCommand(createTableCommand));
+
+    await Promise.race([
+      // 500 ms timeout to create the table
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Table creation timeout")), 500);
+      }),
+
+      // poll for table creation every 25ms for 20 attempts (500ms total)
+      new Promise(async (resolve) => {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          try {
+            const res = await dynamoDbClient.send(
+              new DescribeTableCommand({ TableName: schema.tableName }),
+            );
+            if (
+              res.Table?.TableStatus === "ACTIVE" ||
+              res.Table?.TableStatus == null
+            ) {
+              resolve(undefined);
+              break;
+            }
+          } catch {
+            // ignore until table exists
+          }
+
+          await new Promise((r) => setTimeout(r, 25));
+        }
+      }),
+    ]);
+  }
 
   return dynaliteServer;
 }

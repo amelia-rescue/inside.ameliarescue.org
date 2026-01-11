@@ -8,7 +8,13 @@ import {
 export default [
   index("./routes/_index.tsx"),
   route("admin", "./routes/admin.tsx"),
-  route("admin/create-user", "./routes/admin/create-user.tsx"),
+  ...prefix("admin", [
+    route("create-user", "./routes/admin/create-user.tsx"),
+    route(
+      "create-certification-type",
+      "./routes/admin/create-certification-type.tsx",
+    ),
+  ]),
   route("account/security", "./routes/account.security.tsx"),
   route("roster", "./routes/roster.tsx"),
   route("training-status", "./routes/training-status.tsx"),
