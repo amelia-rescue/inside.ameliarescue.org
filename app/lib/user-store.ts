@@ -6,13 +6,13 @@ import {
   PutCommand,
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { DYNALITE_ENDPOINT, type DynaliteEndpoint } from "./util";
 import {
   AdminCreateUserCommand,
   CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { randomBytes } from "crypto";
 import { type } from "arktype";
+import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
 export const userSchema = type({
   user_id: "string",

@@ -4,9 +4,7 @@ import {
   DynamoDBClient,
 } from "@aws-sdk/client-dynamodb";
 import dynalite, { type DynaliteServer } from "dynalite";
-
-export const DYNALITE_ENDPOINT = "http://localhost:10420" as const;
-export type DynaliteEndpoint = typeof DYNALITE_ENDPOINT;
+import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
 export async function setupDynamo(schema: {
   tableName: string;

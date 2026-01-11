@@ -8,7 +8,7 @@ import {
   vi,
 } from "vitest";
 import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "./util";
+import { setupDynamo, teardownDynamo } from "./dynamo-local";
 
 const cognitoSendSpy = vi.fn().mockResolvedValue({});
 const cognitoClientCtorSpy = vi.fn().mockImplementation(() => {
