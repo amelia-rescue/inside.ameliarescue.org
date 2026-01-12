@@ -49,8 +49,14 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
               <div>
                 <span className="font-medium">{user.email}</span>
               </div>
-              <div>
+              <div className="flex items-center gap-3">
                 <span className="badge badge-neutral">{user.role}</span>
+                <Link
+                  to={`/admin/update-user/${user.user_id}`}
+                  className="btn btn-sm btn-ghost"
+                >
+                  Edit
+                </Link>
               </div>
             </li>
           ))}

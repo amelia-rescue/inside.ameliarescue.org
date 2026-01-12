@@ -14,6 +14,7 @@ export default [
       "create-certification-type",
       "./routes/admin/create-certification-type.tsx",
     ),
+    route("update-user/:user_id", "./routes/admin/update-user.tsx"),
   ]),
   route("account/security", "./routes/account.security.tsx"),
   route("roster", "./routes/roster.tsx"),

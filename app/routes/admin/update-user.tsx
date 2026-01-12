@@ -1,30 +1,34 @@
-import { data, Link, useActionData, useFetcher } from "react-router";
-import type { Route } from "./+types/create-user";
+import { data, Link, useFetcher, redirect } from "react-router";
+import type { Route } from "./+types/update-user";
 import { appContext } from "~/context";
 import { userSchema, UserStore } from "~/lib/user-store";
 import { type } from "arktype";
-import { IoInformationCircle } from "react-icons/io5";
+import { useEffect, useState } from "react";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Create User - Admin - Amelia Rescue" },
-    { name: "description", content: "Create a new user" },
+    { title: "Update User - Admin - Amelia Rescue" },
+    { name: "description", content: "Update user information" },
   ];
 }
 
 export const handle = {
-  breadcrumb: "Create User",
+  breadcrumb: "Update User",
 };
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ context, params }: Route.LoaderArgs) {
   const c = context.get(appContext);
   if (!c) {
     throw new Error("App context not found");
   }
-  return c;
+
+  const store = UserStore.make();
+  const user = await store.getUser(params.user_id);
+
+  return { ...c, user };
 }
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, params }: Route.ActionArgs) {
   const formData = await request.formData();
   const formValues = {
     email: formData.get("email"),
@@ -35,20 +39,40 @@ export async function action({ request }: Route.ActionArgs) {
     certification_level: formData.get("certification_level"),
   };
 
+  if (
+    formValues.membership_status.includes("junior") &&
+    formValues.membership_status.length > 1
+  ) {
+    return data(
+      {
+        success: false,
+        error: "Junior members cannot be providers or drivers",
+      },
+      { status: 400 },
+    );
+  }
+
   const user = userSchema({
-    user_id: crypto.randomUUID(),
+    user_id: params.user_id,
     ...formValues,
   });
+
   if (user instanceof type.errors) {
-    return data({ error: user.summary, formValues }, { status: 400 });
+    return data(
+      { success: false, error: user.summary, formValues },
+      { status: 400 },
+    );
   }
 
   try {
     const store = UserStore.make();
-    await store.createUser(user);
+    await store.updateUser(user);
   } catch (error) {
     if (error instanceof Error) {
-      return data({ error: error.message, formValues }, { status: 500 });
+      return data(
+        { success: false, error: error.message, formValues },
+        { status: 500 },
+      );
     }
     throw error;
   }
@@ -56,22 +80,26 @@ export async function action({ request }: Route.ActionArgs) {
   return { success: true };
 }
 
-export default function CreateUser({ loaderData }: Route.ComponentProps) {
+export default function UpdateUser({ loaderData }: Route.ComponentProps) {
   const { user } = loaderData;
   const fetcher = useFetcher<typeof action>();
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
+  useEffect(() => {
+    if (fetcher.data?.success === true && fetcher.state === "idle") {
+      setShowSuccessMessage(true);
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [fetcher.data?.success, fetcher.state]);
+
   return (
     <div className="mx-auto w-full max-w-2xl">
       <div className="card bg-base-100 shadow-lg">
         <div className="card-body">
-          <h2 className="card-title mb-4">New User Information</h2>
-
-          <div className="alert alert-info mb-4">
-            <IoInformationCircle className="h-6 w-6 shrink-0" />
-            <span>
-              New users will automatically receive an email with a temporary
-              password.
-            </span>
-          </div>
+          <h2 className="card-title mb-4">Update User Information</h2>
 
           {fetcher.data && "error" in fetcher.data && (
             <div className="alert alert-error mb-4">
@@ -79,13 +107,11 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
             </div>
           )}
 
-          {fetcher.data &&
-            "success" in fetcher.data &&
-            fetcher.data.success && (
-              <div className="alert alert-success mb-4">
-                <span>User created successfully!</span>
-              </div>
-            )}
+          {showSuccessMessage && (
+            <div className="alert alert-success mb-4">
+              <span>User updated successfully!</span>
+            </div>
+          )}
 
           <fetcher.Form method="post" className="space-y-6">
             <div className="form-control w-full">
@@ -95,6 +121,7 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
               <input
                 type="email"
                 name="email"
+                defaultValue={user.email}
                 placeholder="user@ameliarescue.org"
                 className="input input-bordered w-full"
                 autoComplete="off"
@@ -109,6 +136,7 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
               <input
                 type="text"
                 name="first_name"
+                defaultValue={user.first_name}
                 placeholder="John"
                 className="input input-bordered w-full"
                 autoComplete="off"
@@ -123,6 +151,7 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
               <input
                 type="text"
                 name="last_name"
+                defaultValue={user.last_name}
                 placeholder="Doe"
                 className="input input-bordered w-full"
                 autoComplete="off"
@@ -136,6 +165,7 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
               </label>
               <select
                 name="role"
+                defaultValue={user.role}
                 className="select select-bordered w-full"
                 required
               >
@@ -155,6 +185,11 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                     type="checkbox"
                     name="membership_status"
                     value="provider"
+                    defaultChecked={
+                      Array.isArray(user.membership_status)
+                        ? user.membership_status.includes("provider")
+                        : user.membership_status === "provider"
+                    }
                     className="checkbox"
                   />
                   <span>Provider</span>
@@ -164,15 +199,25 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                     type="checkbox"
                     name="membership_status"
                     value="driver"
+                    defaultChecked={
+                      Array.isArray(user.membership_status)
+                        ? user.membership_status.includes("driver")
+                        : user.membership_status === "driver"
+                    }
                     className="checkbox"
                   />
-                  <span>Driver</span>
+                  <span>Driver Only</span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-3">
                   <input
                     type="checkbox"
                     name="membership_status"
                     value="junior"
+                    defaultChecked={
+                      Array.isArray(user.membership_status)
+                        ? user.membership_status.includes("junior")
+                        : user.membership_status === "junior"
+                    }
                     className="checkbox"
                   />
                   <span>Junior</span>
@@ -186,6 +231,7 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
               </label>
               <select
                 name="certification_level"
+                defaultValue={user.certification_level}
                 className="select select-bordered w-full"
                 required
               >
@@ -203,7 +249,11 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                 Cancel
               </Link>
               <button type="submit" className="btn btn-success">
-                Create User
+                {fetcher.state === "idle" ? (
+                  "Update User"
+                ) : (
+                  <span className="loading loading-spinner loading-xs"></span>
+                )}
               </button>
             </div>
           </fetcher.Form>

@@ -21,7 +21,7 @@ export const userSchema = type({
   email: "string",
   role: "'admin' | 'user'",
   "phone?": "string",
-  "membership_status?": "'provider' | 'driver_only' | 'junior'",
+  "membership_status?": "('provider' | 'driver' | 'junior')[]",
   "certification_level?":
     "'cpr' | 'basic' | 'advanced' | 'intermediate' | 'paramedic'",
   "cpr_certification_url?": "string",
@@ -30,6 +30,7 @@ export const userSchema = type({
   "certifications?": "string[]",
   "recentActivity?": "string[]",
 });
+userSchema.onUndeclaredKey("delete");
 
 export type User = typeof userSchema.infer;
 
