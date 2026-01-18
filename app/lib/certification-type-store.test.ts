@@ -33,6 +33,7 @@ describe("certification type store test", () => {
     const certificationType = await store.createCertificationType({
       name: "EMT-Basic",
       description: "Emergency Medical Technician - Basic Level",
+      expires: true,
     });
 
     expect(certificationType).toMatchObject({
@@ -65,12 +66,14 @@ describe("certification type store test", () => {
     await store.createCertificationType({
       name: "EMT-Basic",
       description: "Emergency Medical Technician - Basic Level",
+      expires: true,
     });
 
     await expect(
       store.createCertificationType({
         name: "EMT-Basic",
         description: "Duplicate description",
+        expires: true,
       }),
     ).rejects.toBeInstanceOf(CertificationTypeAlreadyExists);
   });
@@ -79,14 +82,27 @@ describe("certification type store test", () => {
     const store = CertificationTypeStore.make();
 
     const typesToCreate = [
-      { name: "EMT-Basic", description: "Basic EMT certification" },
+      {
+        name: "EMT-Basic",
+        description: "Basic EMT certification",
+        expires: true,
+      },
       {
         name: "EMT-Intermediate",
         description: "Intermediate EMT certification",
+        expires: true,
       },
-      { name: "EMT-Paramedic", description: "Paramedic certification" },
-      { name: "CPR", description: "CPR certification" },
-      { name: "EVOC", description: "Emergency Vehicle Operations Course" },
+      {
+        name: "EMT-Paramedic",
+        description: "Paramedic certification",
+        expires: true,
+      },
+      { name: "CPR", description: "CPR certification", expires: true },
+      {
+        name: "EVOC",
+        description: "Emergency Vehicle Operations Course",
+        expires: true,
+      },
     ];
 
     await Promise.all(
@@ -117,6 +133,7 @@ describe("certification type store test", () => {
     const certificationType = await store.createCertificationType({
       name: "EMT-Super/Paramedic (Advanced)",
       description: "Advanced certification with special characters",
+      expires: true,
     });
 
     expect(certificationType.name).toBe("EMT-Super/Paramedic (Advanced)");

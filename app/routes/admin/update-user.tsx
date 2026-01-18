@@ -2,8 +2,14 @@ import { data, Link, useFetcher, redirect } from "react-router";
 import type { Route } from "./+types/update-user";
 import { appContext } from "~/context";
 import { userSchema, UserStore } from "~/lib/user-store";
+import {
+  CertificationTypeStore,
+  type CertificationType,
+} from "~/lib/certification-type-store";
 import { type } from "arktype";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { CertificationStore } from "~/lib/certification-store";
+import { FiExternalLink } from "react-icons/fi";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -25,13 +31,14 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   const store = UserStore.make();
   const user = await store.getUser(params.user_id);
 
-  return { ...c, user };
+  const tableData = await getTableData(user.user_id);
+
+  return { ...c, user, tableData };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
   const formData = await request.formData();
   const formValues = {
-    email: formData.get("email"),
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name"),
     role: formData.get("role"),
@@ -52,8 +59,12 @@ export async function action({ request, params }: Route.ActionArgs) {
     );
   }
 
+  const store = UserStore.make();
+  const existingUser = await store.getUser(params.user_id);
+
   const user = userSchema({
     user_id: params.user_id,
+    email: existingUser.email,
     ...formValues,
   });
 
@@ -65,7 +76,6 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   try {
-    const store = UserStore.make();
     await store.updateUser(user);
   } catch (error) {
     if (error instanceof Error) {
@@ -81,7 +91,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function UpdateUser({ loaderData }: Route.ComponentProps) {
-  const { user } = loaderData;
+  const { user, tableData } = loaderData;
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
@@ -123,9 +133,10 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                 name="email"
                 defaultValue={user.email}
                 placeholder="user@ameliarescue.org"
-                className="input input-bordered w-full"
+                className="input input-bordered w-full cursor-not-allowed opacity-60"
                 autoComplete="off"
                 required
+                readOnly
               />
             </div>
 
@@ -191,6 +202,18 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                         : user.membership_status === "provider"
                     }
                     className="checkbox"
+                    required
+                    onChange={(e) => {
+                      const checkboxes = document.querySelectorAll(
+                        'input[name="membership_status"]',
+                      ) as NodeListOf<HTMLInputElement>;
+                      const isAnyChecked = Array.from(checkboxes).some(
+                        (cb) => cb.checked,
+                      );
+                      checkboxes.forEach((cb) => {
+                        cb.required = !isAnyChecked;
+                      });
+                    }}
                   />
                   <span>Provider</span>
                 </label>
@@ -205,8 +228,20 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                         : user.membership_status === "driver"
                     }
                     className="checkbox"
+                    required
+                    onChange={(e) => {
+                      const checkboxes = document.querySelectorAll(
+                        'input[name="membership_status"]',
+                      ) as NodeListOf<HTMLInputElement>;
+                      const isAnyChecked = Array.from(checkboxes).some(
+                        (cb) => cb.checked,
+                      );
+                      checkboxes.forEach((cb) => {
+                        cb.required = !isAnyChecked;
+                      });
+                    }}
                   />
-                  <span>Driver Only</span>
+                  <span>Driver</span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-3">
                   <input
@@ -219,6 +254,18 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                         : user.membership_status === "junior"
                     }
                     className="checkbox"
+                    required
+                    onChange={(e) => {
+                      const checkboxes = document.querySelectorAll(
+                        'input[name="membership_status"]',
+                      ) as NodeListOf<HTMLInputElement>;
+                      const isAnyChecked = Array.from(checkboxes).some(
+                        (cb) => cb.checked,
+                      );
+                      checkboxes.forEach((cb) => {
+                        cb.required = !isAnyChecked;
+                      });
+                    }}
                   />
                   <span>Junior</span>
                 </label>
@@ -258,6 +305,263 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
             </div>
           </fetcher.Form>
         </div>
+      </div>
+
+      <div className="rounded-box border-base-content/5 bg-base-100 mt-6 overflow-x-auto border">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Certification</th>
+              <th>Description</th>
+              <th>Uploaded Document</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableData.map((certType) => (
+              <tr key={certType.name}>
+                <td>{certType.name}</td>
+                <td>{certType.description}</td>
+                <td>
+                  {certType.existing_cert?.file_url ? (
+                    <a
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      href={certType.existing_cert.file_url}
+                      className="inline-flex items-center gap-1"
+                    >
+                      View <FiExternalLink className="inline" />
+                    </a>
+                  ) : (
+                    "Not uploaded"
+                  )}
+                </td>
+                <td>
+                  {certType.existing_cert?.file_url ? (
+                    <UploadModal
+                      buttonText="Replace"
+                      certType={certType}
+                      userId={user.user_id}
+                    />
+                  ) : (
+                    <UploadModal
+                      buttonText="Upload"
+                      certType={certType}
+                      userId={user.user_id}
+                    />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function UploadModal(props: {
+  buttonText: string;
+  certType: CertificationType;
+  userId: string;
+}) {
+  const { buttonText, certType, userId } = props;
+  const ref = useRef<HTMLDialogElement>(null);
+  function handleClick() {
+    ref.current?.showModal();
+  }
+
+  return (
+    <>
+      <button className="btn" onClick={handleClick}>
+        {buttonText}
+      </button>
+      <dialog ref={ref} className="modal">
+        <div className="modal-box">
+          <form method="dialog">
+            {/* if there is a button in form, it will close the modal */}
+            <button className="btn btn-sm btn-circle btn-ghost absolute top-2 right-2">
+              ✕
+            </button>
+          </form>
+          <h3 className="text-lg font-bold">Certification Upload</h3>
+          <CertificationUpload
+            key={certType.name}
+            userId={userId}
+            certificationType={certType}
+          />
+        </div>
+      </dialog>
+    </>
+  );
+}
+
+async function getTableData(user_id: string) {
+  const certificationTypeStore = CertificationTypeStore.make();
+  const certificationStore = CertificationStore.make();
+  const [certificationTypes, userCertifications] = await Promise.all([
+    certificationTypeStore.listCertificationTypes(),
+    certificationStore.listCertificationsByUser(user_id),
+  ]);
+
+  return certificationTypes.map((certType) => {
+    const existingCert = userCertifications.find(
+      (cert) => cert.certification_type_name === certType.name,
+    );
+    return {
+      ...certType,
+      existing_cert: existingCert,
+    };
+  });
+}
+
+function CertificationUpload({
+  userId,
+  certificationType,
+}: {
+  userId: string;
+  certificationType: CertificationType;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | undefined>();
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  const handleFileUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setUploading(true);
+    setUploadError(undefined);
+    setUploadSuccess(false);
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const file = formData.get("file") as File;
+
+    if (!file) {
+      setUploadError("Please select a file");
+      setUploading(false);
+      return;
+    }
+
+    try {
+      // Step 1: Get pre-signed URL
+      const urlFormData = new FormData();
+      urlFormData.append("user_id", userId);
+      urlFormData.append("certification_type_name", certificationType.name);
+      urlFormData.append("file_name", file.name);
+      urlFormData.append("content_type", file.type);
+
+      const urlResponse = await fetch("/api/certifications/get-upload-url", {
+        method: "POST",
+        body: urlFormData,
+      });
+
+      if (!urlResponse.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+
+      const { uploadUrl, fileUrl, certificationId } = await urlResponse.json();
+
+      // Step 2: Upload file to S3
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload file");
+      }
+
+      // Step 3: Save certification record
+      const saveFormData = new FormData();
+      saveFormData.append("certification_id", certificationId);
+      saveFormData.append("user_id", userId);
+      saveFormData.append("certification_type_name", certificationType.name);
+      saveFormData.append("file_url", fileUrl);
+
+      const saveResponse = await fetch("/api/certifications/save", {
+        method: "POST",
+        body: saveFormData,
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error("Failed to save certification");
+      }
+
+      setUploadSuccess(true);
+      form.reset();
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="card bg-base-100 shadow-lg">
+      <div className="card-body">
+        <h2 className="card-title mb-4">{certificationType.name}</h2>
+        <p className="text-base-content/70 mb-4 text-sm">
+          {certificationType.description}
+        </p>
+
+        {uploadError && (
+          <div className="alert alert-error mb-4">
+            <span>{uploadError}</span>
+          </div>
+        )}
+
+        {uploadSuccess && (
+          <div className="alert alert-success mb-4">
+            <span>Certification uploaded successfully!</span>
+          </div>
+        )}
+
+        <form onSubmit={handleFileUpload} className="space-y-6">
+          <div className="form-control w-full">
+            <label className="label">
+              <span className="label-text">File</span>
+            </label>
+            <input
+              type="file"
+              name="file"
+              className="file-input file-input-bordered w-full"
+              accept=".pdf,.jpg,.jpeg,.png"
+              required
+              disabled={uploading}
+            />
+          </div>
+
+          {certificationType.expires === true && (
+            <div className="form-control w-full">
+              <label className="label">
+                <span className="label-text">Expiration Date</span>
+              </label>
+              <input
+                type="date"
+                name="expires_on"
+                className="input input-bordered w-full"
+                disabled={uploading}
+              />
+            </div>
+          )}
+
+          <div className="card-actions justify-end">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={uploading}
+            >
+              {uploading ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                "Upload Certification"
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

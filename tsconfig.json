@@ -9,9 +9,9 @@
     ".react-router/types/**/*"
   ],
   "compilerOptions": {
-    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "lib": ["DOM", "DOM.Iterable", "ES2024"],
     "types": ["node", "vite/client", "@testing-library/jest-dom"],
-    "target": "ES2022",
+    "target": "ES2024",
     "module": "ES2022",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",

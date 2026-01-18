@@ -6,6 +6,7 @@ import {
   CertificationTypeStore,
 } from "~/lib/certification-type-store";
 import { type } from "arktype";
+import { IoWarning } from "react-icons/io5";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -33,6 +34,7 @@ export async function action({ request }: Route.ActionArgs) {
   const formValues = {
     name: formData.get("name"),
     description: formData.get("description"),
+    expires: formData.get("expires") === "on",
   };
 
   const certificationType = certificationTypeSchema(formValues);
@@ -68,19 +70,7 @@ export default function CreateCertificationType({
           <h2 className="card-title mb-4">New Certification Type</h2>
 
           <div className="alert alert-warning mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6 shrink-0 stroke-current"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
+            <IoWarning className="h-6 w-6 shrink-0" />
             <span>
               <strong>Warning:</strong> Certification types cannot be deleted
               once created. Please ensure the name and description are correct.
@@ -136,6 +126,18 @@ export default function CreateCertificationType({
                 <span className="label-text-alt">
                   A brief description of this certification
                 </span>
+              </label>
+            </div>
+
+            <div className="form-control w-full">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  name="expires"
+                  className="checkbox"
+                  defaultChecked
+                />
+                <span>This certification expires</span>
               </label>
             </div>
 

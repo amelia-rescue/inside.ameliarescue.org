@@ -47,7 +47,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
               className="flex items-center justify-between py-3"
             >
               <div>
-                <span className="font-medium">{user.email}</span>
+                <span className="font-medium">{`${user.first_name} ${user.last_name}`}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="badge badge-neutral">{user.role}</span>

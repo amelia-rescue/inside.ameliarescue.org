@@ -30,6 +30,10 @@ export default [
     route("callback", "./routes/auth/callback.tsx"),
     route("passkeys/add", "./routes/auth/passkeys.add.tsx"),
   ]),
+  ...prefix("api/certifications", [
+    route("get-upload-url", "./routes/api/certifications.get-upload-url.tsx"),
+    route("save", "./routes/api/certifications.save.tsx"),
+  ]),
   route("test", "./routes/test.tsx"),
   route("*", "./routes/$.tsx"),
 ] satisfies RouteConfig;

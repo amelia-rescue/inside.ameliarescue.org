@@ -12,6 +12,7 @@ import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 export const certificationTypeSchema = type({
   name: "string",
   description: "string",
+  expires: "boolean",
 });
 
 export type CertificationType = typeof certificationTypeSchema.infer;

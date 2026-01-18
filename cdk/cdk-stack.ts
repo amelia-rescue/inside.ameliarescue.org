@@ -168,6 +168,22 @@ export class CdkStack extends cdk.Stack {
       sortKey: { name: "uploaded_at", type: dynamodb.AttributeType.STRING },
     });
 
+    // Create S3 bucket for file uploads
+    const fileUploadsBucket = new s3.Bucket(this, "FileUploadsBucket", {
+      enforceSSL: true,
+      publicReadAccess: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.POST],
+          allowedOrigins: ["*"],
+          allowedHeaders: ["*"],
+        },
+      ],
+    });
+
     // Create CloudWatch log group for Lambda function
     const logGroup = new logs.LogGroup(this, "ReactRouterHandlerLogs", {
       logGroupName: "/aws/lambda/inside-amelia-rescue",
@@ -206,9 +222,11 @@ export class CdkStack extends cdk.Stack {
           COGNITO_DOMAIN: authDomainName,
           SESSION_SECRET: `session-secret-${cdk.Stack.of(this).account}`,
           APP_URL: `https://${appDomainName}`,
+          FILE_CDN_URL: `https://${appDomainName}`,
           USERS_TABLE_NAME: usersTable.tableName,
           CERTIFICATION_TYPES_TABLE_NAME: certificationTypesTable.tableName,
           USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
+          FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
         },
       },
     );
@@ -216,6 +234,7 @@ export class CdkStack extends cdk.Stack {
     usersTable.grantReadWriteData(lambdaFunction);
     certificationTypesTable.grantReadWriteData(lambdaFunction);
     userCertificationsTable.grantReadWriteData(lambdaFunction);
+    fileUploadsBucket.grantReadWrite(lambdaFunction);
 
     // Grant Lambda permissions to manage Cognito users
     userPool.grant(
@@ -292,6 +311,22 @@ export class CdkStack extends cdk.Stack {
               cloudfront.AccessLevel.LIST,
             ],
           }),
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
+        "/files/*": {
+          origin: origins.S3BucketOrigin.withOriginAccessControl(
+            fileUploadsBucket,
+            {
+              originAccessLevels: [
+                cloudfront.AccessLevel.READ,
+                cloudfront.AccessLevel.LIST,
+              ],
+            },
+          ),
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
