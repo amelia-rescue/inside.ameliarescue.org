@@ -97,6 +97,19 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         </Link>
 
         <Link
+          to="/hospital-list"
+          className="card bg-base-100 shadow hover:shadow-md"
+        >
+          <div className="card-body">
+            <h2 className="card-title">Hospital List</h2>
+            <p className="text-sm opacity-70">Regional hospital contacts.</p>
+            <div className="card-actions justify-end">
+              <span className="btn btn-sm btn-ghost">Open</span>
+            </div>
+          </div>
+        </Link>
+
+        <Link
           to="/truck-check"
           className="card bg-base-100 shadow hover:shadow-md"
         >
@@ -127,18 +140,20 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           </div>
         </a>
 
-        <Link
-          to="/admin"
-          className="card bg-error-content shadow hover:shadow-md"
-        >
-          <div className="card-body text-primary">
-            <h2 className="card-title">Admin</h2>
-            <p className="text-sm opacity-70">Manage users and certs.</p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
+        {user.website_role === "admin" && (
+          <Link
+            to="/admin"
+            className="card bg-error-content shadow hover:shadow-md"
+          >
+            <div className="card-body text-primary">
+              <h2 className="card-title">Admin</h2>
+              <p className="text-sm opacity-70">Manage users and certs.</p>
+              <div className="card-actions justify-end">
+                <span className="btn btn-sm btn-ghost">Open</span>
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        )}
       </div>
     </>
   );

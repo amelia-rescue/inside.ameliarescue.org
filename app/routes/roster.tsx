@@ -1,8 +1,14 @@
-import { useLoaderData } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/roster";
 import { UserStore } from "~/lib/user-store";
+import { appContext } from "~/context";
 
 export async function loader({ context }: Route.LoaderArgs) {
+  const ctx = context.get(appContext);
+  if (!ctx) {
+    throw new Error("No user found");
+  }
+
   const userStore = UserStore.make();
   const users = await userStore.listUsers();
 
@@ -13,11 +19,11 @@ export async function loader({ context }: Route.LoaderArgs) {
     return a.first_name.localeCompare(b.first_name);
   });
 
-  return { users: sortedUsers };
+  return { users: sortedUsers, currentUserId: ctx.user.user_id };
 }
 
 export default function Roster() {
-  const { users } = useLoaderData<typeof loader>();
+  const { users, currentUserId } = useLoaderData<typeof loader>();
 
   return (
     <div className="card bg-base-100 shadow">
@@ -60,9 +66,16 @@ export default function Roster() {
                         </div>
                       </div>
                       <div>
-                        <div className="font-bold">
+                        <Link
+                          to={
+                            user.user_id === currentUserId
+                              ? "/profile"
+                              : `/user/${user.user_id}`
+                          }
+                          className="font-bold hover:underline"
+                        >
                           {user.first_name} {user.last_name}
-                        </div>
+                        </Link>
                       </div>
                     </div>
                   </td>

@@ -21,6 +21,7 @@ export default [
   route("protocols", "./routes/protocols.tsx"),
   route("constitution", "./routes/constitution.tsx"),
   route("sops", "./routes/sops.tsx"),
+  route("hospital-list", "./routes/hospital-list.tsx"),
   route("truck-check", "./routes/truck-check.tsx"),
   route("profile", "./routes/profile.tsx"),
   route("user/:user_id", "./routes/user.$user_id.tsx"),
