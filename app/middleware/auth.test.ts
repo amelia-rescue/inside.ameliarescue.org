@@ -15,9 +15,9 @@ const testUser: User = {
   first_name: "Test",
   last_name: "User",
   website_role: "admin",
-  membership_role: [
-    { role_name: "Provider", track_id: "paramedic" },
-    { role_name: "Driver", track_id: "driver_basic" },
+  membership_roles: [
+    { role_name: "Provider", track_name: "Paramedic" },
+    { role_name: "Driver", track_name: "Driver Basic" },
   ],
 };
 

@@ -16,7 +16,7 @@ import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
 const membershipRoleItem = type({
   role_name: "string",
-  track_id: "string",
+  track_name: "string",
 });
 
 export const userSchema = type({
@@ -25,8 +25,9 @@ export const userSchema = type({
   last_name: "string",
   email: "string",
   website_role: "'admin' | 'user'",
-  membership_role: membershipRoleItem.array(),
+  membership_roles: membershipRoleItem.array(),
   "phone?": "string",
+  "profile_picture_url?": "string",
 });
 userSchema.onUndeclaredKey("delete");
 

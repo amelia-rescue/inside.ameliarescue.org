@@ -11,6 +11,8 @@ import { useEffect, useRef, useState } from "react";
 import { CertificationStore } from "~/lib/certification-store";
 import { FiExternalLink } from "react-icons/fi";
 import { CertificationUpload } from "~/components/upload-certification";
+import { RoleStore } from "~/lib/role-store";
+import { TrackStore } from "~/lib/track-store";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -34,30 +36,49 @@ export async function loader({ context, params }: Route.LoaderArgs) {
 
   const tableData = await getTableData(user.user_id);
 
-  return { ...c, user, tableData };
+  const roleStore = RoleStore.make();
+  const trackStore = TrackStore.make();
+  const roles = await roleStore.listRoles();
+  const tracks = await trackStore.listTracks();
+
+  return { ...c, user, tableData, roles, tracks };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
   const formData = await request.formData();
-  const formValues = {
-    first_name: formData.get("first_name"),
-    last_name: formData.get("last_name"),
-    website_role: formData.get("website_website_role"),
-    membership_role: formData.getAll("membership_role"),
-  };
 
-  if (
-    formValues.membership_role.includes("junior") &&
-    formValues.membership_role.length > 1
-  ) {
+  // Parse role-track combinations from form data
+  const membershipRoleEntries: Array<{
+    role_name: string;
+    track_name: string;
+  }> = [];
+  const roleEntries = formData.getAll("role_name");
+  const trackEntries = formData.getAll("track_name");
+
+  for (let i = 0; i < roleEntries.length; i++) {
+    const role_name = roleEntries[i] as string;
+    const track_name = trackEntries[i] as string;
+    if (role_name && track_name) {
+      membershipRoleEntries.push({ role_name, track_name });
+    }
+  }
+
+  if (membershipRoleEntries.length === 0) {
     return data(
       {
         success: false,
-        error: "Junior members cannot be providers or drivers",
+        error: "At least one role-track assignment is required",
       },
       { status: 400 },
     );
   }
+
+  const formValues = {
+    first_name: formData.get("first_name"),
+    last_name: formData.get("last_name"),
+    website_role: formData.get("website_role"),
+    membership_roles: membershipRoleEntries,
+  };
 
   const store = UserStore.make();
   const existingUser = await store.getUser(params.user_id);
@@ -91,9 +112,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function UpdateUser({ loaderData }: Route.ComponentProps) {
-  const { user, tableData } = loaderData;
+  const { user, tableData, roles, tracks } = loaderData;
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [assignments, setAssignments] = useState(
+    user.membership_roles.map((m, idx) => ({ ...m, id: idx })),
+  );
 
   useEffect(() => {
     if (fetcher.data?.success === true && fetcher.state === "idle") {
@@ -104,6 +128,27 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
       return () => clearTimeout(timer);
     }
   }, [fetcher.data?.success, fetcher.state]);
+
+  const addAssignment = () => {
+    setAssignments([
+      ...assignments,
+      { id: Date.now(), role_name: "", track_name: "" },
+    ]);
+  };
+
+  const removeAssignment = (id: number) => {
+    setAssignments(assignments.filter((a) => a.id !== id));
+  };
+
+  const updateAssignment = (
+    id: number,
+    field: "role_name" | "track_name",
+    value: string,
+  ) => {
+    setAssignments(
+      assignments.map((a) => (a.id === id ? { ...a, [field]: value } : a)),
+    );
+  };
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -188,83 +233,86 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
 
             <div className="form-control w-full">
               <label className="label">
-                <span className="label-text">Membership Status</span>
+                <span className="label-text">Role & Track Assignments</span>
               </label>
-              {/* TODO: Update this form to handle role-track assignments [{role_id, track_id}] */}
-              <div className="flex flex-col gap-2">
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    name="membership_role"
-                    value="provider"
-                    defaultChecked={user.membership_role.some(
-                      (m) => m.role_name === "Provider",
-                    )}
-                    className="checkbox"
-                    required
-                    onChange={(e) => {
-                      const checkboxes = document.querySelectorAll(
-                        'input[name="membership_role"]',
-                      ) as NodeListOf<HTMLInputElement>;
-                      const isAnyChecked = Array.from(checkboxes).some(
-                        (cb) => cb.checked,
-                      );
-                      checkboxes.forEach((cb) => {
-                        cb.required = !isAnyChecked;
-                      });
-                    }}
-                  />
-                  <span>Provider</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    name="membership_role"
-                    value="driver"
-                    defaultChecked={user.membership_role.some(
-                      (m) => m.role_name === "Driver",
-                    )}
-                    className="checkbox"
-                    required
-                    onChange={(e) => {
-                      const checkboxes = document.querySelectorAll(
-                        'input[name="membership_role"]',
-                      ) as NodeListOf<HTMLInputElement>;
-                      const isAnyChecked = Array.from(checkboxes).some(
-                        (cb) => cb.checked,
-                      );
-                      checkboxes.forEach((cb) => {
-                        cb.required = !isAnyChecked;
-                      });
-                    }}
-                  />
-                  <span>Driver</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    name="membership_role"
-                    value="junior"
-                    defaultChecked={user.membership_role.some(
-                      (m) => m.role_name === "Junior",
-                    )}
-                    className="checkbox"
-                    required
-                    onChange={(e) => {
-                      const checkboxes = document.querySelectorAll(
-                        'input[name="membership_role"]',
-                      ) as NodeListOf<HTMLInputElement>;
-                      const isAnyChecked = Array.from(checkboxes).some(
-                        (cb) => cb.checked,
-                      );
-                      checkboxes.forEach((cb) => {
-                        cb.required = !isAnyChecked;
-                      });
-                    }}
-                  />
-                  <span>Junior</span>
-                </label>
+              <div className="space-y-3">
+                {assignments.map((assignment) => {
+                  const selectedRole = roles.find(
+                    (r) => r.name === assignment.role_name,
+                  );
+                  const allowedTracks = selectedRole
+                    ? tracks.filter((t) =>
+                        selectedRole.allowed_tracks.includes(t.name),
+                      )
+                    : [];
+
+                  return (
+                    <div
+                      key={assignment.id}
+                      className="flex items-center gap-2"
+                    >
+                      <select
+                        name="role_name"
+                        value={assignment.role_name}
+                        onChange={(e) =>
+                          updateAssignment(
+                            assignment.id,
+                            "role_name",
+                            e.target.value,
+                          )
+                        }
+                        className="select select-bordered select-sm flex-1"
+                        required
+                      >
+                        <option value="">Select Role</option>
+                        {roles.map((role) => (
+                          <option key={role.name} value={role.name}>
+                            {role.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        name="track_name"
+                        value={assignment.track_name}
+                        onChange={(e) =>
+                          updateAssignment(
+                            assignment.id,
+                            "track_name",
+                            e.target.value,
+                          )
+                        }
+                        className="select select-bordered select-sm flex-1"
+                        required
+                        disabled={!assignment.role_name}
+                      >
+                        <option value="">Select Track</option>
+                        {allowedTracks.map((track) => (
+                          <option key={track.name} value={track.name}>
+                            {track.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => removeAssignment(assignment.id)}
+                        className="btn btn-error btn-sm"
+                        disabled={assignments.length === 1}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
+              <button
+                type="button"
+                onClick={addAssignment}
+                className="btn btn-secondary btn-sm mt-2"
+              >
+                + Add Assignment
+              </button>
             </div>
 
             <div className="card-actions justify-end pt-4">

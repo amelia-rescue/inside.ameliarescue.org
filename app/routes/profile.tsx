@@ -4,25 +4,82 @@ import { appContext } from "~/context";
 import { useEffect, useState, useRef } from "react";
 import { ArkErrors, type } from "arktype";
 import { UserStore } from "~/lib/user-store";
-import { CertificationTypeStore } from "~/lib/certification-type-store";
+import {
+  CertificationTypeStore,
+  type CertificationType,
+} from "~/lib/certification-type-store";
 import { CertificationStore } from "~/lib/certification-store";
+import { TrackStore } from "~/lib/track-store";
+import { RoleStore } from "~/lib/role-store";
+import { CertificationUpload } from "~/components/upload-certification";
 
-async function getTableData(user_id: string) {
+// todo: come up with a better name
+async function getCertificationData(user_id: string) {
   const certificationTypeStore = CertificationTypeStore.make();
   const certificationStore = CertificationStore.make();
-  const [certificationTypes, userCertifications] = await Promise.all([
-    certificationTypeStore.listCertificationTypes(),
-    certificationStore.listCertificationsByUser(user_id),
-  ]);
+  const userStore = UserStore.make();
+  const trackStore = TrackStore.make();
+  const roleStore = RoleStore.make();
 
-  return certificationTypes.map((certType) => {
+  const user = await userStore.getUser(user_id);
+
+  const [certificationTypes, userCertifications, allTracks, allRoles] =
+    await Promise.all([
+      certificationTypeStore.listCertificationTypes(),
+      certificationStore.listCertificationsByUser(user_id),
+      trackStore.listTracks(),
+      roleStore.listRoles(),
+    ]);
+
+  // Get all required certifications for user's role-track combinations
+  const requiredCertNames = new Set<string>();
+  for (const assignment of user.membership_roles) {
+    const track = allTracks.find((t) => t.name === assignment.track_name);
+    if (track) {
+      track.required_certifications.forEach((certName) =>
+        requiredCertNames.add(certName),
+      );
+    }
+  }
+
+  const certData = certificationTypes.map((certType) => {
     const existingCert = userCertifications.find(
       (cert) => cert.certification_type_name === certType.name,
     );
+
+    // Calculate status
+    let status: "active" | "expiring_soon" | "expired" | "missing" = "missing";
+    if (existingCert && existingCert.expires_on) {
+      const expiresOn = new Date(existingCert.expires_on);
+      const now = new Date();
+      const threeMonthsFromNow = new Date();
+      threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+
+      if (expiresOn < now) {
+        status = "expired";
+      } else if (expiresOn < threeMonthsFromNow) {
+        status = "expiring_soon";
+      } else {
+        status = "active";
+      }
+    } else if (existingCert) {
+      // Has cert but no expiration date
+      status = "active";
+    }
+
     return {
       ...certType,
       existing_cert: existingCert,
+      is_required: requiredCertNames.has(certType.name),
+      status,
     };
+  });
+
+  // Sort: required certifications first, then alphabetically by name
+  return certData.sort((a, b) => {
+    if (a.is_required && !b.is_required) return -1;
+    if (!a.is_required && b.is_required) return 1;
+    return a.name.localeCompare(b.name);
   });
 }
 
@@ -31,7 +88,7 @@ export async function loader({ context }: Route.LoaderArgs) {
   if (!ctx) {
     throw new Error("No user found");
   }
-  const certification_data = await getTableData(ctx.user.user_id);
+  const certification_data = await getCertificationData(ctx.user.user_id);
   return { user: ctx.user, certification_data };
 }
 
@@ -64,9 +121,12 @@ export default function Profile() {
   const { user } = useLoaderData<typeof loader>();
   const { certification_data } = useLoaderData<typeof loader>();
   const ref = useRef<HTMLDialogElement>(null);
+  const certModalRef = useRef<HTMLDialogElement>(null);
   const contactFetcher = useFetcher<typeof action>();
   const { success, errors } = contactFetcher.data || {};
   const [phoneValue, setPhoneValue] = useState(user.phone);
+  const [selectedCertType, setSelectedCertType] =
+    useState<CertificationType | null>(null);
 
   const formatPhoneNumber = (value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -112,9 +172,9 @@ export default function Profile() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {user.membership_role.map((assignment, index) => (
+              {user.membership_roles.map((assignment, index) => (
                 <span key={index} className="badge badge-primary">
-                  {assignment.role_name} - {assignment.track_id}
+                  {assignment.role_name} - {assignment.track_name}
                 </span>
               ))}
             </div>
@@ -140,8 +200,6 @@ export default function Profile() {
                   <dd className="font-medium">{user.phone}</dd>
                   <dt className="opacity-70">Email</dt>
                   <dd className="font-medium">{user.email}</dd>
-                  <dt className="opacity-70">Preferred</dt>
-                  <dd className="font-medium">Text</dd>
                 </dl>
               </div>
             </div>
@@ -151,11 +209,11 @@ export default function Profile() {
                 <h2 className="card-title text-base">Membership</h2>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <dt className="opacity-70">Status</dt>
-                  <dd className="font-medium">Active</dd>
+                  <dd className="font-medium">Active/Placeholder</dd>
                   <dt className="opacity-70">Website Role</dt>
-                  <dd className="font-medium">Provider</dd>
+                  <dd className="font-medium">{user.website_role}</dd>
                   <dt className="opacity-70">Joined</dt>
-                  <dd className="font-medium">Jan 2024</dd>
+                  <dd className="font-medium">Jan 1900</dd>
                 </dl>
               </div>
             </div>
@@ -216,75 +274,119 @@ export default function Profile() {
       <div className="mt-6 grid gap-6 lg:grid-cols-1">
         <div className="card bg-base-100 shadow">
           <div className="card-body">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="card-title">Certifications</h2>
-              <div className="flex gap-2">
-                <button type="button" className="btn btn-sm btn-primary">
-                  Add certification
-                </button>
-                <button type="button" className="btn btn-sm">
-                  Replace
-                </button>
-              </div>
-            </div>
+            <h2 className="card-title">Certifications</h2>
 
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
                   <tr>
                     <th>Name</th>
+                    <th>Required</th>
                     <th>Issued</th>
                     <th>Expires</th>
                     <th>Status</th>
+                    <th>View</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {certification_data.map((certType) => (
-                    <tr>
-                      <td>{certType.name}</td>
-                      <td>{certType.existing_cert?.issued_on}</td>
-                      <td>{certType.existing_cert?.expires_on}</td>
-                      <td>TBD</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td>CPR / BLS</td>
-                    <td>Mar 2025</td>
-                    <td>Mar 2027</td>
-                    <td>
-                      <span className="badge badge-success">Valid</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>EVOC</td>
-                    <td>Jul 2024</td>
-                    <td>Jul 2026</td>
-                    <td>
-                      <span className="badge badge-success">Valid</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>ICS-100</td>
-                    <td>Jan 2023</td>
-                    <td>—</td>
-                    <td>
-                      <span className="badge">On file</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>PHTLS</td>
-                    <td>Aug 2022</td>
-                    <td>Aug 2024</td>
-                    <td>
-                      <span className="badge badge-warning">Expired</span>
-                    </td>
-                  </tr>
+                  {certification_data.map((certType) => {
+                    const getStatusBadge = () => {
+                      switch (certType.status) {
+                        case "active":
+                          return (
+                            <span className="badge badge-success">Active</span>
+                          );
+                        case "expiring_soon":
+                          return (
+                            <span className="badge badge-warning">
+                              Expiring Soon
+                            </span>
+                          );
+                        case "expired":
+                          return (
+                            <span className="badge badge-error">Expired</span>
+                          );
+                        case "missing":
+                          return (
+                            <span className="badge badge-ghost">Missing</span>
+                          );
+                      }
+                    };
+
+                    return (
+                      <tr key={certType.name}>
+                        <td>{certType.name}</td>
+                        <td>
+                          {certType.is_required ? (
+                            <span className="badge badge-sm badge-primary">
+                              Required
+                            </span>
+                          ) : (
+                            <span className="text-base-content/50">—</span>
+                          )}
+                        </td>
+                        <td>{certType.existing_cert?.issued_on || "—"}</td>
+                        <td>{certType.existing_cert?.expires_on || "—"}</td>
+                        <td>{getStatusBadge()}</td>
+                        <td>
+                          {certType.existing_cert?.file_url ? (
+                            <a
+                              href={certType.existing_cert.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-xs btn-ghost"
+                            >
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-base-content/50">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-primary"
+                            onClick={() => {
+                              setSelectedCertType(certType);
+                              certModalRef.current?.showModal();
+                            }}
+                          >
+                            {certType.existing_cert ? "Update" : "Upload"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
       </div>
+
+      <dialog
+        ref={certModalRef}
+        id="certification_upload_modal"
+        className="modal modal-bottom sm:modal-middle"
+      >
+        <div className="modal-box max-w-2xl">
+          <form method="dialog">
+            <button className="btn btn-sm btn-circle btn-ghost absolute top-2 right-2">
+              ✕
+            </button>
+          </form>
+          {selectedCertType && (
+            <CertificationUpload
+              userId={user.user_id}
+              certificationType={selectedCertType}
+            />
+          )}
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
     </>
   );
 }
