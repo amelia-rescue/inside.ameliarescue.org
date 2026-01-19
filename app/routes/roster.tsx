@@ -76,7 +76,7 @@ export default function Roster() {
                             key={index}
                             className="badge badge-primary badge-sm"
                           >
-                            {role.role_name}
+                            {role.role_name} {role.track_name}
                           </span>
                         ))
                       ) : (
