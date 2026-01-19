@@ -269,4 +269,95 @@ describe("certification store test", () => {
 
     expect(withoutExpiration.expires_on).toBeUndefined();
   });
+
+  it("should soft-delete previous certifications when uploading a replacement", async () => {
+    const store = CertificationStore.make();
+
+    // Create initial EMT certification
+    await store.createCertification({
+      certification_id: "cert-old-1",
+      user_id: "user-123",
+      certification_type_name: "EMT-Basic",
+      file_url: "https://example.com/old-cert1.pdf",
+      uploaded_at: "2024-01-01T00:00:00Z",
+      expires_on: "2025-01-01",
+    });
+
+    // Create another EMT certification (replacement scenario)
+    await store.createCertification({
+      certification_id: "cert-old-2",
+      user_id: "user-123",
+      certification_type_name: "EMT-Basic",
+      file_url: "https://example.com/old-cert2.pdf",
+      uploaded_at: "2024-02-01T00:00:00Z",
+      expires_on: "2025-02-01",
+    });
+
+    // Create a different certification type for the same user
+    await store.createCertification({
+      certification_id: "cert-cpr",
+      user_id: "user-123",
+      certification_type_name: "CPR",
+      file_url: "https://example.com/cpr.pdf",
+      uploaded_at: "2024-01-15T00:00:00Z",
+    });
+
+    // Verify we have 3 certifications before soft-delete
+    const certsBeforeDelete = await store.listCertificationsByUser("user-123");
+    expect(certsBeforeDelete.length).toBe(3);
+
+    // Soft-delete all EMT-Basic certifications
+    await store.softDeletePreviousCertifications("user-123", "EMT-Basic");
+
+    // Verify only CPR certification remains visible
+    const certsAfterDelete = await store.listCertificationsByUser("user-123");
+    expect(certsAfterDelete.length).toBe(1);
+    expect(certsAfterDelete[0].certification_type_name).toBe("CPR");
+
+    // Verify the old certifications still exist in the database but have deleted_at set
+    const oldCert1 = await store.getCertification("cert-old-1");
+    expect(oldCert1.deleted_at).toBeDefined();
+    expect(oldCert1.deleted_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+
+    const oldCert2 = await store.getCertification("cert-old-2");
+    expect(oldCert2.deleted_at).toBeDefined();
+    expect(oldCert2.deleted_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+
+    // Verify CPR cert is not soft-deleted
+    const cprCert = await store.getCertification("cert-cpr");
+    expect(cprCert.deleted_at).toBeUndefined();
+  });
+
+  it("should not affect other users when soft-deleting certifications", async () => {
+    const store = CertificationStore.make();
+
+    // Create EMT certifications for two different users
+    await store.createCertification({
+      certification_id: "cert-user1",
+      user_id: "user-123",
+      certification_type_name: "EMT-Basic",
+      file_url: "https://example.com/user1-cert.pdf",
+      uploaded_at: "2024-01-01T00:00:00Z",
+    });
+
+    await store.createCertification({
+      certification_id: "cert-user2",
+      user_id: "user-456",
+      certification_type_name: "EMT-Basic",
+      file_url: "https://example.com/user2-cert.pdf",
+      uploaded_at: "2024-01-01T00:00:00Z",
+    });
+
+    // Soft-delete user-123's EMT certifications
+    await store.softDeletePreviousCertifications("user-123", "EMT-Basic");
+
+    // Verify user-123 has no certifications
+    const user123Certs = await store.listCertificationsByUser("user-123");
+    expect(user123Certs.length).toBe(0);
+
+    // Verify user-456 still has their certification
+    const user456Certs = await store.listCertificationsByUser("user-456");
+    expect(user456Certs.length).toBe(1);
+    expect(user456Certs[0].certification_id).toBe("cert-user2");
+  });
 });

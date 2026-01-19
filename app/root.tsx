@@ -63,11 +63,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center gap-2">
                   {data?.user && (
                     <Link to="/profile">
-                      <div className="avatar placeholder">
-                        <div className="bg-neutral text-neutral-content flex w-10 items-center justify-center rounded-full">
-                          <span className="text-xl">
-                            {data.user.first_name.charAt(0)}
-                          </span>
+                      <div className="avatar">
+                        <div className="ring-primary ring-offset-base-100 w-10 rounded-full ring ring-offset-2">
+                          {data.user.profile_picture_url ? (
+                            <img
+                              src={data.user.profile_picture_url}
+                              alt={`${data.user.first_name} ${data.user.last_name}`}
+                            />
+                          ) : (
+                            <div className="bg-neutral text-neutral-content flex h-full w-full items-center justify-center">
+                              <span className="text-xl">
+                                {data.user.first_name.charAt(0)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </Link>

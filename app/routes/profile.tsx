@@ -12,6 +12,7 @@ import { CertificationStore } from "~/lib/certification-store";
 import { TrackStore } from "~/lib/track-store";
 import { RoleStore } from "~/lib/role-store";
 import { CertificationUpload } from "~/components/upload-certification";
+import { ProfilePictureUpload } from "~/components/profile-picture-upload";
 
 // todo: come up with a better name
 async function getCertificationData(user_id: string) {
@@ -122,11 +123,13 @@ export default function Profile() {
   const { certification_data } = useLoaderData<typeof loader>();
   const ref = useRef<HTMLDialogElement>(null);
   const certModalRef = useRef<HTMLDialogElement>(null);
+  const profilePicModalRef = useRef<HTMLDialogElement>(null);
   const contactFetcher = useFetcher<typeof action>();
   const { success, errors } = contactFetcher.data || {};
   const [phoneValue, setPhoneValue] = useState(user.phone);
   const [selectedCertType, setSelectedCertType] =
     useState<CertificationType | null>(null);
+  const [showProfilePicModal, setShowProfilePicModal] = useState(false);
 
   const formatPhoneNumber = (value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -156,18 +159,34 @@ export default function Profile() {
         <div className="card-body">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <div className="avatar avatar-placeholder">
-                <div className="bg-neutral text-neutral-content w-20 rounded-full">
-                  <span className="text-3xl">
-                    {user.first_name[0]}
-                    {user.last_name[0]}
-                  </span>
+              <div className="avatar">
+                <div className="ring-primary ring-offset-base-100 w-20 rounded-full ring ring-offset-2">
+                  {user.profile_picture_url ? (
+                    <img
+                      src={user.profile_picture_url}
+                      alt={`${user.first_name} ${user.last_name}`}
+                    />
+                  ) : (
+                    <div className="bg-neutral text-neutral-content flex h-full w-full items-center justify-center">
+                      <span className="text-3xl">
+                        {user.first_name[0]}
+                        {user.last_name[0]}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
                 <h1 className="text-2xl font-bold">
                   {user.first_name} {user.last_name}
                 </h1>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost"
+                  onClick={() => profilePicModalRef.current?.showModal()}
+                >
+                  {user.profile_picture_url ? "Change" : "Upload"} Photo
+                </button>
               </div>
             </div>
 
@@ -382,6 +401,25 @@ export default function Profile() {
               certificationType={selectedCertType}
             />
           )}
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
+
+      <dialog
+        ref={profilePicModalRef}
+        id="profile_picture_modal"
+        className="modal modal-bottom sm:modal-middle"
+      >
+        <div className="modal-box">
+          <form method="dialog">
+            <button className="btn btn-sm btn-circle btn-ghost absolute top-2 right-2">
+              ✕
+            </button>
+          </form>
+          <h3 className="mb-4 text-lg font-bold">Upload Profile Picture</h3>
+          <ProfilePictureUpload userId={user.user_id} />
         </div>
         <form method="dialog" className="modal-backdrop">
           <button>close</button>

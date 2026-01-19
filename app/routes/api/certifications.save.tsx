@@ -46,6 +46,11 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     const store = CertificationStore.make();
+
+    // Soft-delete any previous certifications of this type for this user
+    await store.softDeletePreviousCertifications(userId, certificationTypeName);
+
+    // Create the new certification
     const certification = await store.createCertification({
       certification_id: certificationId,
       user_id: userId,

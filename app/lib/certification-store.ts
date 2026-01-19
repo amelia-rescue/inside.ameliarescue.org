@@ -26,6 +26,7 @@ export type Certification = typeof certificationSchema.infer;
 interface DocumentCertification extends Certification {
   created_at: string;
   updated_at: string;
+  deleted_at?: string;
 }
 
 export class CertificationNotFound extends Error {
@@ -130,6 +131,7 @@ export class CertificationStore {
         TableName: this.tableName,
         IndexName: "UserIdIndex",
         KeyConditionExpression: "user_id = :userId",
+        FilterExpression: "attribute_not_exists(deleted_at)",
         ExpressionAttributeValues: {
           ":userId": userId,
         },
@@ -177,6 +179,43 @@ export class CertificationStore {
     );
 
     return updatedCertification;
+  }
+
+  async softDeletePreviousCertifications(
+    userId: string,
+    certificationTypeName: string,
+  ): Promise<void> {
+    // Get all certifications for this user and type (including deleted ones)
+    const result = await this.client.send(
+      new QueryCommand({
+        TableName: this.tableName,
+        IndexName: "UserIdIndex",
+        KeyConditionExpression: "user_id = :userId",
+        FilterExpression:
+          "certification_type_name = :typeName AND attribute_not_exists(deleted_at)",
+        ExpressionAttributeValues: {
+          ":userId": userId,
+          ":typeName": certificationTypeName,
+        },
+      }),
+    );
+
+    const certifications = (result.Items || []) as DocumentCertification[];
+    const now = new Date().toISOString();
+
+    // Soft-delete all existing certifications of this type
+    for (const cert of certifications) {
+      await this.client.send(
+        new PutCommand({
+          TableName: this.tableName,
+          Item: {
+            ...cert,
+            deleted_at: now,
+            updated_at: now,
+          },
+        }),
+      );
+    }
   }
 
   async deleteCertification(certificationId: string): Promise<void> {
