@@ -168,6 +168,26 @@ export class CdkStack extends cdk.Stack {
       sortKey: { name: "uploaded_at", type: dynamodb.AttributeType.STRING },
     });
 
+    const rolesTable = new dynamodb.Table(this, "RolesTable", {
+      tableName: "aes_roles",
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: {
+        name: "name",
+        type: dynamodb.AttributeType.STRING,
+      },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const tracksTable = new dynamodb.Table(this, "TracksTable", {
+      tableName: "aes_tracks",
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: {
+        name: "name",
+        type: dynamodb.AttributeType.STRING,
+      },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Create S3 bucket for file uploads
     const fileUploadsBucket = new s3.Bucket(this, "FileUploadsBucket", {
       enforceSSL: true,
@@ -226,6 +246,8 @@ export class CdkStack extends cdk.Stack {
           USERS_TABLE_NAME: usersTable.tableName,
           CERTIFICATION_TYPES_TABLE_NAME: certificationTypesTable.tableName,
           USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
+          ROLES_TABLE_NAME: rolesTable.tableName,
+          TRACKS_TABLE_NAME: tracksTable.tableName,
           FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
         },
       },
@@ -234,6 +256,8 @@ export class CdkStack extends cdk.Stack {
     usersTable.grantReadWriteData(lambdaFunction);
     certificationTypesTable.grantReadWriteData(lambdaFunction);
     userCertificationsTable.grantReadWriteData(lambdaFunction);
+    rolesTable.grantReadWriteData(lambdaFunction);
+    tracksTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);
 
     // Grant Lambda permissions to manage Cognito users
@@ -410,6 +434,14 @@ export class CdkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "UserCertificationsTableName", {
       value: userCertificationsTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "RolesTableName", {
+      value: rolesTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "TracksTableName", {
+      value: tracksTable.tableName,
     });
 
     new cdk.CfnOutput(this, "CognitoHostedUIUrl", {

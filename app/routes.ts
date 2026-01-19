@@ -10,10 +10,9 @@ export default [
   route("admin", "./routes/admin.tsx"),
   ...prefix("admin", [
     route("create-user", "./routes/admin/create-user.tsx"),
-    route(
-      "create-certification-type",
-      "./routes/admin/create-certification-type.tsx",
-    ),
+    route("certification-type", "./routes/admin/certification-type.tsx"),
+    route("roles", "./routes/admin/roles.tsx"),
+    route("tracks", "./routes/admin/tracks.tsx"),
     route("update-user/:user_id", "./routes/admin/update-user.tsx"),
   ]),
   route("account/security", "./routes/account.security.tsx"),

@@ -5,6 +5,7 @@ import {
   CertificationTypeStore,
   CertificationTypeNotFound,
   CertificationTypeAlreadyExists,
+  type CertificationType,
 } from "./certification-type-store";
 
 describe("certification type store test", () => {
@@ -39,6 +40,7 @@ describe("certification type store test", () => {
     expect(certificationType).toMatchObject({
       name: "EMT-Basic",
       description: "Emergency Medical Technician - Basic Level",
+      expires: true,
       created_at: expect.any(String),
       updated_at: expect.any(String),
     });
@@ -47,6 +49,7 @@ describe("certification type store test", () => {
     expect(retrieved).toMatchObject({
       name: "EMT-Basic",
       description: "Emergency Medical Technician - Basic Level",
+      expires: true,
       created_at: expect.any(String),
       updated_at: expect.any(String),
     });
@@ -81,7 +84,7 @@ describe("certification type store test", () => {
   it("should be able to list all certification types", async () => {
     const store = CertificationTypeStore.make();
 
-    const typesToCreate = [
+    const typesToCreate: CertificationType[] = [
       {
         name: "EMT-Basic",
         description: "Basic EMT certification",
@@ -97,7 +100,11 @@ describe("certification type store test", () => {
         description: "Paramedic certification",
         expires: true,
       },
-      { name: "CPR", description: "CPR certification", expires: true },
+      {
+        name: "CPR",
+        description: "CPR certification",
+        expires: true,
+      },
       {
         name: "EVOC",
         description: "Emergency Vehicle Operations Course",

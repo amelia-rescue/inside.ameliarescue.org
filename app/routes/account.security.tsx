@@ -1,14 +1,17 @@
 import { type LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData } from "react-router";
-import { requireUser, type SessionUser } from "~/lib/session.server";
+import { requireUser } from "~/lib/session.server";
+import { UserStore, type User } from "~/lib/user-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await requireUser(request);
+  const sessionUser = await requireUser(request);
+  const userStore = UserStore.make();
+  const user = await userStore.getUser(sessionUser.user_id);
   return { user };
 }
 
 export default function AccountSecurity() {
-  const { user } = useLoaderData<{ user: SessionUser }>();
+  const { user } = useLoaderData<{ user: User }>();
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">

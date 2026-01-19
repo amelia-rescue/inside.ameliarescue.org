@@ -2,6 +2,7 @@ import { data } from "react-router";
 import type { Route } from "./+types/certifications.save";
 import { CertificationStore } from "~/lib/certification-store";
 import { CertificationTypeStore } from "~/lib/certification-type-store";
+import dayjs from "dayjs";
 
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
@@ -11,7 +12,8 @@ export async function action({ request }: Route.ActionArgs) {
     "certification_type_name",
   ) as string;
   const fileUrl = formData.get("file_url") as string;
-  const expiresOn = formData.get("expires_on") as string | null;
+  const expires_on = formData.get("expires_on") as string | undefined;
+  const issued_on = formData.get("issued_on") as string | undefined;
 
   if (!certificationId || !userId || !certificationTypeName || !fileUrl) {
     return data({ error: "Missing required fields" }, { status: 400 });
@@ -23,13 +25,24 @@ export async function action({ request }: Route.ActionArgs) {
       certificationTypeName,
     );
 
-    if (certificationType.expires && !expiresOn) {
-      return data(
-        {
-          error: `Certification type "${certificationTypeName}" requires an expiration date`,
-        },
-        { status: 400 },
-      );
+    if (certificationType.expires) {
+      if (!expires_on || !issued_on) {
+        return data(
+          {
+            error: `Certification type "${certificationTypeName}" requires an issued date and expiration date`,
+          },
+          { status: 400 },
+        );
+      }
+      const now = dayjs();
+      if (dayjs(issued_on).isAfter(now)) {
+        return data(
+          {
+            error: `The issued date for ${certificationTypeName} cannot be in the future`,
+          },
+          { status: 400 },
+        );
+      }
     }
 
     const store = CertificationStore.make();
@@ -39,7 +52,8 @@ export async function action({ request }: Route.ActionArgs) {
       certification_type_name: certificationTypeName,
       file_url: fileUrl,
       uploaded_at: new Date().toISOString(),
-      ...(expiresOn ? { expires_on: expiresOn } : {}),
+      expires_on,
+      issued_on,
     });
 
     return data({ success: true, certification });

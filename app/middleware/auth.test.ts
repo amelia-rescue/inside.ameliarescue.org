@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { authMiddleware } from "./auth";
 import { appContext } from "~/context";
-import { setupDynamo, teardownDynamo } from "~/lib/dynamo-local";
-import { afterEach } from "node:test";
+
 import type { SessionUser } from "~/lib/session.server";
 import { UserStore, type User } from "~/lib/user-store";
 
@@ -15,7 +14,11 @@ const testUser: User = {
   email: "test@example.com",
   first_name: "Test",
   last_name: "User",
-  role: "admin",
+  website_role: "admin",
+  membership_role: [
+    { role_name: "Provider", track_id: "paramedic" },
+    { role_name: "Driver", track_id: "driver_basic" },
+  ],
 };
 
 vi.mock("~/lib/user-store", () => ({

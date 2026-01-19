@@ -1,6 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DeleteCommand,
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
@@ -101,6 +100,25 @@ export class CertificationTypeStore {
       ExpressionAttributeNames: {
         "#name": "name",
       },
+    });
+    await CertificationTypeStore.client.send(command);
+    return documentCertificationType;
+  }
+
+  public async updateCertificationType(
+    certificationType: CertificationType,
+  ): Promise<DocumentCertificationType> {
+    const existing = await this.getCertificationType(certificationType.name);
+
+    const documentCertificationType: DocumentCertificationType = {
+      ...certificationType,
+      created_at: existing.created_at,
+      updated_at: new Date().toISOString(),
+    };
+
+    const command = new PutCommand({
+      TableName: this.tableName,
+      Item: documentCertificationType,
     });
     await CertificationTypeStore.client.send(command);
     return documentCertificationType;

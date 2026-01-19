@@ -14,21 +14,19 @@ import { randomBytes } from "crypto";
 import { type } from "arktype";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
+const membershipRoleItem = type({
+  role_name: "string",
+  track_id: "string",
+});
+
 export const userSchema = type({
   user_id: "string",
   first_name: "string",
   last_name: "string",
   email: "string",
-  role: "'admin' | 'user'",
+  website_role: "'admin' | 'user'",
+  membership_role: membershipRoleItem.array(),
   "phone?": "string",
-  "membership_status?": "('provider' | 'driver' | 'junior')[]",
-  "certification_level?":
-    "'cpr' | 'basic' | 'advanced' | 'intermediate' | 'paramedic'",
-  "cpr_certification_url?": "string",
-  "provider_certification_url?": "string",
-  "evoc_certification_url?": "string",
-  "certifications?": "string[]",
-  "recentActivity?": "string[]",
 });
 userSchema.onUndeclaredKey("delete");
 

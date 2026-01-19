@@ -30,11 +30,14 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         <Link to="/admin/create-user" className="btn btn-primary">
           Create New User
         </Link>
-        <Link
-          to="/admin/create-certification-type"
-          className="btn btn-secondary"
-        >
-          Create Certification Type
+        <Link to="/admin/certification-type" className="btn btn-secondary">
+          Manage Certification Types
+        </Link>
+        <Link to="/admin/roles" className="btn btn-secondary">
+          Manage Roles
+        </Link>
+        <Link to="/admin/tracks" className="btn btn-secondary">
+          Manage Tracks
         </Link>
       </div>
 
@@ -50,7 +53,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 <span className="font-medium">{`${user.first_name} ${user.last_name}`}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="badge badge-neutral">{user.role}</span>
+                <span className="badge badge-neutral">{user.website_role}</span>
                 <Link
                   to={`/admin/update-user/${user.user_id}`}
                   className="btn btn-sm btn-ghost"

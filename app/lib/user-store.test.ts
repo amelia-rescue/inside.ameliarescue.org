@@ -60,7 +60,8 @@ describe("user store test", () => {
       first_name: "Test",
       last_name: "User",
       email: "test@example.com",
-      role: "admin",
+      website_role: "admin",
+      membership_role: [{ role_name: "Provider", track_id: "emt" }],
     });
 
     const user = await store.getUser(user_id);
@@ -94,7 +95,7 @@ describe("user store test", () => {
       first_name: "Test",
       last_name: "User",
       email: "test@example.com",
-      role: "admin",
+      website_role: "admin",
     });
   });
 
@@ -105,7 +106,8 @@ describe("user store test", () => {
       first_name: "Test",
       last_name: "User",
       email: "test@example.com",
-      role: "admin",
+      website_role: "admin",
+      membership_role: [{ role_name: "Provider", track_id: "emt" }],
     });
     const user = await store.getUser(user_id);
     expect(user.user_id).toBe(user_id);
@@ -118,10 +120,11 @@ describe("user store test", () => {
     const store = UserStore.make();
 
     const usersToCreate = Array.from({ length: 10 }, (_, i) => ({
-      first_name: "Test",
-      last_name: `User${i}`,
-      email: `test-${i}@example.com`,
-      role: "user" as const,
+      first_name: `Test ${i}`,
+      last_name: "User",
+      email: `test${i}@example.com`,
+      website_role: "user" as const,
+      membership_role: [{ role_name: "Junior", track_id: "emt" }],
     }));
 
     await Promise.all(usersToCreate.map((user) => store.createUser(user)));
@@ -136,7 +139,8 @@ describe("user store test", () => {
       first_name: "Test",
       last_name: "User",
       email: "test@example.com",
-      role: "admin",
+      website_role: "admin",
+      membership_role: [{ role_name: "Provider", track_id: "emt" }],
     });
     await store.updateUser({
       user_id,
@@ -169,13 +173,15 @@ describe("user store test", () => {
         first_name: "Active",
         last_name: "User",
         email: "active@example.com",
-        role: "user",
+        website_role: "user",
+        membership_role: [{ role_name: "Junior", track_id: "emt" }],
       }),
       store.createUser({
         first_name: "Deleted",
         last_name: "User",
         email: "deleted@example.com",
-        role: "user",
+        website_role: "user",
+        membership_role: [{ role_name: "Junior", track_id: "emt" }],
       }),
     ]);
     const actualActiveId = activeUser.user_id;
@@ -204,7 +210,8 @@ describe("user store test", () => {
       first_name: "Test",
       last_name: "User",
       email: "test@example.com",
-      role: "admin",
+      website_role: "admin",
+      membership_role: [{ role_name: "Provider", track_id: "emt" }],
     });
 
     await store.deletePermanently(user_id);

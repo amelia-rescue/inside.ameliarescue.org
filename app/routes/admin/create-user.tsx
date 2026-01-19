@@ -30,7 +30,7 @@ export async function action({ request }: Route.ActionArgs) {
     email: formData.get("email"),
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name"),
-    role: formData.get("role"),
+    website_role: formData.get("website_role"),
     membership_status: formData.getAll("membership_status"),
     certification_level: formData.get("certification_level"),
   };
@@ -132,14 +132,14 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
 
             <div className="form-control w-full">
               <label className="label">
-                <span className="label-text">Role</span>
+                <span className="label-text">Website Role</span>
               </label>
               <select
-                name="role"
+                name="website_role"
                 className="select select-bordered w-full"
                 required
               >
-                <option value="">Select a role</option>
+                <option value="">Select a website role</option>
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>

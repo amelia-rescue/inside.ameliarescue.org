@@ -15,6 +15,7 @@ export const certificationSchema = type({
   user_id: "string",
   certification_type_name: "string",
   file_url: "string",
+  "issued_on?": "string",
   "expires_on?": "string",
   uploaded_at: "string",
 });

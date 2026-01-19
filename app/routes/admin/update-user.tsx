@@ -1,4 +1,4 @@
-import { data, Link, useFetcher, redirect } from "react-router";
+import { data, Link, useFetcher } from "react-router";
 import type { Route } from "./+types/update-user";
 import { appContext } from "~/context";
 import { userSchema, UserStore } from "~/lib/user-store";
@@ -10,6 +10,7 @@ import { type } from "arktype";
 import { useEffect, useRef, useState } from "react";
 import { CertificationStore } from "~/lib/certification-store";
 import { FiExternalLink } from "react-icons/fi";
+import { CertificationUpload } from "~/components/upload-certification";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -41,14 +42,13 @@ export async function action({ request, params }: Route.ActionArgs) {
   const formValues = {
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name"),
-    role: formData.get("role"),
-    membership_status: formData.getAll("membership_status"),
-    certification_level: formData.get("certification_level"),
+    website_role: formData.get("website_website_role"),
+    membership_role: formData.getAll("membership_role"),
   };
 
   if (
-    formValues.membership_status.includes("junior") &&
-    formValues.membership_status.length > 1
+    formValues.membership_role.includes("junior") &&
+    formValues.membership_role.length > 1
   ) {
     return data(
       {
@@ -172,15 +172,15 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
 
             <div className="form-control w-full">
               <label className="label">
-                <span className="label-text">Role</span>
+                <span className="label-text">website_role</span>
               </label>
               <select
-                name="role"
-                defaultValue={user.role}
+                name="website_role"
+                defaultValue={user.website_role}
                 className="select select-bordered w-full"
                 required
               >
-                <option value="">Select a role</option>
+                <option value="">Select a website_role</option>
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
@@ -190,22 +190,21 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
               <label className="label">
                 <span className="label-text">Membership Status</span>
               </label>
+              {/* TODO: Update this form to handle role-track assignments [{role_id, track_id}] */}
               <div className="flex flex-col gap-2">
                 <label className="flex cursor-pointer items-center gap-3">
                   <input
                     type="checkbox"
-                    name="membership_status"
+                    name="membership_role"
                     value="provider"
-                    defaultChecked={
-                      Array.isArray(user.membership_status)
-                        ? user.membership_status.includes("provider")
-                        : user.membership_status === "provider"
-                    }
+                    defaultChecked={user.membership_role.some(
+                      (m) => m.role_name === "Provider",
+                    )}
                     className="checkbox"
                     required
                     onChange={(e) => {
                       const checkboxes = document.querySelectorAll(
-                        'input[name="membership_status"]',
+                        'input[name="membership_role"]',
                       ) as NodeListOf<HTMLInputElement>;
                       const isAnyChecked = Array.from(checkboxes).some(
                         (cb) => cb.checked,
@@ -220,18 +219,16 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                 <label className="flex cursor-pointer items-center gap-3">
                   <input
                     type="checkbox"
-                    name="membership_status"
+                    name="membership_role"
                     value="driver"
-                    defaultChecked={
-                      Array.isArray(user.membership_status)
-                        ? user.membership_status.includes("driver")
-                        : user.membership_status === "driver"
-                    }
+                    defaultChecked={user.membership_role.some(
+                      (m) => m.role_name === "Driver",
+                    )}
                     className="checkbox"
                     required
                     onChange={(e) => {
                       const checkboxes = document.querySelectorAll(
-                        'input[name="membership_status"]',
+                        'input[name="membership_role"]',
                       ) as NodeListOf<HTMLInputElement>;
                       const isAnyChecked = Array.from(checkboxes).some(
                         (cb) => cb.checked,
@@ -246,18 +243,16 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                 <label className="flex cursor-pointer items-center gap-3">
                   <input
                     type="checkbox"
-                    name="membership_status"
+                    name="membership_role"
                     value="junior"
-                    defaultChecked={
-                      Array.isArray(user.membership_status)
-                        ? user.membership_status.includes("junior")
-                        : user.membership_status === "junior"
-                    }
+                    defaultChecked={user.membership_role.some(
+                      (m) => m.role_name === "Junior",
+                    )}
                     className="checkbox"
                     required
                     onChange={(e) => {
                       const checkboxes = document.querySelectorAll(
-                        'input[name="membership_status"]',
+                        'input[name="membership_role"]',
                       ) as NodeListOf<HTMLInputElement>;
                       const isAnyChecked = Array.from(checkboxes).some(
                         (cb) => cb.checked,
@@ -270,25 +265,6 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                   <span>Junior</span>
                 </label>
               </div>
-            </div>
-
-            <div className="form-control w-full">
-              <label className="label">
-                <span className="label-text">Certification Level</span>
-              </label>
-              <select
-                name="certification_level"
-                defaultValue={user.certification_level}
-                className="select select-bordered w-full"
-                required
-              >
-                <option value="">Select certification level</option>
-                <option value="cpr">CPR</option>
-                <option value="basic">Basic</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="paramedic">Paramedic</option>
-              </select>
             </div>
 
             <div className="card-actions justify-end pt-4">
@@ -413,156 +389,4 @@ async function getTableData(user_id: string) {
       existing_cert: existingCert,
     };
   });
-}
-
-function CertificationUpload({
-  userId,
-  certificationType,
-}: {
-  userId: string;
-  certificationType: CertificationType;
-}) {
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | undefined>();
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-
-  const handleFileUpload = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setUploading(true);
-    setUploadError(undefined);
-    setUploadSuccess(false);
-
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const file = formData.get("file") as File;
-
-    if (!file) {
-      setUploadError("Please select a file");
-      setUploading(false);
-      return;
-    }
-
-    try {
-      // Step 1: Get pre-signed URL
-      const urlFormData = new FormData();
-      urlFormData.append("user_id", userId);
-      urlFormData.append("certification_type_name", certificationType.name);
-      urlFormData.append("file_name", file.name);
-      urlFormData.append("content_type", file.type);
-
-      const urlResponse = await fetch("/api/certifications/get-upload-url", {
-        method: "POST",
-        body: urlFormData,
-      });
-
-      if (!urlResponse.ok) {
-        throw new Error("Failed to get upload URL");
-      }
-
-      const { uploadUrl, fileUrl, certificationId } = await urlResponse.json();
-
-      // Step 2: Upload file to S3
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type,
-        },
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to upload file");
-      }
-
-      // Step 3: Save certification record
-      const saveFormData = new FormData();
-      saveFormData.append("certification_id", certificationId);
-      saveFormData.append("user_id", userId);
-      saveFormData.append("certification_type_name", certificationType.name);
-      saveFormData.append("file_url", fileUrl);
-
-      const saveResponse = await fetch("/api/certifications/save", {
-        method: "POST",
-        body: saveFormData,
-      });
-
-      if (!saveResponse.ok) {
-        throw new Error("Failed to save certification");
-      }
-
-      setUploadSuccess(true);
-      form.reset();
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="card bg-base-100 shadow-lg">
-      <div className="card-body">
-        <h2 className="card-title mb-4">{certificationType.name}</h2>
-        <p className="text-base-content/70 mb-4 text-sm">
-          {certificationType.description}
-        </p>
-
-        {uploadError && (
-          <div className="alert alert-error mb-4">
-            <span>{uploadError}</span>
-          </div>
-        )}
-
-        {uploadSuccess && (
-          <div className="alert alert-success mb-4">
-            <span>Certification uploaded successfully!</span>
-          </div>
-        )}
-
-        <form onSubmit={handleFileUpload} className="space-y-6">
-          <div className="form-control w-full">
-            <label className="label">
-              <span className="label-text">File</span>
-            </label>
-            <input
-              type="file"
-              name="file"
-              className="file-input file-input-bordered w-full"
-              accept=".pdf,.jpg,.jpeg,.png"
-              required
-              disabled={uploading}
-            />
-          </div>
-
-          {certificationType.expires === true && (
-            <div className="form-control w-full">
-              <label className="label">
-                <span className="label-text">Expiration Date</span>
-              </label>
-              <input
-                type="date"
-                name="expires_on"
-                className="input input-bordered w-full"
-                disabled={uploading}
-              />
-            </div>
-          )}
-
-          <div className="card-actions justify-end">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={uploading}
-            >
-              {uploading ? (
-                <span className="loading loading-spinner loading-xs"></span>
-              ) : (
-                "Upload Certification"
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
 }
