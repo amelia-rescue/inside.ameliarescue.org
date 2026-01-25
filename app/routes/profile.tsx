@@ -233,12 +233,8 @@ export default function Profile() {
               <div className="card-body">
                 <h2 className="card-title text-base">Membership</h2>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <dt className="opacity-70">Status</dt>
-                  <dd className="font-medium">Active/Placeholder</dd>
                   <dt className="opacity-70">Website Role</dt>
                   <dd className="font-medium">{user.website_role}</dd>
-                  <dt className="opacity-70">Joined</dt>
-                  <dd className="font-medium">Jan 1900</dd>
                 </dl>
               </div>
             </div>
