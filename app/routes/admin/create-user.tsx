@@ -4,6 +4,9 @@ import { appContext } from "~/context";
 import { userSchema, UserStore } from "~/lib/user-store";
 import { type } from "arktype";
 import { IoInformationCircle } from "react-icons/io5";
+import { useState } from "react";
+import { RoleStore } from "~/lib/role-store";
+import { TrackStore } from "~/lib/track-store";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -21,18 +24,69 @@ export async function loader({ context }: Route.LoaderArgs) {
   if (!c) {
     throw new Error("App context not found");
   }
-  return c;
+
+  const roleStore = RoleStore.make();
+  const trackStore = TrackStore.make();
+  const roles = await roleStore.listRoles();
+  const tracks = await trackStore.listTracks();
+
+  return { ...c, roles, tracks };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
+
+  // Parse role-track combinations from form data
+  const membershipRoleEntries: Array<{
+    role_name: string;
+    track_name: string;
+    precepting: boolean;
+  }> = [];
+  const roleEntries = formData.getAll("role_name");
+  const trackEntries = formData.getAll("track_name");
+  const preceptingEntries = formData.getAll("precepting");
+
+  for (let i = 0; i < roleEntries.length; i++) {
+    const role_name = roleEntries[i] as string;
+    const track_name = trackEntries[i] as string;
+    const precepting = preceptingEntries[i] === "true";
+    if (role_name && track_name) {
+      membershipRoleEntries.push({ role_name, track_name, precepting });
+    }
+  }
+
+  if (membershipRoleEntries.length === 0) {
+    return data(
+      {
+        success: false,
+        error: "At least one role-track assignment is required",
+      },
+      { status: 400 },
+    );
+  }
+
+  // Check for duplicate role-track combinations
+  const seen = new Set<string>();
+  for (const entry of membershipRoleEntries) {
+    const key = `${entry.role_name}:${entry.track_name}`;
+    if (seen.has(key)) {
+      return data(
+        {
+          success: false,
+          error: `Duplicate role-track combination: ${entry.role_name} - ${entry.track_name}`,
+        },
+        { status: 400 },
+      );
+    }
+    seen.add(key);
+  }
+
   const formValues = {
     email: formData.get("email"),
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name"),
     website_role: formData.get("website_role"),
-    membership_status: formData.getAll("membership_status"),
-    certification_level: formData.get("certification_level"),
+    membership_roles: membershipRoleEntries,
   };
 
   const user = userSchema({
@@ -57,8 +111,52 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function CreateUser({ loaderData }: Route.ComponentProps) {
-  const { user } = loaderData;
+  const { user, roles, tracks } = loaderData;
   const fetcher = useFetcher<typeof action>();
+  const [assignments, setAssignments] = useState([
+    { id: Date.now(), role_name: "", track_name: "", precepting: false },
+  ]);
+
+  const addAssignment = () => {
+    setAssignments([
+      ...assignments,
+      { id: Date.now(), role_name: "", track_name: "", precepting: false },
+    ]);
+  };
+
+  const removeAssignment = (id: number) => {
+    setAssignments(assignments.filter((a) => a.id !== id));
+  };
+
+  const updateAssignment = (
+    id: number,
+    field: "role_name" | "track_name" | "precepting",
+    value: string | boolean,
+  ) => {
+    const updatedAssignments = assignments.map((a) =>
+      a.id === id ? { ...a, [field]: value } : a,
+    );
+
+    // Check for duplicates if role_name or track_name is being updated
+    if (field === "role_name" || field === "track_name") {
+      const currentAssignment = updatedAssignments.find((a) => a.id === id);
+      if (currentAssignment?.role_name && currentAssignment?.track_name) {
+        const duplicates = updatedAssignments.filter(
+          (a) =>
+            a.id !== id &&
+            a.role_name === currentAssignment.role_name &&
+            a.track_name === currentAssignment.track_name,
+        );
+        if (duplicates.length > 0) {
+          // Don't update if it would create a duplicate
+          return;
+        }
+      }
+    }
+
+    setAssignments(updatedAssignments);
+  };
+
   return (
     <div className="mx-auto w-full max-w-2xl">
       <div className="card bg-base-100 shadow-lg">
@@ -147,55 +245,104 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
 
             <div className="form-control w-full">
               <label className="label">
-                <span className="label-text">Membership Status</span>
+                <span className="label-text">Role & Track Assignments</span>
               </label>
-              <div className="flex flex-col gap-2">
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    name="membership_status"
-                    value="provider"
-                    className="checkbox"
-                  />
-                  <span>Provider</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    name="membership_status"
-                    value="driver"
-                    className="checkbox"
-                  />
-                  <span>Driver</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    name="membership_status"
-                    value="junior"
-                    className="checkbox"
-                  />
-                  <span>Junior</span>
-                </label>
-              </div>
-            </div>
+              <div className="space-y-3">
+                {assignments.map((assignment) => {
+                  const selectedRole = roles.find(
+                    (r) => r.name === assignment.role_name,
+                  );
+                  const allowedTracks = selectedRole
+                    ? tracks.filter((t) =>
+                        selectedRole.allowed_tracks.includes(t.name),
+                      )
+                    : [];
 
-            <div className="form-control w-full">
-              <label className="label">
-                <span className="label-text">Certification Level</span>
-              </label>
-              <select
-                name="certification_level"
-                className="select select-bordered w-full"
-                required
+                  return (
+                    <div
+                      key={assignment.id}
+                      className="flex items-center gap-2"
+                    >
+                      <select
+                        name="role_name"
+                        value={assignment.role_name}
+                        onChange={(e) =>
+                          updateAssignment(
+                            assignment.id,
+                            "role_name",
+                            e.target.value,
+                          )
+                        }
+                        className="select select-bordered select-sm flex-1"
+                        required
+                      >
+                        <option value="">Select Role</option>
+                        {roles.map((role) => (
+                          <option key={role.name} value={role.name}>
+                            {role.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        name="track_name"
+                        value={assignment.track_name}
+                        onChange={(e) =>
+                          updateAssignment(
+                            assignment.id,
+                            "track_name",
+                            e.target.value,
+                          )
+                        }
+                        className="select select-bordered select-sm flex-1"
+                        required
+                        disabled={!assignment.role_name}
+                      >
+                        <option value="">Select Track</option>
+                        {allowedTracks.map((track) => (
+                          <option key={track.name} value={track.name}>
+                            {track.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          name="precepting"
+                          checked={assignment.precepting}
+                          onChange={(e) =>
+                            updateAssignment(
+                              assignment.id,
+                              "precepting",
+                              e.target.checked,
+                            )
+                          }
+                          value="true"
+                          className="checkbox checkbox-sm"
+                        />
+                        <span className="text-sm">Precepting</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => removeAssignment(assignment.id)}
+                        className="btn btn-error btn-sm"
+                        disabled={assignments.length === 1}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={addAssignment}
+                className="btn btn-secondary btn-sm mt-2"
               >
-                <option value="">Select certification level</option>
-                <option value="cpr">CPR</option>
-                <option value="basic">Basic</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="paramedic">Paramedic</option>
-              </select>
+                + Add Assignment
+              </button>
             </div>
 
             <div className="card-actions justify-end pt-4">

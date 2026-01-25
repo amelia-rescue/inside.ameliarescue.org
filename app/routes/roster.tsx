@@ -87,9 +87,14 @@ export default function Roster() {
                         user.membership_roles.map((role, index) => (
                           <span
                             key={index}
-                            className="badge badge-primary badge-sm"
+                            className={`badge badge-sm ${
+                              role.precepting
+                                ? "badge-warning"
+                                : "badge-primary"
+                            }`}
                           >
-                            {role.role_name} {role.track_name}
+                            {role.role_name} - {role.track_name}
+                            {role.precepting && " (Precepting)"}
                           </span>
                         ))
                       ) : (

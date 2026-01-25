@@ -1,6 +1,71 @@
-# Welcome to React Router!
+# Inside Amelia Rescue
 
-A modern, production-ready template for building full-stack React applications using React Router.
+Member management system for Amelia Rescue Squad.
+
+## Data Model
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              USER                                       │
+│  ┌─────────────────────────────────────────────────────────────┐       │
+│  │ • user_id                                                    │       │
+│  │ • first_name, last_name, email, phone                        │       │
+│  │ • website_role (admin | user)                                │       │
+│  │ • profile_picture_url                                        │       │
+│  └─────────────────────────────────────────────────────────────┘       │
+│                                                                          │
+│  Has many MEMBERSHIP ROLES (role-track assignments):                    │
+│  ┌──────────────────────────────────────────────────────────┐          │
+│  │ • role_name          ──────┐                             │          │
+│  │ • track_name         ──────┼──┐                          │          │
+│  │ • precepting (boolean)     │  │                          │          │
+│  └────────────────────────────┼──┼──────────────────────────┘          │
+└────────────────────────────────┼──┼───────────────────────────────────┘
+                                 │  │
+                    ┌────────────┘  └────────────┐
+                    │                             │
+                    ▼                             ▼
+         ┌──────────────────┐          ┌──────────────────┐
+         │      ROLE         │          │      TRACK       │
+         ├──────────────────┤          ├──────────────────┤
+         │ • name            │          │ • name           │
+         │ • description     │          │ • description    │
+         │ • allowed_tracks[]│──────────│ • required_      │
+         └──────────────────┘          │   certifications[]│
+                                       └──────────┬────────┘
+                                                  │
+                                                  │ References
+                                                  │
+                                                  ▼
+                                       ┌──────────────────────┐
+                                       │ CERTIFICATION TYPE   │
+                                       ├──────────────────────┤
+                                       │ • name               │
+                                       │ • description        │
+                                       └──────────┬───────────┘
+                                                  │
+                                                  │ Has many
+                                                  │
+                                                  ▼
+                                       ┌──────────────────────┐
+                                       │   CERTIFICATION      │
+                                       ├──────────────────────┤
+                                       │ • user_id            │
+                                       │ • certification_     │
+                                       │   type_name          │
+                                       │ • issued_on          │
+                                       │ • expires_on         │
+                                       │ • file_url           │
+                                       └──────────────────────┘
+
+Example Flow:
+  1. User "John Doe" has membership_role: { role_name: "Provider", 
+     track_name: "EMT", precepting: false }
+  2. Role "Provider" allows tracks: ["EMT", "ALS", "BLS"]
+  3. Track "EMT" requires certifications: ["CPR", "EMT-Basic"]
+  4. User must have Certifications for "CPR" and "EMT-Basic" to be cleared
+  5. If precepting: true, user is training/precepting for that track
+```
 
 [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
 

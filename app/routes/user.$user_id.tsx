@@ -134,8 +134,14 @@ export default function User() {
 
             <div className="flex flex-wrap gap-2">
               {user.membership_roles.map((assignment, index) => (
-                <span key={index} className="badge badge-primary">
+                <span
+                  key={index}
+                  className={`badge ${
+                    assignment.precepting ? "badge-warning" : "badge-primary"
+                  }`}
+                >
                   {assignment.role_name} - {assignment.track_name}
+                  {assignment.precepting && " (Precepting)"}
                 </span>
               ))}
             </div>

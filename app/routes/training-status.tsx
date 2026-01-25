@@ -21,7 +21,7 @@ type CertStatus = "active" | "expiring_soon" | "expired" | "missing";
 interface TrainingStatusRow {
   user_id: string;
   name: string;
-  roles: string[];
+  roles: Array<{ label: string; precepting: boolean }>;
   certifications: Record<string, CertStatus>;
 }
 
@@ -92,9 +92,10 @@ export async function loader({ context }: Route.LoaderArgs) {
     return {
       user_id: user.user_id,
       name: `${user.first_name} ${user.last_name}`,
-      roles: user.membership_roles.map(
-        (r) => `${r.role_name} - ${r.track_name}`,
-      ),
+      roles: user.membership_roles.map((r) => ({
+        label: `${r.role_name} - ${r.track_name}`,
+        precepting: r.precepting,
+      })),
       certifications,
     };
   });
@@ -140,10 +141,16 @@ export default function TrainingStatus() {
       columnHelper.accessor("roles", {
         header: "Roles",
         cell: (info) => (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-col gap-1">
             {info.getValue().map((role, idx) => (
-              <span key={idx} className="badge badge-primary badge-sm">
-                {role}
+              <span
+                key={idx}
+                className={`badge badge-sm whitespace-nowrap ${
+                  role.precepting ? "badge-warning" : "badge-primary"
+                }`}
+              >
+                {role.label}
+                {role.precepting && " (Precepting)"}
               </span>
             ))}
           </div>

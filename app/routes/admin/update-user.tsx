@@ -51,15 +51,18 @@ export async function action({ request, params }: Route.ActionArgs) {
   const membershipRoleEntries: Array<{
     role_name: string;
     track_name: string;
+    precepting: boolean;
   }> = [];
   const roleEntries = formData.getAll("role_name");
   const trackEntries = formData.getAll("track_name");
+  const preceptingEntries = formData.getAll("precepting");
 
   for (let i = 0; i < roleEntries.length; i++) {
     const role_name = roleEntries[i] as string;
     const track_name = trackEntries[i] as string;
+    const precepting = preceptingEntries[i] === "true";
     if (role_name && track_name) {
-      membershipRoleEntries.push({ role_name, track_name });
+      membershipRoleEntries.push({ role_name, track_name, precepting });
     }
   }
 
@@ -71,6 +74,22 @@ export async function action({ request, params }: Route.ActionArgs) {
       },
       { status: 400 },
     );
+  }
+
+  // Check for duplicate role-track combinations
+  const seen = new Set<string>();
+  for (const entry of membershipRoleEntries) {
+    const key = `${entry.role_name}:${entry.track_name}`;
+    if (seen.has(key)) {
+      return data(
+        {
+          success: false,
+          error: `Duplicate role-track combination: ${entry.role_name} - ${entry.track_name}`,
+        },
+        { status: 400 },
+      );
+    }
+    seen.add(key);
   }
 
   const formValues = {
@@ -132,7 +151,7 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
   const addAssignment = () => {
     setAssignments([
       ...assignments,
-      { id: Date.now(), role_name: "", track_name: "" },
+      { id: Date.now(), role_name: "", track_name: "", precepting: false },
     ]);
   };
 
@@ -142,12 +161,31 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
 
   const updateAssignment = (
     id: number,
-    field: "role_name" | "track_name",
-    value: string,
+    field: "role_name" | "track_name" | "precepting",
+    value: string | boolean,
   ) => {
-    setAssignments(
-      assignments.map((a) => (a.id === id ? { ...a, [field]: value } : a)),
+    const updatedAssignments = assignments.map((a) =>
+      a.id === id ? { ...a, [field]: value } : a,
     );
+
+    // Check for duplicates if role_name or track_name is being updated
+    if (field === "role_name" || field === "track_name") {
+      const currentAssignment = updatedAssignments.find((a) => a.id === id);
+      if (currentAssignment?.role_name && currentAssignment?.track_name) {
+        const duplicates = updatedAssignments.filter(
+          (a) =>
+            a.id !== id &&
+            a.role_name === currentAssignment.role_name &&
+            a.track_name === currentAssignment.track_name,
+        );
+        if (duplicates.length > 0) {
+          // Don't update if it would create a duplicate
+          return;
+        }
+      }
+    }
+
+    setAssignments(updatedAssignments);
   };
 
   return (
@@ -293,6 +331,24 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                           </option>
                         ))}
                       </select>
+
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          name="precepting"
+                          checked={assignment.precepting}
+                          onChange={(e) =>
+                            updateAssignment(
+                              assignment.id,
+                              "precepting",
+                              e.target.checked,
+                            )
+                          }
+                          value="true"
+                          className="checkbox checkbox-sm"
+                        />
+                        <span className="text-sm">Precepting</span>
+                      </label>
 
                       <button
                         type="button"

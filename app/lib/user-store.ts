@@ -17,6 +17,7 @@ import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 const membershipRoleItem = type({
   role_name: "string",
   track_name: "string",
+  precepting: "boolean",
 });
 
 export const userSchema = type({
