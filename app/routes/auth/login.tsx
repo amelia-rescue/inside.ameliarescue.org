@@ -4,7 +4,7 @@ import { getUser, setSessionData } from "~/lib/session.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // If already logged in, redirect to home
-  const user = await getUser(request);
+  const { user } = await getUser(request);
   if (user) {
     return redirect("/");
   }

@@ -27,6 +27,7 @@ vi.mock("@aws-sdk/client-cognito-identity-provider", () => {
   return {
     CognitoIdentityProviderClient: cognitoClientCtorSpy,
     AdminCreateUserCommand: vi.fn().mockImplementation((input) => ({ input })),
+    AdminDeleteUserCommand: vi.fn().mockImplementation((input) => ({ input })),
   };
 });
 
@@ -199,7 +200,7 @@ describe("user store test", () => {
     const actualActiveId = activeUser.user_id;
     const actualDeletedId = deletedUser.user_id;
 
-    await store.deleteUser(actualDeletedId);
+    await store.softDelete(actualDeletedId);
 
     const withoutDeleted = await store.listUsers();
     expect(withoutDeleted.map((u) => u.user_id)).toEqual([actualActiveId]);
@@ -215,7 +216,24 @@ describe("user store test", () => {
     expect(deletedUserFromList?.deleted_at).toBeTruthy();
   });
 
-  it("should be able to delete users permanently", async () => {
+  it("should throw UserNotFound when getting a soft-deleted user", async () => {
+    const store = UserStore.make();
+
+    const { user_id } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
+      email: "test@example.com",
+      website_role: "admin",
+      membership_roles: [
+        { role_name: "Provider", track_name: "EMT", precepting: false },
+      ],
+    });
+
+    await store.softDelete(user_id);
+    await expect(store.getUser(user_id)).rejects.toBeInstanceOf(UserNotFound);
+  });
+
+  it("should be able to hard delete users permanently", async () => {
     const store = UserStore.make();
 
     const { user_id } = await store.createUser({

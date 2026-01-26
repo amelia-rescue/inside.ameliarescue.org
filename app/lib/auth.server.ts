@@ -67,7 +67,10 @@ export async function getLoginUrl(
   url.searchParams.set("client_id", COGNITO_CLIENT_ID);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "openid email profile");
+  url.searchParams.set(
+    "scope",
+    "openid email profile aws.cognito.signin.user.admin",
+  );
   url.searchParams.set("code_challenge", codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
 
@@ -98,7 +101,10 @@ export async function getPasskeyAddUrl(
   url.searchParams.set("client_id", COGNITO_CLIENT_ID);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "openid email profile");
+  url.searchParams.set(
+    "scope",
+    "openid email profile aws.cognito.signin.user.admin",
+  );
   url.searchParams.set("code_challenge", codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
 
@@ -221,4 +227,90 @@ export function getAuthConfig() {
     clientId: COGNITO_CLIENT_ID,
     domain: COGNITO_DOMAIN,
   };
+}
+
+interface WebAuthnCredential {
+  AuthenticatorAttachment?: string;
+  AuthenticatorTransports?: string[];
+  CreatedAt: number;
+  CredentialId: string;
+  FriendlyCredentialName?: string;
+  RelyingPartyId: string;
+}
+
+interface ListWebAuthnCredentialsResponse {
+  Credentials: WebAuthnCredential[];
+  NextToken?: string;
+}
+
+/**
+ * List registered passkeys (WebAuthn credentials) for the current user
+ */
+export async function listWebAuthnCredentials(
+  accessToken: string,
+  maxResults: number = 20,
+  nextToken?: string,
+): Promise<ListWebAuthnCredentialsResponse> {
+  const endpoint = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`;
+
+  const body: {
+    AccessToken: string;
+    MaxResults?: number;
+    NextToken?: string;
+  } = {
+    AccessToken: accessToken,
+  };
+
+  if (maxResults) {
+    body.MaxResults = maxResults;
+  }
+
+  if (nextToken) {
+    body.NextToken = nextToken;
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-amz-json-1.1",
+      "X-Amz-Target":
+        "AWSCognitoIdentityProviderService.ListWebAuthnCredentials",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to list WebAuthn credentials: ${error}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Delete a registered passkey (WebAuthn credential) for the current user
+ */
+export async function deleteWebAuthnCredential(
+  accessToken: string,
+  credentialId: string,
+): Promise<void> {
+  const endpoint = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-amz-json-1.1",
+      "X-Amz-Target":
+        "AWSCognitoIdentityProviderService.DeleteWebAuthnCredential",
+    },
+    body: JSON.stringify({
+      AccessToken: accessToken,
+      CredentialId: credentialId,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to delete WebAuthn credential: ${error}`);
+  }
 }

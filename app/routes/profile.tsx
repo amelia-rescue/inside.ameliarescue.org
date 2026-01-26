@@ -1,4 +1,4 @@
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/profile";
 import { appContext } from "~/context";
 import { useEffect, useState, useRef } from "react";
@@ -231,7 +231,15 @@ export default function Profile() {
 
             <div className="card bg-base-200">
               <div className="card-body">
-                <h2 className="card-title text-base">Membership</h2>
+                <div className="flex items-center justify-between gap-4">
+                  <h2 className="card-title text-base">Membership</h2>
+                  <Link
+                    to="/account/security"
+                    className="btn btn-sm btn-primary"
+                  >
+                    Account Security
+                  </Link>
+                </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <dt className="opacity-70">Website Role</dt>
                   <dd className="font-medium">{user.website_role}</dd>

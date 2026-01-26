@@ -1,19 +1,35 @@
-import { createCookieSessionStorage, redirect } from "react-router";
+import { createCookie, redirect } from "react-router";
 
 const SESSION_SECRET =
   process.env.SESSION_SECRET || "default-secret-change-in-production";
 
-// Create session storage
-export const sessionStorage = createCookieSessionStorage({
-  cookie: {
-    name: "__session",
-    httpOnly: true,
-    path: "/",
-    sameSite: "lax",
-    secrets: [SESSION_SECRET],
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
-  },
+const cookieOptions = {
+  httpOnly: true,
+  path: "/",
+  sameSite: "lax" as const,
+  secrets: [SESSION_SECRET],
+  secure: process.env.NODE_ENV === "production",
+};
+
+// Create separate cookies for user data and tokens
+const userCookie = createCookie("__user", {
+  ...cookieOptions,
+  maxAge: 60 * 60 * 24 * 30, // 30 days
+});
+
+const accessTokenCookie = createCookie("__access_token", {
+  ...cookieOptions,
+  maxAge: 60 * 60 * 24, // 1 day
+});
+
+const refreshTokenCookie = createCookie("__refresh_token", {
+  ...cookieOptions,
+  maxAge: 60 * 60 * 24 * 30, // 30 days
+});
+
+const tempDataCookie = createCookie("__temp", {
+  ...cookieOptions,
+  maxAge: 60 * 10, // 10 minutes for temporary auth data
 });
 
 export interface SessionUser {
@@ -23,23 +39,46 @@ export interface SessionUser {
   expiresAt: number;
 }
 
-/**
- * Get session from request
- */
-export async function getSession(request: Request) {
-  const cookie = request.headers.get("Cookie");
-  return sessionStorage.getSession(cookie);
+interface UserData {
+  user_id: string;
+  expiresAt: number;
 }
 
 /**
- * Get user from session, with optional token refresh
+ * Get user data and tokens from cookies
+ */
+async function getUserFromCookies(
+  request: Request,
+): Promise<SessionUser | null> {
+  const cookieHeader = request.headers.get("Cookie");
+  const userData = (await userCookie.parse(cookieHeader)) as UserData | null;
+  const accessToken = (await accessTokenCookie.parse(cookieHeader)) as
+    | string
+    | null;
+  const refreshToken = (await refreshTokenCookie.parse(cookieHeader)) as
+    | string
+    | null;
+
+  if (!userData || !accessToken) {
+    return null;
+  }
+
+  return {
+    user_id: userData.user_id,
+    accessToken,
+    refreshToken: refreshToken || undefined,
+    expiresAt: userData.expiresAt,
+  };
+}
+
+/**
+ * Get user from cookies, with optional token refresh
  * Returns user and session cookie header if tokens were refreshed
  */
 export async function getUser(
   request: Request,
 ): Promise<{ user: SessionUser | null; sessionHeader?: string }> {
-  const session = await getSession(request);
-  const user = session.get("user") as SessionUser | undefined;
+  const user = await getUserFromCookies(request);
 
   if (!user) {
     return { user: null };
@@ -53,7 +92,7 @@ export async function getUser(
         const { refreshAccessToken } = await import("./auth.server");
         const tokens = await refreshAccessToken(user.refreshToken);
 
-        // Update the session with new tokens
+        // Update the user with new tokens
         const updatedUser: SessionUser = {
           ...user,
           accessToken: tokens.access_token,
@@ -62,12 +101,30 @@ export async function getUser(
           refreshToken: tokens.refresh_token || user.refreshToken,
         };
 
-        session.set("user", updatedUser);
+        // Serialize updated cookies
+        const headers = new Headers();
+        headers.append(
+          "Set-Cookie",
+          await userCookie.serialize({
+            user_id: updatedUser.user_id,
+            expiresAt: updatedUser.expiresAt,
+          }),
+        );
+        headers.append(
+          "Set-Cookie",
+          await accessTokenCookie.serialize(updatedUser.accessToken),
+        );
+        if (updatedUser.refreshToken) {
+          headers.append(
+            "Set-Cookie",
+            await refreshTokenCookie.serialize(updatedUser.refreshToken),
+          );
+        }
 
-        // Return updated user and session header to commit changes
+        // Return updated user and combined cookie headers
         return {
           user: updatedUser,
-          sessionHeader: await sessionStorage.commitSession(session),
+          sessionHeader: headers.get("Set-Cookie") || undefined,
         };
       } catch (error) {
         console.error("Token refresh failed:", error);
@@ -99,31 +156,54 @@ export async function requireUser(
 }
 
 /**
- * Create user session
+ * Create user session with separate cookies
  */
 export async function createUserSession(
   user: SessionUser,
   redirectTo: string = "/",
 ) {
-  const session = await sessionStorage.getSession();
-  session.set("user", user);
-  return redirect(redirectTo, {
-    headers: {
-      "Set-Cookie": await sessionStorage.commitSession(session),
-    },
-  });
+  const headers = new Headers();
+
+  headers.append(
+    "Set-Cookie",
+    await userCookie.serialize({
+      user_id: user.user_id,
+      expiresAt: user.expiresAt,
+    }),
+  );
+
+  headers.append(
+    "Set-Cookie",
+    await accessTokenCookie.serialize(user.accessToken),
+  );
+
+  if (user.refreshToken) {
+    headers.append(
+      "Set-Cookie",
+      await refreshTokenCookie.serialize(user.refreshToken),
+    );
+  }
+
+  return redirect(redirectTo, { headers });
 }
 
 /**
- * Logout and destroy session
+ * Logout and destroy all session cookies
  */
 export async function logout(request: Request, redirectTo: string = "/") {
-  const session = await getSession(request);
-  return redirect(redirectTo, {
-    headers: {
-      "Set-Cookie": await sessionStorage.destroySession(session),
-    },
-  });
+  const headers = new Headers();
+
+  headers.append("Set-Cookie", await userCookie.serialize("", { maxAge: 0 }));
+  headers.append(
+    "Set-Cookie",
+    await accessTokenCookie.serialize("", { maxAge: 0 }),
+  );
+  headers.append(
+    "Set-Cookie",
+    await refreshTokenCookie.serialize("", { maxAge: 0 }),
+  );
+
+  return redirect(redirectTo, { headers });
 }
 
 /**
@@ -133,13 +213,18 @@ export async function setSessionData(
   request: Request,
   data: Record<string, string>,
 ) {
-  const session = await getSession(request);
-  Object.entries(data).forEach(([key, value]) => {
-    session.set(key, value);
-  });
+  const cookieHeader = request.headers.get("Cookie");
+  const existing =
+    ((await tempDataCookie.parse(cookieHeader)) as Record<
+      string,
+      string
+    > | null) || {};
+
+  const updated = { ...existing, ...data };
+
   return {
     headers: {
-      "Set-Cookie": await sessionStorage.commitSession(session),
+      "Set-Cookie": await tempDataCookie.serialize(updated),
     },
   };
 }
@@ -151,6 +236,10 @@ export async function getSessionData(
   request: Request,
   key: string,
 ): Promise<string | undefined> {
-  const session = await getSession(request);
-  return session.get(key);
+  const cookieHeader = request.headers.get("Cookie");
+  const data = (await tempDataCookie.parse(cookieHeader)) as Record<
+    string,
+    string
+  > | null;
+  return data?.[key];
 }

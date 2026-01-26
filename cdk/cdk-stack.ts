@@ -95,6 +95,7 @@ export class CdkStack extends cdk.Stack {
           cognito.OAuthScope.EMAIL,
           cognito.OAuthScope.OPENID,
           cognito.OAuthScope.PROFILE,
+          cognito.OAuthScope.COGNITO_ADMIN,
         ],
         callbackUrls: [
           "http://localhost:5173/auth/callback",

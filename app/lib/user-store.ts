@@ -8,6 +8,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import {
   AdminCreateUserCommand,
+  AdminDeleteUserCommand,
   CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { randomBytes } from "crypto";
@@ -85,6 +86,26 @@ export class UserStore {
   }
 
   public async getUser(user_id: string): Promise<DocumentUser> {
+    const command = new GetCommand({
+      TableName: this.tableName,
+      Key: {
+        user_id,
+      },
+    });
+    const response = await UserStore.client.send(command);
+    if (!response.Item) {
+      throw new UserNotFound();
+    }
+    const user = response.Item as unknown as DocumentUser;
+    if (user.deleted_at) {
+      throw new UserNotFound();
+    }
+    return user;
+  }
+
+  private async getUserIncludingDeleted(
+    user_id: string,
+  ): Promise<DocumentUser> {
     const command = new GetCommand({
       TableName: this.tableName,
       Key: {
@@ -182,8 +203,14 @@ export class UserStore {
     await UserStore.client.send(command);
   }
 
-  public async deleteUser(user_id: string) {
-    const existingUser = await this.getUser(user_id);
+  public async softDelete(user_id: string): Promise<void> {
+    const existingUser = await this.getUserIncludingDeleted(user_id);
+
+    // If already deleted, return early
+    if (existingUser.deleted_at) {
+      return;
+    }
+
     const now = new Date().toISOString();
     const deletedUser: DocumentUser = {
       ...existingUser,
@@ -192,6 +219,20 @@ export class UserStore {
       updated_at: now,
       deleted_at: now,
     };
+
+    // Delete user from Cognito - wrap in try-catch to handle errors gracefully
+    try {
+      await UserStore.cognito.send(
+        new AdminDeleteUserCommand({
+          UserPoolId: this.cognitoUserPoolId,
+          Username: user_id,
+        }),
+      );
+    } catch (error) {
+      console.error("Failed to delete user from Cognito:", error);
+      // Continue with DynamoDB update even if Cognito fails
+      // The user might already be deleted or the error might be transient
+    }
 
     const command = new PutCommand({
       TableName: this.tableName,
