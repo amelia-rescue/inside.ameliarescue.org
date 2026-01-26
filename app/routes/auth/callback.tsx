@@ -45,6 +45,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       {
         user_id: userInfo.sub as string,
         accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
         expiresAt,
       },
       redirectTo,

@@ -146,6 +146,39 @@ export async function exchangeCodeForTokens(
 }
 
 /**
+ * Refresh access token using refresh token
+ */
+export async function refreshAccessToken(
+  refreshToken: string,
+): Promise<TokenResponse> {
+  const as = await getAuthorizationServer();
+  if (!as.token_endpoint) {
+    throw new Error("Token endpoint not found");
+  }
+
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: COGNITO_CLIENT_ID,
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch(as.token_endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Token refresh failed: ${error}`);
+  }
+
+  return await response.json();
+}
+
+/**
  * Get user info from access token
  */
 export async function getUserInfo(

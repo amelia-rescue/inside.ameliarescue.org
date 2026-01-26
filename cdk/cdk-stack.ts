@@ -85,6 +85,8 @@ export class CdkStack extends cdk.Stack {
         userSrp: true,
         user: true,
       },
+      accessTokenValidity: cdk.Duration.days(1),
+      refreshTokenValidity: cdk.Duration.days(30),
       oAuth: {
         flows: {
           authorizationCodeGrant: true,

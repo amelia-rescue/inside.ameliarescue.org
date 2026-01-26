@@ -12,7 +12,7 @@ export const authMiddleware: Route.MiddlewareFunction = async function (
   if (excludedPaths.includes(new URL(request.url).pathname)) {
     return await next();
   }
-  const sessionUser = await requireUser(request);
+  const { user: sessionUser, sessionHeader } = await requireUser(request);
   const userStore = UserStore.make();
   const user = await userStore.getUser(sessionUser.user_id);
   const preferences = await getPreferences(request);
@@ -20,5 +20,13 @@ export const authMiddleware: Route.MiddlewareFunction = async function (
     user,
     theme: preferences.theme,
   });
-  return await next();
+
+  const response = await next();
+
+  // If tokens were refreshed, set the session cookie in the response
+  if (sessionHeader) {
+    response.headers.set("Set-Cookie", sessionHeader);
+  }
+
+  return response;
 };

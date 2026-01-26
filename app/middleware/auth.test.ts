@@ -9,6 +9,10 @@ vi.mock("~/lib/session.server", () => ({
   requireUser: vi.fn(),
 }));
 
+vi.mock("~/lib/preferences.server", () => ({
+  getPreferences: vi.fn(async () => ({ theme: "forest" })),
+}));
+
 const testUser: User = {
   user_id: crypto.randomUUID(),
   email: "test@example.com",
@@ -35,8 +39,11 @@ describe("authMiddleware", () => {
   it("get's the user from the session", async () => {
     const { requireUser } = await import("~/lib/session.server");
     vi.mocked(requireUser).mockResolvedValue({
-      user_id: testUser.user_id,
-    } as SessionUser);
+      user: {
+        user_id: testUser.user_id,
+      } as SessionUser,
+      sessionHeader: "some-session-header",
+    });
 
     const context = {
       set: vi.fn(),
