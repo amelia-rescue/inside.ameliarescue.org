@@ -16,8 +16,8 @@ const testUser: User = {
   last_name: "User",
   website_role: "admin",
   membership_roles: [
-    { role_name: "Provider", track_name: "Paramedic" },
-    { role_name: "Driver", track_name: "Driver Basic" },
+    { role_name: "Provider", track_name: "Paramedic", precepting: false },
+    { role_name: "Driver", track_name: "Driver Basic", precepting: false },
   ],
 };
 
@@ -53,6 +53,9 @@ describe("authMiddleware", () => {
     expect(result).toBeDefined();
 
     expect(requireUser).toHaveBeenCalledWith(expect.any(Request));
-    expect(context.set).toHaveBeenCalledWith(appContext, { user: testUser });
+    expect(context.set).toHaveBeenCalledWith(appContext, {
+      user: testUser,
+      theme: "forest",
+    });
   });
 });

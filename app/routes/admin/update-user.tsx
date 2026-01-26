@@ -1,4 +1,4 @@
-import { data, Link, useFetcher } from "react-router";
+import { data, Link, useFetcher, redirect } from "react-router";
 import type { Route } from "./+types/update-user";
 import { appContext } from "~/context";
 import { userSchema, UserStore } from "~/lib/user-store";
@@ -29,6 +29,11 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   const c = context.get(appContext);
   if (!c) {
     throw new Error("App context not found");
+  }
+
+  // Check if user is admin
+  if (c.user.website_role !== "admin") {
+    throw redirect("/");
   }
 
   const store = UserStore.make();

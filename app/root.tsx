@@ -69,6 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const formData = new FormData();
     formData.append("theme", newTheme);
     fetcher.submit(formData, { method: "post" });
+  };
 
   return (
     <html lang="en" data-theme={theme}>
@@ -87,11 +88,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   Inside Amelia Rescue
                 </Link>
                 <div className="flex items-center gap-4">
-                  {loaderData?.user && (
-                    <Link to="/admin" className="btn btn-ghost btn-sm">
-                      Admin
-                    </Link>
-                  )}
+                  {loaderData?.user &&
+                    loaderData.user.website_role === "admin" && (
+                      <Link to="/admin" className="btn btn-ghost btn-sm">
+                        Admin
+                      </Link>
+                    )}
                   <div className="dropdown dropdown-end">
                     <div
                       tabIndex={0}

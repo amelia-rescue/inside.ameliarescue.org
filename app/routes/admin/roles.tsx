@@ -1,4 +1,4 @@
-import { data, Link, useFetcher } from "react-router";
+import { data, Link, useFetcher, redirect } from "react-router";
 import type { Route } from "./+types/roles";
 import { appContext } from "~/context";
 import { roleSchema, RoleStore, type Role } from "~/lib/role-store";
@@ -23,6 +23,12 @@ export async function loader({ context }: Route.LoaderArgs) {
   if (!c) {
     throw new Error("App context not found");
   }
+
+  // Check if user is admin
+  if (c.user.website_role !== "admin") {
+    throw redirect("/");
+  }
+
   const roleStore = RoleStore.make();
   const trackStore = TrackStore.make();
   const [roles, tracks] = await Promise.all([

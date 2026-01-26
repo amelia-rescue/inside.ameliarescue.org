@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, redirect } from "react-router";
 import type { Route } from "./+types/admin";
 import { appContext } from "~/context";
 import { UserStore } from "~/lib/user-store";
@@ -15,6 +15,13 @@ export const handle = {
 };
 
 export async function loader({ context }: Route.LoaderArgs) {
+  const ctx = context.get(appContext);
+
+  // Check if user is admin
+  if (!ctx?.user || ctx.user.website_role !== "admin") {
+    throw redirect("/");
+  }
+
   const userStore = UserStore.make();
   const users = await userStore.listUsers();
   return { users };

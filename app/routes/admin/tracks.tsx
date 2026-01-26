@@ -1,4 +1,4 @@
-import { data, Link, useFetcher } from "react-router";
+import { data, Link, useFetcher, redirect } from "react-router";
 import type { Route } from "./+types/tracks";
 import { appContext } from "~/context";
 import { trackSchema, TrackStore, type Track } from "~/lib/track-store";
@@ -23,6 +23,12 @@ export async function loader({ context }: Route.LoaderArgs) {
   if (!c) {
     throw new Error("App context not found");
   }
+
+  // Check if user is admin
+  if (c.user.website_role !== "admin") {
+    throw redirect("/");
+  }
+
   const trackStore = TrackStore.make();
   const certificationTypeStore = CertificationTypeStore.make();
   const [tracks, certificationTypes] = await Promise.all([
