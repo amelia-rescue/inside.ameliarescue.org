@@ -8,7 +8,10 @@ import {
   ScrollRestoration,
   useRouteError,
   useRouteLoaderData,
+  useFetcher,
+  data,
 } from "react-router";
+import { useEffect } from "react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -38,14 +41,37 @@ export async function loader({ context }: Route.LoaderArgs) {
   const appCtx = context.get(appContext);
   return {
     user: appCtx?.user,
+    theme: appCtx?.theme || "forest",
   };
 }
 
+export async function action({ request }: Route.ActionArgs) {
+  const formData = await request.formData();
+  const theme = formData.get("theme") as string;
+
+  const { setPreferences } = await import("./lib/preferences.server");
+  const headers = await setPreferences({ theme });
+
+  return data({ success: true }, { headers });
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
-  const data = useRouteLoaderData<typeof loader>("root");
+  const loaderData = useRouteLoaderData<typeof loader>("root");
   const error = useRouteError();
+  const fetcher = useFetcher();
+  const theme = loaderData?.theme || "forest";
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  const handleThemeChange = (newTheme: string) => {
+    const formData = new FormData();
+    formData.append("theme", newTheme);
+    fetcher.submit(formData, { method: "post" });
+
   return (
-    <html lang="en" data-theme="forest">
+    <html lang="en" data-theme={theme}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -60,20 +86,59 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Link to="/" className="text-xl font-semibold">
                   Inside Amelia Rescue
                 </Link>
-                <div className="flex items-center gap-2">
-                  {data?.user && (
+                <div className="flex items-center gap-4">
+                  {loaderData?.user && (
+                    <Link to="/admin" className="btn btn-ghost btn-sm">
+                      Admin
+                    </Link>
+                  )}
+                  <div className="dropdown dropdown-end">
+                    <div
+                      tabIndex={0}
+                      role="button"
+                      className="btn btn-ghost btn-sm"
+                    >
+                      Theme
+                    </div>
+                    <ul
+                      tabIndex={0}
+                      className="menu dropdown-content bg-base-100 rounded-box z-10 w-52 p-2 shadow"
+                    >
+                      <li>
+                        <button onClick={() => handleThemeChange("light")}>
+                          Light
+                        </button>
+                      </li>
+                      <li>
+                        <button onClick={() => handleThemeChange("dark")}>
+                          Dark
+                        </button>
+                      </li>
+                      <li>
+                        <button onClick={() => handleThemeChange("retro")}>
+                          Retro
+                        </button>
+                      </li>
+                      <li>
+                        <button onClick={() => handleThemeChange("forest")}>
+                          Forest
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                  {loaderData?.user && (
                     <Link to="/profile">
                       <div className="avatar">
                         <div className="ring-primary ring-offset-base-100 w-10 rounded-full ring ring-offset-2">
-                          {data.user.profile_picture_url ? (
+                          {loaderData.user.profile_picture_url ? (
                             <img
-                              src={data.user.profile_picture_url}
-                              alt={`${data.user.first_name} ${data.user.last_name}`}
+                              src={loaderData.user.profile_picture_url}
+                              alt={`${loaderData.user.first_name} ${loaderData.user.last_name}`}
                             />
                           ) : (
                             <div className="bg-neutral text-neutral-content flex h-full w-full items-center justify-center">
                               <span className="text-xl">
-                                {data.user.first_name.charAt(0)}
+                                {loaderData.user.first_name.charAt(0)}
                               </span>
                             </div>
                           )}
