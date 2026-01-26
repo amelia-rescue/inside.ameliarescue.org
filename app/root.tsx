@@ -88,12 +88,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   Inside Amelia Rescue
                 </Link>
                 <div className="flex items-center gap-4">
-                  {loaderData?.user &&
-                    loaderData.user.website_role === "admin" && (
-                      <Link to="/admin" className="btn btn-ghost btn-sm">
-                        Admin
-                      </Link>
-                    )}
+                  {loaderData?.user && (
+                    <Link
+                      to="/account/security"
+                      className="btn btn-ghost btn-sm"
+                    >
+                      Account
+                    </Link>
+                  )}
                   <div className="dropdown dropdown-end">
                     <div
                       tabIndex={0}
