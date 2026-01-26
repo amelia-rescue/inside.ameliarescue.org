@@ -215,18 +215,8 @@ export async function getUserInfo(
  */
 export function getLogoutUrl(request: Request): string {
   const appUrl = getAppUrl(request);
-  return `https://${COGNITO_DOMAIN}.auth.${COGNITO_REGION}.amazoncognito.com/logout?client_id=${COGNITO_CLIENT_ID}&logout_uri=${encodeURIComponent(appUrl)}`;
-}
-
-/**
- * Get configuration for client-side
- */
-export function getAuthConfig() {
-  return {
-    issuer: COGNITO_ISSUER,
-    clientId: COGNITO_CLIENT_ID,
-    domain: COGNITO_DOMAIN,
-  };
+  const logoutCompleteUrl = `${appUrl}/auth/logout-complete`;
+  return `https://${COGNITO_DOMAIN}/logout?client_id=${COGNITO_CLIENT_ID}&logout_uri=${encodeURIComponent(logoutCompleteUrl)}`;
 }
 
 interface WebAuthnCredential {

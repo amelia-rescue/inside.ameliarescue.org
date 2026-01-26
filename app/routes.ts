@@ -29,6 +29,7 @@ export default [
   ...prefix("auth", [
     route("login", "./routes/auth/login.tsx"),
     route("logout", "./routes/auth/logout.tsx"),
+    route("logout-complete", "./routes/auth/logout-complete.tsx"),
     route("callback", "./routes/auth/callback.tsx"),
     route("passkeys/add", "./routes/auth/passkeys.add.tsx"),
   ]),

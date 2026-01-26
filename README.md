@@ -5,28 +5,28 @@ Member management system for Amelia Rescue Squad.
 ## Data Model
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              USER                                       │
-│  ┌─────────────────────────────────────────────────────────────┐       │
-│  │ • user_id                                                    │       │
-│  │ • first_name, last_name, email, phone                        │       │
-│  │ • website_role (admin | user)                                │       │
-│  │ • profile_picture_url                                        │       │
-│  └─────────────────────────────────────────────────────────────┘       │
-│                                                                          │
-│  Has many MEMBERSHIP ROLES (role-track assignments):                    │
-│  ┌──────────────────────────────────────────────────────────┐          │
-│  │ • role_name          ──────┐                             │          │
-│  │ • track_name         ──────┼──┐                          │          │
-│  │ • precepting (boolean)     │  │                          │          │
-│  └────────────────────────────┼──┼──────────────────────────┘          │
-└────────────────────────────────┼──┼───────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                              USER                                 │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │ • user_id                                                   │  │
+│  │ • first_name, last_name, email, phone                       │  │
+│  │ • website_role (admin | user)                               │  │
+│  │ • profile_picture_url                                       │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+│  Has many MEMBERSHIP ROLES (role-track assignments):              │
+│  ┌──────────────────────────────────────────────────────────┐     │
+│  │ • role_name          ──────┐                             │     │
+│  │ • track_name         ──────┼──┐                          │     │
+│  │ • precepting (boolean)     │  │                          │     │
+│  └────────────────────────────┼──┼──────────────────────────┘     │
+└────────────────────────────────┼──┼───────────────────────────────┘
                                  │  │
                     ┌────────────┘  └────────────┐
-                    │                             │
-                    ▼                             ▼
+                    │                            │
+                    ▼                            ▼
          ┌──────────────────┐          ┌──────────────────┐
-         │      ROLE         │          │      TRACK       │
+         │      ROLE         │          │      TRACK      │
          ├──────────────────┤          ├──────────────────┤
          │ • name            │          │ • name           │
          │ • description     │          │ • description    │
@@ -66,8 +66,6 @@ Example Flow:
   4. User must have Certifications for "CPR" and "EMT-Basic" to be cleared
   5. If precepting: true, user is training/precepting for that track
 ```
-
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
 
 ## Features
 

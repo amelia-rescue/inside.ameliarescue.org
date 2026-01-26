@@ -8,7 +8,12 @@ export const authMiddleware: Route.MiddlewareFunction = async function (
   { request, context },
   next,
 ) {
-  const excludedPaths = ["/auth/login", "/auth/logout", "/auth/callback"];
+  const excludedPaths = [
+    "/auth/login",
+    "/auth/logout",
+    "/auth/logout-complete",
+    "/auth/callback",
+  ];
   if (excludedPaths.includes(new URL(request.url).pathname)) {
     return await next();
   }
