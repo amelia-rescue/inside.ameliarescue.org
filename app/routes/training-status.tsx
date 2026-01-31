@@ -15,6 +15,12 @@ import {
   flexRender,
   type SortingState,
 } from "@tanstack/react-table";
+import {
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaTimesCircle,
+  FaMinusCircle,
+} from "react-icons/fa";
 
 type CertStatus = "active" | "expiring_soon" | "expired" | "missing";
 
@@ -108,17 +114,39 @@ export async function loader({ context }: Route.LoaderArgs) {
     );
   });
 
+  // Calculate compliance statistics
+  let totalRequiredCerts = 0;
+  let totalActiveCerts = 0;
+  trainingData.forEach((row) => {
+    Object.values(row.certifications).forEach((status) => {
+      totalRequiredCerts++;
+      if (status === "active") {
+        totalActiveCerts++;
+      }
+    });
+  });
+
+  const compliancePercentage =
+    totalRequiredCerts > 0
+      ? Math.round((totalActiveCerts / totalRequiredCerts) * 100)
+      : 0;
+
   return {
     trainingData,
     certificationTypes: Array.from(allRequiredCerts).sort(),
     currentUserId: ctx.user.user_id,
+    complianceStats: {
+      totalRequiredCerts,
+      totalActiveCerts,
+      compliancePercentage,
+    },
   };
 }
 
 const columnHelper = createColumnHelper<TrainingStatusRow>();
 
 export default function TrainingStatus() {
-  const { trainingData, certificationTypes, currentUserId } =
+  const { trainingData, certificationTypes, currentUserId, complianceStats } =
     useLoaderData<typeof loader>();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -177,17 +205,19 @@ export default function TrainingStatus() {
                   : status === "expired"
                     ? "badge-error"
                     : "badge-error"; // missing is also red/error
-            const label =
-              status === "active"
-                ? "✓"
-                : status === "expiring_soon"
-                  ? "⚠"
-                  : status === "expired"
-                    ? "✗"
-                    : "—";
+            const icon =
+              status === "active" ? (
+                <FaCheckCircle />
+              ) : status === "expiring_soon" ? (
+                <FaExclamationTriangle />
+              ) : status === "expired" ? (
+                <FaTimesCircle />
+              ) : (
+                <FaMinusCircle />
+              );
             return (
               <div className="flex justify-center">
-                <span className={`badge ${badgeClass} badge-sm`}>{label}</span>
+                <span className={`badge ${badgeClass} badge-sm`}>{icon}</span>
               </div>
             );
           },
@@ -235,21 +265,45 @@ export default function TrainingStatus() {
 
         <div className="divider" />
 
-        <div className="flex gap-4 text-sm">
+        <div className="mb-6">
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="font-medium">Overall Compliance</span>
+            <span className="text-base-content/70">
+              {complianceStats.totalActiveCerts} /{" "}
+              {complianceStats.totalRequiredCerts} active (
+              {complianceStats.compliancePercentage}%)
+            </span>
+          </div>
+          <progress
+            className="progress progress-success w-full"
+            value={complianceStats.compliancePercentage}
+            max="100"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:gap-4">
           <div className="flex items-center gap-2">
-            <span className="badge badge-success badge-sm">✓</span>
+            <span className="badge badge-success badge-sm">
+              <FaCheckCircle />
+            </span>
             <span>Active</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="badge badge-warning badge-sm">⚠</span>
+            <span className="badge badge-warning badge-sm">
+              <FaExclamationTriangle />
+            </span>
             <span>Expiring Soon</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="badge badge-error badge-sm">✗</span>
+            <span className="badge badge-error badge-sm">
+              <FaTimesCircle />
+            </span>
             <span>Expired</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="badge badge-error badge-sm">—</span>
+            <span className="badge badge-error badge-sm">
+              <FaMinusCircle />
+            </span>
             <span>Missing</span>
           </div>
         </div>
