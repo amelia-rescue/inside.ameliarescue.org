@@ -224,6 +224,29 @@ export class CdkStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const certificationRemindersTable = new dynamodb.Table(
+      this,
+      "CertificationRemindersTable",
+      {
+        tableName: "aes_certification_reminders",
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        partitionKey: {
+          name: "reminder_id",
+          type: dynamodb.AttributeType.STRING,
+        },
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    certificationRemindersTable.addGlobalSecondaryIndex({
+      indexName: "UserIdIndex",
+      partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
+      sortKey: {
+        name: "sent_at",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
     // Create S3 bucket for file uploads
     const fileUploadsBucket = new s3.Bucket(this, "FileUploadsBucket", {
       enforceSSL: true,
@@ -284,6 +307,8 @@ export class CdkStack extends cdk.Stack {
           USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
           ROLES_TABLE_NAME: rolesTable.tableName,
           TRACKS_TABLE_NAME: tracksTable.tableName,
+          CERTIFICATION_REMINDERS_TABLE_NAME:
+            certificationRemindersTable.tableName,
           FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
         },
       },
@@ -294,6 +319,7 @@ export class CdkStack extends cdk.Stack {
     userCertificationsTable.grantReadWriteData(lambdaFunction);
     rolesTable.grantReadWriteData(lambdaFunction);
     tracksTable.grantReadWriteData(lambdaFunction);
+    certificationRemindersTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);
 
     // Grant Lambda permissions to manage Cognito users
@@ -343,6 +369,8 @@ export class CdkStack extends cdk.Stack {
           USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
           ROLES_TABLE_NAME: rolesTable.tableName,
           TRACKS_TABLE_NAME: tracksTable.tableName,
+          CERTIFICATION_REMINDERS_TABLE_NAME:
+            certificationRemindersTable.tableName,
         },
       },
     );
@@ -353,6 +381,9 @@ export class CdkStack extends cdk.Stack {
     userCertificationsTable.grantReadWriteData(certificationReminderFunction);
     rolesTable.grantReadWriteData(certificationReminderFunction);
     tracksTable.grantReadWriteData(certificationReminderFunction);
+    certificationRemindersTable.grantReadWriteData(
+      certificationReminderFunction,
+    );
 
     // Create EventBridge rule to trigger Lambda every hour
     const certificationReminderCronRule = new events.Rule(
@@ -543,6 +574,10 @@ export class CdkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "TracksTableName", {
       value: tracksTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "CertificationRemindersTableName", {
+      value: certificationRemindersTable.tableName,
     });
 
     new cdk.CfnOutput(this, "CognitoHostedUIUrl", {
