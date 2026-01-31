@@ -189,6 +189,7 @@ export default function User() {
                     <th>Issued</th>
                     <th>Expires</th>
                     <th>Status</th>
+                    <th>View</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -231,6 +232,20 @@ export default function User() {
                         <td>{certType.existing_cert?.issued_on || "—"}</td>
                         <td>{certType.existing_cert?.expires_on || "—"}</td>
                         <td>{getStatusBadge()}</td>
+                        <td>
+                          {certType.existing_cert?.file_url ? (
+                            <a
+                              href={certType.existing_cert.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-xs btn-ghost"
+                            >
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-base-content/50">—</span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}

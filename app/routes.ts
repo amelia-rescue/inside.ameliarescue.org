@@ -16,7 +16,6 @@ export default [
     route("update-user/:user_id", "./routes/admin/update-user.tsx"),
   ]),
   route("account/security", "./routes/security.tsx"),
-  route("temp", "./routes/temp.tsx"),
   route("roster", "./routes/roster.tsx"),
   route("training-status", "./routes/training-status.tsx"),
   route("protocols", "./routes/protocols.tsx"),
