@@ -14,6 +14,7 @@ import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
+import * as ses from "aws-cdk-lib/aws-ses";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
@@ -39,6 +40,14 @@ export class CdkStack extends cdk.Stack {
       appCertificate,
       authCertificate,
     } = props;
+
+    // Create SES email identity for sending emails from custom domain
+    // Go into the console and click "publish DNS records" in the SES console -> identities section after deployment
+    // However, it wouldn't be terribly difficult to set this up in code but AI is not doing it correctly and may require
+    // some string manipulation that I don't care to write at the moment.
+    const sesIdentity = new ses.CfnEmailIdentity(this, "SesEmailIdentity", {
+      emailIdentity: appDomainName,
+    });
 
     // Create Cognito User Pool with Passkey support
     const userPool = new cognito.UserPool(this, "UserPool", {
@@ -89,6 +98,11 @@ export class CdkStack extends cdk.Stack {
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
+      email: cognito.UserPoolEmail.withSES({
+        fromEmail: `noreply@${appDomainName}`,
+        fromName: "Inside Amelia Rescue",
+        sesVerifiedDomain: appDomainName,
+      }),
     });
 
     // Create User Pool Client with OIDC configuration
