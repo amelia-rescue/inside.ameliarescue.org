@@ -1,5 +1,6 @@
 import { createCookie, redirect } from "react-router";
 import { refreshAccessToken } from "./auth.server";
+import { log } from "./logger";
 
 const SESSION_SECRET =
   process.env.SESSION_SECRET || "default-secret-change-in-production";
@@ -127,7 +128,7 @@ export async function getUser(
           sessionHeader: headers.get("Set-Cookie") || undefined,
         };
       } catch (error) {
-        console.error("Token refresh failed:", error);
+        log.error("Token refresh failed", { error });
         // If refresh fails, return null to force re-authentication
         return { user: null };
       }

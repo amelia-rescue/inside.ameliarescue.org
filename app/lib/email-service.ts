@@ -1,5 +1,6 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import type { User } from "./user-store";
+import { log } from "./logger";
 
 export class EmailService {
   private readonly client: SESClient;
@@ -149,9 +150,9 @@ https://inside.ameliarescue.org
 
     try {
       await this.client.send(command);
-      console.log(`Email sent successfully to ${toEmail}`);
+      log.info("Email sent successfully", { to_email: toEmail });
     } catch (error) {
-      console.error(`Failed to send email to ${toEmail}:`, error);
+      log.error("Failed to send email", { to_email: toEmail, error });
       throw error;
     }
   }

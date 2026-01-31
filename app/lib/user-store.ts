@@ -14,6 +14,7 @@ import {
 import { randomBytes } from "crypto";
 import { type } from "arktype";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
+import { log } from "./logger";
 
 const membershipRoleItem = type({
   role_name: "string",
@@ -236,7 +237,7 @@ export class UserStore {
         }),
       );
     } catch (error) {
-      console.error("Failed to delete user from Cognito:", error);
+      log.error("Failed to delete user from Cognito", { error });
       // Continue with DynamoDB update even if Cognito fails
       // The user might already be deleted or the error might be transient
     }

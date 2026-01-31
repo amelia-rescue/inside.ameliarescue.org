@@ -2,6 +2,7 @@ import { RoleStore } from "./role-store";
 import { TrackStore } from "./track-store";
 import { CertificationTypeStore } from "./certification-type-store";
 import { MembershipService } from "./membership-service";
+import { log } from "./logger";
 
 export async function seedMembershipHierarchy() {
   const roleStore = RoleStore.make();
@@ -85,5 +86,5 @@ export async function seedMembershipHierarchy() {
     await certificationTypeStore.createCertificationType(certType);
   }
 
-  console.log("Membership hierarchy seeded successfully!");
+  log.info("Membership hierarchy seeded successfully");
 }

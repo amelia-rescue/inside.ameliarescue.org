@@ -1,4 +1,4 @@
-function _log(level: string, message: string, obj: any) {
+function _log(level: string, message: string, obj?: any) {
   if (import.meta.env?.MODE === "test") {
     return;
   }
@@ -12,13 +12,13 @@ function _log(level: string, message: string, obj: any) {
 }
 
 export const log = {
-  info: (message: string, obj: any) => {
+  info: (message: string, obj?: any) => {
     _log("info", message, obj);
   },
-  warn: (message: string, obj: any) => {
+  warn: (message: string, obj?: any) => {
     _log("warn", message, obj);
   },
-  error: (message: string, obj: any) => {
+  error: (message: string, obj?: any) => {
     _log("error", message, obj);
   },
 };

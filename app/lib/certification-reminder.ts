@@ -9,6 +9,7 @@ import { TrackStore, type Track } from "./track-store";
 import { UserStore, type User } from "./user-store";
 import { CertificationReminderStore } from "./certification-reminder-store";
 import { EmailService } from "./email-service";
+import { log } from "./logger";
 
 interface CertificationReminderDeps {
   userStore?: UserStore;
@@ -128,9 +129,10 @@ export class CertificationReminder {
         );
 
       if (!hasReminder) {
-        console.log(
-          `Sending expired certification reminder for user ${user.user_id}, cert ${cert.certification_id}`,
-        );
+        log.info("Sending expired certification reminder", {
+          user_id: user.user_id,
+          certification_id: cert.certification_id,
+        });
 
         try {
           await this.emailService.sendCertificationExpiredEmail({
@@ -148,10 +150,10 @@ export class CertificationReminder {
             email_sent: true,
           });
         } catch (error) {
-          console.error(
-            `Failed to send expired certification email for user ${user.user_id}:`,
+          log.error("Failed to send expired certification email", {
+            user_id: user.user_id,
             error,
-          );
+          });
         }
       }
     }
@@ -165,9 +167,10 @@ export class CertificationReminder {
         );
 
       if (!hasReminder) {
-        console.log(
-          `Sending expiring soon certification reminder for user ${user.user_id}, cert ${cert.certification_id}`,
-        );
+        log.info("Sending expiring soon certification reminder", {
+          user_id: user.user_id,
+          certification_id: cert.certification_id,
+        });
 
         try {
           await this.emailService.sendCertificationExpiringSoonEmail({
@@ -185,10 +188,10 @@ export class CertificationReminder {
             email_sent: true,
           });
         } catch (error) {
-          console.error(
-            `Failed to send expiring soon certification email for user ${user.user_id}:`,
+          log.error("Failed to send expiring soon certification email", {
+            user_id: user.user_id,
             error,
-          );
+          });
         }
       }
     }
@@ -202,9 +205,10 @@ export class CertificationReminder {
         );
 
       if (!hasReminder) {
-        console.log(
-          `Sending missing certification reminder for user ${user.user_id}, cert type ${missingCert.name}`,
-        );
+        log.info("Sending missing certification reminder", {
+          user_id: user.user_id,
+          certification_type: missingCert.name,
+        });
 
         try {
           await this.emailService.sendMissingCertificationEmail({
@@ -221,10 +225,10 @@ export class CertificationReminder {
             email_sent: true,
           });
         } catch (error) {
-          console.error(
-            `Failed to send missing certification email for user ${user.user_id}:`,
+          log.error("Failed to send missing certification email", {
+            user_id: user.user_id,
             error,
-          );
+          });
         }
       }
     }
