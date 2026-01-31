@@ -15,6 +15,12 @@ describe("certification reminder test", () => {
   let dynamo: DynaliteServer;
   let mockCognitoClient: any;
   let cognitoSendSpy: any;
+  let userStore: UserStore;
+  let roleStore: RoleStore;
+  let trackStore: TrackStore;
+  let certificationTypeStore: CertificationTypeStore;
+  let certificationStore: CertificationStore;
+  let reminderStore: CertificationReminderStore;
 
   beforeEach(async () => {
     // Reset UserStore static cognito client
@@ -33,6 +39,51 @@ describe("certification reminder test", () => {
     };
 
     dynamo = await setupDynamo();
+
+    // Initialize stores
+    userStore = UserStore.make({ cognito: mockCognitoClient });
+    roleStore = RoleStore.make();
+    trackStore = TrackStore.make();
+    certificationTypeStore = CertificationTypeStore.make();
+    certificationStore = CertificationStore.make();
+    reminderStore = CertificationReminderStore.make();
+
+    // Create common test data
+    await roleStore.createRole({
+      name: "Crew Member",
+      description: "Basic crew member role",
+      allowed_tracks: ["BLS", "ALS"],
+    });
+
+    await trackStore.createTrack({
+      name: "BLS",
+      description: "Basic Life Support track",
+      required_certifications: ["CPR", "First Aid"],
+    });
+
+    await trackStore.createTrack({
+      name: "ALS",
+      description: "Advanced Life Support track",
+      required_certifications: ["ACLS"],
+    });
+
+    await certificationTypeStore.createCertificationType({
+      name: "CPR",
+      description: "CPR certification",
+      expires: true,
+    });
+
+    await certificationTypeStore.createCertificationType({
+      name: "First Aid",
+      description: "First Aid certification",
+      expires: true,
+    });
+
+    await certificationTypeStore.createCertificationType({
+      name: "ACLS",
+      description: "Advanced Cardiac Life Support",
+      expires: true,
+    });
 
     // Mock EmailService to prevent actual email sending
     vi.spyOn(
@@ -55,32 +106,6 @@ describe("certification reminder test", () => {
   });
 
   it("should send expired certification reminder", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const certificationStore = CertificationStore.make();
-    const reminderStore = CertificationReminderStore.make();
-
-    // Create test data
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "John",
       last_name: "Doe",
@@ -91,7 +116,7 @@ describe("certification reminder test", () => {
       ],
     });
 
-    // Create expired certification
+    // Create expired CPR certification and valid First Aid
     const yesterday = dayjs().subtract(1, "day").toISOString();
     await certificationStore.createCertification({
       certification_id: "cert-1",
@@ -100,6 +125,15 @@ describe("certification reminder test", () => {
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
       expires_on: yesterday,
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-1b",
+      user_id: user.user_id,
+      certification_type_name: "First Aid",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
     });
 
     const certificationReminder = new CertificationReminder({ userStore });
@@ -125,32 +159,6 @@ describe("certification reminder test", () => {
   });
 
   it("should send expiring soon certification reminder", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const certificationStore = CertificationStore.make();
-    const reminderStore = CertificationReminderStore.make();
-
-    // Create test data
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "Jane",
       last_name: "Smith",
@@ -161,7 +169,7 @@ describe("certification reminder test", () => {
       ],
     });
 
-    // Create certification expiring in 2 months
+    // Create CPR expiring in 2 months and valid First Aid
     const twoMonthsFromNow = dayjs().add(2, "months").toISOString();
     await certificationStore.createCertification({
       certification_id: "cert-2",
@@ -170,6 +178,15 @@ describe("certification reminder test", () => {
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(1, "year").toISOString(),
       expires_on: twoMonthsFromNow,
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-2b",
+      user_id: user.user_id,
+      certification_type_name: "First Aid",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
     });
 
     const certificationReminder = new CertificationReminder({ userStore });
@@ -195,37 +212,6 @@ describe("certification reminder test", () => {
   });
 
   it("should send missing certification reminder", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const reminderStore = CertificationReminderStore.make();
-
-    // Create test data
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR", "First Aid"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "First Aid",
-      description: "First Aid certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "Bob",
       last_name: "Johnson",
@@ -271,32 +257,6 @@ describe("certification reminder test", () => {
   });
 
   it("should not send duplicate expired certification reminders", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const certificationStore = CertificationStore.make();
-    const reminderStore = CertificationReminderStore.make();
-
-    // Create test data
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "Alice",
       last_name: "Williams",
@@ -315,6 +275,15 @@ describe("certification reminder test", () => {
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
       expires_on: yesterday,
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-4b",
+      user_id: user.user_id,
+      certification_type_name: "First Aid",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
     });
 
     const certificationReminder = new CertificationReminder({ userStore });
@@ -336,37 +305,12 @@ describe("certification reminder test", () => {
       EmailService.prototype.sendCertificationExpiredEmail,
     ).not.toHaveBeenCalled();
 
-    // Should still only have one reminder
+    // Should still only have one reminder for expired cert
     const reminders = await reminderStore.getRemindersByUser(user.user_id);
     expect(reminders).toHaveLength(1);
   });
 
   it("should not send duplicate expiring soon reminders", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const certificationStore = CertificationStore.make();
-    const reminderStore = CertificationReminderStore.make();
-
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "Charlie",
       last_name: "Brown",
@@ -385,6 +329,15 @@ describe("certification reminder test", () => {
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(1, "year").toISOString(),
       expires_on: twoMonthsFromNow,
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-5b",
+      user_id: user.user_id,
+      certification_type_name: "First Aid",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
     });
 
     const certificationReminder = new CertificationReminder({ userStore });
@@ -410,30 +363,6 @@ describe("certification reminder test", () => {
   });
 
   it("should not send duplicate missing certification reminders", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const reminderStore = CertificationReminderStore.make();
-
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "Diana",
       last_name: "Prince",
@@ -446,11 +375,11 @@ describe("certification reminder test", () => {
 
     const certificationReminder = new CertificationReminder({ userStore });
 
-    // Run first time
+    // Run first time - user missing both CPR and First Aid
     await certificationReminder.checkAllUserCertifications();
     expect(
       EmailService.prototype.sendMissingCertificationEmail,
-    ).toHaveBeenCalledTimes(1);
+    ).toHaveBeenCalledTimes(2);
 
     vi.clearAllMocks();
 
@@ -463,34 +392,10 @@ describe("certification reminder test", () => {
     ).not.toHaveBeenCalled();
 
     const reminders = await reminderStore.getRemindersByUser(user.user_id);
-    expect(reminders).toHaveLength(1);
+    expect(reminders).toHaveLength(2);
   });
 
   it("should not send reminder for certification expiring in 4 months", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const certificationStore = CertificationStore.make();
-
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "Eve",
       last_name: "Adams",
@@ -501,12 +406,21 @@ describe("certification reminder test", () => {
       ],
     });
 
-    // Create certification expiring in 4 months (outside the 3-month window)
+    // Create certifications expiring in 4 months (outside the 3-month window)
     const fourMonthsFromNow = dayjs().add(4, "months").toISOString();
     await certificationStore.createCertification({
       certification_id: "cert-7",
       user_id: user.user_id,
       certification_type_name: "CPR",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().subtract(8, "months").toISOString(),
+      expires_on: fourMonthsFromNow,
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-7b",
+      user_id: user.user_id,
+      certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(8, "months").toISOString(),
       expires_on: fourMonthsFromNow,
@@ -528,30 +442,6 @@ describe("certification reminder test", () => {
   });
 
   it("should not send reminder for valid current certification", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const certificationStore = CertificationStore.make();
-
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "Frank",
       last_name: "Miller",
@@ -562,12 +452,21 @@ describe("certification reminder test", () => {
       ],
     });
 
-    // Create valid certification expiring in 1 year
+    // Create valid certifications expiring in 1 year
     const oneYearFromNow = dayjs().add(1, "year").toISOString();
     await certificationStore.createCertification({
       certification_id: "cert-8",
       user_id: user.user_id,
       certification_type_name: "CPR",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: oneYearFromNow,
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-8b",
+      user_id: user.user_id,
+      certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
       expires_on: oneYearFromNow,
@@ -589,30 +488,6 @@ describe("certification reminder test", () => {
   });
 
   it("should handle multiple users with different certification states", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const certificationStore = CertificationStore.make();
-
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     // User with expired cert
     const user1 = await userStore.createUser({
       first_name: "User",
@@ -631,6 +506,15 @@ describe("certification reminder test", () => {
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
       expires_on: dayjs().subtract(1, "day").toISOString(),
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-9b",
+      user_id: user1.user_id,
+      certification_type_name: "First Aid",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().subtract(2, "years").toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
     });
 
     // User with expiring soon cert
@@ -653,7 +537,16 @@ describe("certification reminder test", () => {
       expires_on: dayjs().add(2, "months").toISOString(),
     });
 
-    // User with missing cert
+    await certificationStore.createCertification({
+      certification_id: "cert-10b",
+      user_id: user2.user_id,
+      certification_type_name: "First Aid",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().subtract(1, "year").toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
+    });
+
+    // User with missing certs
     const user3 = await userStore.createUser({
       first_name: "User",
       last_name: "Eleven",
@@ -676,35 +569,10 @@ describe("certification reminder test", () => {
     ).toHaveBeenCalledTimes(1);
     expect(
       EmailService.prototype.sendMissingCertificationEmail,
-    ).toHaveBeenCalledTimes(1);
+    ).toHaveBeenCalledTimes(2);
   });
 
   it("should not save reminder when email sending fails", async () => {
-    const userStore = UserStore.make({ cognito: mockCognitoClient });
-    const roleStore = RoleStore.make();
-    const trackStore = TrackStore.make();
-    const certificationTypeStore = CertificationTypeStore.make();
-    const certificationStore = CertificationStore.make();
-    const reminderStore = CertificationReminderStore.make();
-
-    await roleStore.createRole({
-      name: "Crew Member",
-      description: "Basic crew member role",
-      allowed_tracks: ["BLS"],
-    });
-
-    await trackStore.createTrack({
-      name: "BLS",
-      description: "Basic Life Support track",
-      required_certifications: ["CPR"],
-    });
-
-    await certificationTypeStore.createCertificationType({
-      name: "CPR",
-      description: "CPR certification",
-      expires: true,
-    });
-
     const user = await userStore.createUser({
       first_name: "Test",
       last_name: "User",
@@ -715,7 +583,7 @@ describe("certification reminder test", () => {
       ],
     });
 
-    // Create expired certification
+    // Create expired certification and valid First Aid
     const yesterday = dayjs().subtract(1, "day").toISOString();
     await certificationStore.createCertification({
       certification_id: "cert-fail",
@@ -726,16 +594,29 @@ describe("certification reminder test", () => {
       expires_on: yesterday,
     });
 
+    await certificationStore.createCertification({
+      certification_id: "cert-fail-2",
+      user_id: user.user_id,
+      certification_type_name: "First Aid",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
+    });
+
     // Mock email service to throw an error
     vi.spyOn(
       EmailService.prototype,
       "sendCertificationExpiredEmail",
     ).mockRejectedValue(new Error("Email service unavailable"));
+    vi.spyOn(
+      EmailService.prototype,
+      "sendMissingCertificationEmail",
+    ).mockRejectedValue(new Error("Email service unavailable"));
 
     const certificationReminder = new CertificationReminder({ userStore });
     await certificationReminder.checkAllUserCertifications();
 
-    // Verify email was attempted
+    // Verify email was attempted for expired cert
     expect(
       EmailService.prototype.sendCertificationExpiredEmail,
     ).toHaveBeenCalledTimes(1);
@@ -743,5 +624,50 @@ describe("certification reminder test", () => {
     // Verify NO reminder was saved due to email failure
     const reminders = await reminderStore.getRemindersByUser(user.user_id);
     expect(reminders).toHaveLength(0);
+  });
+
+  it("should not send missing required certification reminders for certifcations that are not required by the user", async () => {
+    const user = await userStore.createUser({
+      first_name: "Test",
+      last_name: "User",
+      email: "test@example.com",
+      website_role: "user",
+      membership_roles: [
+        { role_name: "Crew Member", track_name: "BLS", precepting: false },
+      ],
+    });
+
+    const certificationReminder = new CertificationReminder({ userStore });
+    await certificationReminder.checkAllUserCertifications();
+
+    // Should send emails for CPR and First Aid (required by BLS), but not ACLS (required by ALS)
+    expect(
+      EmailService.prototype.sendMissingCertificationEmail,
+    ).toHaveBeenCalledTimes(2);
+    expect(
+      EmailService.prototype.sendMissingCertificationEmail,
+    ).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        certificationName: "ACLS",
+      }),
+    );
+    expect(
+      EmailService.prototype.sendMissingCertificationEmail,
+    ).toHaveBeenCalledWith({
+      user: expect.objectContaining({
+        email: "test@example.com",
+        first_name: "Test",
+      }),
+      certificationName: "CPR",
+    });
+    expect(
+      EmailService.prototype.sendMissingCertificationEmail,
+    ).toHaveBeenCalledWith({
+      user: expect.objectContaining({
+        email: "test@example.com",
+        first_name: "Test",
+      }),
+      certificationName: "First Aid",
+    });
   });
 });

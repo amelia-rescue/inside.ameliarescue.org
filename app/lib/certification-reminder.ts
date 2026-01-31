@@ -72,12 +72,15 @@ export class CertificationReminder {
         (userRole) => userRole.role_name === role.name,
       ),
     );
-    // get all the tracks for from the user roles
+    // get all the tracks the user is actually assigned to (not just allowed tracks)
     const userTracks = new Set<Track>();
-    for (const userRole of userRoles) {
-      userRole.allowed_tracks.forEach((trackName) => {
-        userTracks.add(this.tracks.find((track) => track.name === trackName)!);
-      });
+    for (const membershipRole of user.membership_roles) {
+      const track = this.tracks.find(
+        (t) => t.name === membershipRole.track_name,
+      );
+      if (track) {
+        userTracks.add(track);
+      }
     }
 
     // use the tracks to get all the required certifications for this user
