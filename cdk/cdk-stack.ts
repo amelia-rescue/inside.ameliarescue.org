@@ -18,6 +18,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const passwordExpiryDays = 30;
 
 export interface CdkStackProps extends cdk.StackProps {
   appDomainName: string;
@@ -46,6 +47,21 @@ export class CdkStack extends cdk.Stack {
       signInAliases: {
         email: true,
       },
+      userVerification: {
+        emailSubject: "Verify your email for inside.ameliarescue.org",
+        emailBody:
+          "Your verification code for inside.ameliarescue.org is {####}.",
+        smsMessage: "Your inside.ameliarescue.org verification code is {####}.",
+      },
+      userInvitation: {
+        emailSubject: "You're invited to inside.ameliarescue.org",
+        emailBody: `Your username is {username} and temporary password is {####}. Your temporary password will expire in ${passwordExpiryDays} days. Open https://inside.ameliarescue.org to set your password.`,
+        smsMessage: `Your inside.ameliarescue.org username is {username} and temporary password is {####}.`,
+      },
+      deviceTracking: {
+        challengeRequiredOnNewDevice: true,
+        deviceOnlyRememberedOnUserPrompt: false,
+      },
       autoVerify: {
         email: true,
       },
@@ -69,6 +85,7 @@ export class CdkStack extends cdk.Stack {
         requireUppercase: false,
         requireDigits: false,
         requireSymbols: false,
+        tempPasswordValidity: cdk.Duration.days(passwordExpiryDays),
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: cdk.RemovalPolicy.DESTROY,

@@ -1,4 +1,5 @@
 import { createCookie, redirect } from "react-router";
+import { refreshAccessToken } from "./auth.server";
 
 const SESSION_SECRET =
   process.env.SESSION_SECRET || "default-secret-change-in-production";
@@ -89,7 +90,6 @@ export async function getUser(
     // Try to refresh the token if we have a refresh token
     if (user.refreshToken) {
       try {
-        const { refreshAccessToken } = await import("./auth.server");
         const tokens = await refreshAccessToken(user.refreshToken);
 
         // Update the user with new tokens
