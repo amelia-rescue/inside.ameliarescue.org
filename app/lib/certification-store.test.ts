@@ -11,27 +11,7 @@ describe("certification store test", () => {
   let dynamo: DynaliteServer;
 
   beforeEach(async () => {
-    dynamo = await setupDynamo(
-      {
-        tableName: "aes_users",
-        partitionKey: "user_id",
-      },
-      {
-        tableName: "aes_certification_types",
-        partitionKey: "name",
-      },
-      {
-        tableName: "aes_user_certifications",
-        partitionKey: "certification_id",
-        gsi: [
-          {
-            indexName: "UserIdIndex",
-            partitionKey: "user_id",
-            sortKey: "uploaded_at",
-          },
-        ],
-      },
-    );
+    dynamo = await setupDynamo();
   });
 
   afterEach(async () => {

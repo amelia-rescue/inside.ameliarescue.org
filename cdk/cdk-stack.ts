@@ -247,6 +247,20 @@ export class CdkStack extends cdk.Stack {
       },
     });
 
+    const certificationSnapshotsTable = new dynamodb.Table(
+      this,
+      "CertificationSnapshotsTable",
+      {
+        tableName: "aes_certification_snapshots",
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        partitionKey: {
+          name: "snapshot_date",
+          type: dynamodb.AttributeType.STRING,
+        },
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
     // Create S3 bucket for file uploads
     const fileUploadsBucket = new s3.Bucket(this, "FileUploadsBucket", {
       enforceSSL: true,
@@ -409,6 +423,85 @@ export class CdkStack extends cdk.Stack {
     // Add Lambda as target for the EventBridge rule
     certificationReminderCronRule.addTarget(
       new eventsTargets.LambdaFunction(certificationReminderFunction),
+    );
+
+    // Create CloudWatch log group for certification snapshot Lambda function
+    const certificationSnapshotLogGroup = new logs.LogGroup(
+      this,
+      "certification-snapshot-logs",
+      {
+        logGroupName: "/aws/lambda/inside-amelia-rescue-certification-snapshot",
+        retention: logs.RetentionDays.SEVEN_YEARS,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    // Create Lambda function for certification snapshot scheduled task
+    const certificationSnapshotFunction = new nodejs.NodejsFunction(
+      this,
+      "CertificationSnapshotFunction",
+      {
+        functionName: "inside-amelia-rescue-certification-snapshot",
+        runtime: lambda.Runtime.NODEJS_24_X,
+        handler: "handler",
+        entry: path.join(__dirname, "../server/certification-snapshot.ts"),
+        memorySize: 1024,
+        timeout: cdk.Duration.seconds(300),
+        architecture: cdk.aws_lambda.Architecture.ARM_64,
+        logGroup: certificationSnapshotLogGroup,
+        bundling: {
+          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          minify: true,
+          sourceMap: true,
+          target: "es2022",
+        },
+        environment: {
+          NODE_ENV: "production",
+          USERS_TABLE_NAME: usersTable.tableName,
+          CERTIFICATION_TYPES_TABLE_NAME: certificationTypesTable.tableName,
+          USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
+          ROLES_TABLE_NAME: rolesTable.tableName,
+          TRACKS_TABLE_NAME: tracksTable.tableName,
+          CERTIFICATION_REMINDERS_TABLE_NAME:
+            certificationRemindersTable.tableName,
+          CERTIFICATION_SNAPSHOTS_TABLE_NAME:
+            certificationSnapshotsTable.tableName,
+        },
+      },
+    );
+
+    // Grant certification snapshot Lambda permissions to access DynamoDB tables
+    usersTable.grantReadWriteData(certificationSnapshotFunction);
+    certificationTypesTable.grantReadWriteData(certificationSnapshotFunction);
+    userCertificationsTable.grantReadWriteData(certificationSnapshotFunction);
+    rolesTable.grantReadWriteData(certificationSnapshotFunction);
+    tracksTable.grantReadWriteData(certificationSnapshotFunction);
+    certificationRemindersTable.grantReadData(certificationSnapshotFunction);
+    certificationSnapshotsTable.grantReadWriteData(
+      certificationSnapshotFunction,
+    );
+
+    // Create EventBridge rule to trigger Lambda daily at 6 AM UTC
+    const certificationSnapshotCronRule = new events.Rule(
+      this,
+      "CertificationSnapshotRule",
+      {
+        ruleName: "certification-snapshot-task",
+        description:
+          "Triggers the certification snapshot lambda function daily at 6 AM UTC",
+        schedule: events.Schedule.cron({
+          minute: "0",
+          hour: "6",
+          day: "*",
+          month: "*",
+          year: "*",
+        }),
+      },
+    );
+
+    // Add Lambda as target for the EventBridge rule
+    certificationSnapshotCronRule.addTarget(
+      new eventsTargets.LambdaFunction(certificationSnapshotFunction),
     );
 
     // Create API Gateway HTTP API
@@ -587,6 +680,10 @@ export class CdkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "CertificationRemindersTableName", {
       value: certificationRemindersTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "CertificationSnapshotsTableName", {
+      value: certificationSnapshotsTable.tableName,
     });
 
     new cdk.CfnOutput(this, "CognitoHostedUIUrl", {

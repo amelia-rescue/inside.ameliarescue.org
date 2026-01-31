@@ -12,16 +12,7 @@ describe("certification type store test", () => {
   let dynamo: DynaliteServer;
 
   beforeEach(async () => {
-    dynamo = await setupDynamo(
-      {
-        tableName: "aes_users",
-        partitionKey: "user_id",
-      },
-      {
-        tableName: "aes_certification_types",
-        partitionKey: "name",
-      },
-    );
+    dynamo = await setupDynamo();
   });
 
   afterEach(async () => {

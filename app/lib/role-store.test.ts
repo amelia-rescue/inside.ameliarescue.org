@@ -12,10 +12,7 @@ describe("role store test", () => {
   let dynamo: DynaliteServer;
 
   beforeEach(async () => {
-    dynamo = await setupDynamo({
-      tableName: "aes_roles",
-      partitionKey: "name",
-    });
+    dynamo = await setupDynamo();
   });
 
   afterEach(async () => {

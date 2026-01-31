@@ -29,10 +29,7 @@ describe("user store test", () => {
       send: cognitoSendSpy,
     };
 
-    dynamo = await setupDynamo({
-      tableName: "aes_users",
-      partitionKey: "user_id",
-    });
+    dynamo = await setupDynamo();
   });
 
   afterEach(async () => {

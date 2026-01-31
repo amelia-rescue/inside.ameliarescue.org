@@ -11,17 +11,7 @@ describe("certification reminder store test", () => {
   let dynamo: DynaliteServer;
 
   beforeEach(async () => {
-    dynamo = await setupDynamo({
-      tableName: "aes_certification_reminders",
-      partitionKey: "reminder_id",
-      gsi: [
-        {
-          indexName: "UserIdIndex",
-          partitionKey: "user_id",
-          sortKey: "sent_at",
-        },
-      ],
-    });
+    dynamo = await setupDynamo();
   });
 
   afterEach(async () => {

@@ -12,10 +12,7 @@ describe("track store test", () => {
   let dynamo: DynaliteServer;
 
   beforeEach(async () => {
-    dynamo = await setupDynamo({
-      tableName: "aes_tracks",
-      partitionKey: "name",
-    });
+    dynamo = await setupDynamo();
   });
 
   afterEach(async () => {

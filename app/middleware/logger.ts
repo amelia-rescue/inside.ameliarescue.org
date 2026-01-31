@@ -1,4 +1,6 @@
+import { log } from "~/lib/logger";
 import type { Route } from "../+types/root";
+import { getUser } from "~/lib/session.server";
 
 const requestLogger: Route.MiddlewareFunction = async function (
   { request, context },
@@ -9,15 +11,18 @@ const requestLogger: Route.MiddlewareFunction = async function (
 
   try {
     response = await next();
-    console.log(
-      JSON.stringify({
-        status: response.status,
-        time: performance.now() - start,
-        method: request.method,
-        url: request.url,
-        // headers: Object.fromEntries(request.headers),
-      }),
-    );
+
+    const url = new URL(request.url);
+    const query = url.searchParams;
+    const { user } = await getUser(request);
+    log.info("request_log", {
+      status: response.status,
+      time: performance.now() - start,
+      method: request.method,
+      path: url.pathname,
+      query: Object.fromEntries(query.entries()),
+      user: user?.user_id,
+    });
     return response;
   } catch (error) {
     let response = Response.json(
@@ -29,14 +34,18 @@ const requestLogger: Route.MiddlewareFunction = async function (
         response = error;
       }
     }
-    console.log(
-      JSON.stringify({
-        status: response.status,
-        time: performance.now() - start,
-        method: request.method,
-        url: request.url,
-      }),
-    );
+    const url = new URL(request.url);
+    const query = url.searchParams;
+    const { user } = await getUser(request);
+
+    log.info("request_log", {
+      status: response.status,
+      time: performance.now() - start,
+      method: request.method,
+      path: url.pathname,
+      query: Object.fromEntries(query.entries()),
+      user: user?.user_id,
+    });
     return response;
   }
 };

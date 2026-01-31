@@ -6,7 +6,56 @@ import {
 import dynalite, { type DynaliteServer } from "dynalite";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
-export async function setupDynamo(
+export async function setupDynamo() {
+  const schemas = [
+    {
+      tableName: "aes_users",
+      partitionKey: "user_id",
+    },
+    {
+      tableName: "aes_roles",
+      partitionKey: "name",
+    },
+    {
+      tableName: "aes_tracks",
+      partitionKey: "name",
+    },
+    {
+      tableName: "aes_certification_types",
+      partitionKey: "name",
+    },
+    {
+      tableName: "aes_user_certifications",
+      partitionKey: "certification_id",
+      gsi: [
+        {
+          indexName: "UserIdIndex",
+          partitionKey: "user_id",
+          sortKey: "uploaded_at",
+        },
+      ],
+    },
+    {
+      tableName: "aes_certification_reminders",
+      partitionKey: "reminder_id",
+      gsi: [
+        {
+          indexName: "UserIdIndex",
+          partitionKey: "user_id",
+          sortKey: "sent_at",
+        },
+      ],
+    },
+    {
+      tableName: "aes_certification_snapshots",
+      partitionKey: "snapshot_date",
+    },
+  ];
+
+  return await _setupDynamo(...schemas);
+}
+
+export async function _setupDynamo(
   ...schemas: Array<{
     tableName: string;
     partitionKey: string;
@@ -125,10 +174,10 @@ export async function setupDynamo(
     await Promise.race([
       // 500 ms timeout to create the table
       new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Table creation timeout")), 500);
+        setTimeout(() => reject(new Error("Table creation timeout")), 2000);
       }),
 
-      // poll for table creation every 25ms for 20 attempts (500ms total)
+      // poll for table creation every 25ms for 20 attempts (2000ms total)
       new Promise(async (resolve) => {
         for (let attempt = 0; attempt < 20; attempt++) {
           try {

@@ -32,46 +32,7 @@ describe("certification reminder test", () => {
       send: cognitoSendSpy,
     };
 
-    dynamo = await setupDynamo(
-      {
-        tableName: "aes_users",
-        partitionKey: "user_id",
-      },
-      {
-        tableName: "aes_roles",
-        partitionKey: "name",
-      },
-      {
-        tableName: "aes_tracks",
-        partitionKey: "name",
-      },
-      {
-        tableName: "aes_certification_types",
-        partitionKey: "name",
-      },
-      {
-        tableName: "aes_user_certifications",
-        partitionKey: "certification_id",
-        gsi: [
-          {
-            indexName: "UserIdIndex",
-            partitionKey: "user_id",
-            sortKey: "uploaded_at",
-          },
-        ],
-      },
-      {
-        tableName: "aes_certification_reminders",
-        partitionKey: "reminder_id",
-        gsi: [
-          {
-            indexName: "UserIdIndex",
-            partitionKey: "user_id",
-            sortKey: "sent_at",
-          },
-        ],
-      },
-    );
+    dynamo = await setupDynamo();
 
     // Mock EmailService to prevent actual email sending
     vi.spyOn(
