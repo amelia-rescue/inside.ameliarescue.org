@@ -168,6 +168,11 @@ export class UserStore {
     return documentUser;
   }
 
+  /**
+   * Lists all users in the database.
+   * @param includeDeleted - Whether to include deleted users in the list.
+   * @returns A promise that resolves to an array of users.
+   */
   public async listUsers(includeDeleted = false): Promise<DocumentUser[]> {
     const command = new ScanCommand(
       includeDeleted

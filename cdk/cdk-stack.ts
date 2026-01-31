@@ -15,6 +15,8 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
 import * as ses from "aws-cdk-lib/aws-ses";
+import * as events from "aws-cdk-lib/aws-events";
+import * as eventsTargets from "aws-cdk-lib/aws-events-targets";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
@@ -302,6 +304,71 @@ export class CdkStack extends cdk.Stack {
       "cognito-idp:AdminUpdateUserAttributes",
       "cognito-idp:AdminGetUser",
       "cognito-idp:AdminDeleteUser",
+    );
+
+    // Create CloudWatch log group for certification reminder Lambda function
+    const certificationReminderLogGroup = new logs.LogGroup(
+      this,
+      "certification-reminder-logs",
+      {
+        logGroupName: "/aws/lambda/inside-amelia-rescue-certification-reminder",
+        retention: logs.RetentionDays.SEVEN_YEARS,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    // Create Lambda function for certification reminder scheduled task
+    const certificationReminderFunction = new nodejs.NodejsFunction(
+      this,
+      "CertificationReminderFunction",
+      {
+        functionName: "inside-amelia-rescue-certification-reminder",
+        runtime: lambda.Runtime.NODEJS_24_X,
+        handler: "handler",
+        entry: path.join(__dirname, "../server/certification-reminder.ts"),
+        memorySize: 1024,
+        timeout: cdk.Duration.seconds(60),
+        architecture: cdk.aws_lambda.Architecture.ARM_64,
+        logGroup: certificationReminderLogGroup,
+        bundling: {
+          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          minify: true,
+          sourceMap: true,
+          target: "es2022",
+        },
+        environment: {
+          NODE_ENV: "production",
+          USERS_TABLE_NAME: usersTable.tableName,
+          CERTIFICATION_TYPES_TABLE_NAME: certificationTypesTable.tableName,
+          USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
+          ROLES_TABLE_NAME: rolesTable.tableName,
+          TRACKS_TABLE_NAME: tracksTable.tableName,
+        },
+      },
+    );
+
+    // Grant certification reminder Lambda permissions to access DynamoDB tables
+    usersTable.grantReadWriteData(certificationReminderFunction);
+    certificationTypesTable.grantReadWriteData(certificationReminderFunction);
+    userCertificationsTable.grantReadWriteData(certificationReminderFunction);
+    rolesTable.grantReadWriteData(certificationReminderFunction);
+    tracksTable.grantReadWriteData(certificationReminderFunction);
+
+    // Create EventBridge rule to trigger Lambda every hour
+    const certificationReminderCronRule = new events.Rule(
+      this,
+      "CertificationReminderRule",
+      {
+        ruleName: "certification-reminder-task",
+        description:
+          "Triggers the certification reminder lambda function periodically",
+        schedule: events.Schedule.rate(cdk.Duration.hours(1)),
+      },
+    );
+
+    // Add Lambda as target for the EventBridge rule
+    certificationReminderCronRule.addTarget(
+      new eventsTargets.LambdaFunction(certificationReminderFunction),
     );
 
     // Create API Gateway HTTP API
