@@ -9,41 +9,26 @@ import {
 } from "vitest";
 import type { DynaliteServer } from "dynalite";
 import { setupDynamo, teardownDynamo } from "./dynamo-local";
-
-const cognitoSendSpy = vi.fn().mockImplementation(async () => {
-  return {
-    User: {
-      Username: crypto.randomUUID(),
-    },
-  };
-});
-const cognitoClientCtorSpy = vi.fn().mockImplementation(() => {
-  return {
-    send: cognitoSendSpy,
-  };
-});
-
-vi.mock("@aws-sdk/client-cognito-identity-provider", () => {
-  return {
-    CognitoIdentityProviderClient: cognitoClientCtorSpy,
-    AdminCreateUserCommand: vi.fn().mockImplementation((input) => ({ input })),
-    AdminDeleteUserCommand: vi.fn().mockImplementation((input) => ({ input })),
-  };
-});
+import { UserNotFound, UserStore } from "./user-store";
 
 describe("user store test", () => {
   let dynamo: DynaliteServer;
-  let UserStore: typeof import("./user-store").UserStore;
-  let UserNotFound: typeof import("./user-store").UserNotFound;
-
-  beforeAll(async () => {
-    process.env.COGNITO_USER_POOL_ID = "test-user-pool";
-    ({ UserStore, UserNotFound } = await import("./user-store"));
-  });
+  let mockCognitoClient: any;
+  let cognitoSendSpy: any;
 
   beforeEach(async () => {
-    cognitoSendSpy.mockClear();
-    cognitoClientCtorSpy.mockClear();
+    cognitoSendSpy = vi.fn().mockImplementation(async () => {
+      return {
+        User: {
+          Username: crypto.randomUUID(),
+        },
+      };
+    });
+
+    mockCognitoClient = {
+      send: cognitoSendSpy,
+    };
+
     dynamo = await setupDynamo({
       tableName: "aes_users",
       partitionKey: "user_id",
@@ -55,7 +40,7 @@ describe("user store test", () => {
   });
 
   it("should be able to create and get a user", async () => {
-    const store = UserStore.make();
+    const store = UserStore.make({ cognito: mockCognitoClient });
 
     const { user_id } = await store.createUser({
       first_name: "Test",
@@ -69,27 +54,29 @@ describe("user store test", () => {
 
     const user = await store.getUser(user_id);
     expect(cognitoSendSpy).toHaveBeenCalledTimes(1);
-    expect(cognitoSendSpy).toHaveBeenCalledWith({
-      input: {
-        TemporaryPassword: expect.any(String),
-        Username: "test@example.com",
-        UserPoolId: "test-user-pool",
-        UserAttributes: [
-          {
-            Name: "email",
-            Value: "test@example.com",
-          },
-          {
-            Name: "given_name",
-            Value: "Test",
-          },
-          {
-            Name: "family_name",
-            Value: "User",
-          },
-        ],
-      },
-    });
+    expect(cognitoSendSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: {
+          TemporaryPassword: expect.any(String),
+          Username: "test@example.com",
+          UserPoolId: "inside-amelia-rescue-users",
+          UserAttributes: [
+            {
+              Name: "email",
+              Value: "test@example.com",
+            },
+            {
+              Name: "given_name",
+              Value: "Test",
+            },
+            {
+              Name: "family_name",
+              Value: "User",
+            },
+          ],
+        },
+      }),
+    );
 
     expect(user).toMatchObject({
       user_id: expect.any(String),
@@ -103,7 +90,7 @@ describe("user store test", () => {
   });
 
   it("should be able to create and get a user 2", async () => {
-    const store = UserStore.make();
+    const store = UserStore.make({ cognito: mockCognitoClient });
 
     const { user_id } = await store.createUser({
       first_name: "Test",
@@ -122,7 +109,7 @@ describe("user store test", () => {
   });
 
   it("should be able to list users", async () => {
-    const store = UserStore.make();
+    const store = UserStore.make({ cognito: mockCognitoClient });
 
     const usersToCreate = Array.from({ length: 10 }, (_, i) => ({
       first_name: `Test ${i}`,
@@ -141,7 +128,7 @@ describe("user store test", () => {
   });
 
   it("should be able to update users", async () => {
-    const store = UserStore.make();
+    const store = UserStore.make({ cognito: mockCognitoClient });
     const { user_id } = await store.createUser({
       first_name: "Test",
       last_name: "User",
@@ -161,7 +148,7 @@ describe("user store test", () => {
   });
 
   it("should throw a UserNotFound error when trying to update a usser that does not exist", async () => {
-    const store = UserStore.make();
+    const store = UserStore.make({ cognito: mockCognitoClient });
     await expect(
       store.updateUser({
         user_id: "non-existent-user",
@@ -172,7 +159,7 @@ describe("user store test", () => {
   });
 
   it("should be able to soft delete users and list them out if includeDeleted is true", async () => {
-    const store = UserStore.make();
+    const store = UserStore.make({ cognito: mockCognitoClient });
 
     const activeId = crypto.randomUUID();
     const deletedId = crypto.randomUUID();
@@ -217,7 +204,7 @@ describe("user store test", () => {
   });
 
   it("should throw UserNotFound when getting a soft-deleted user", async () => {
-    const store = UserStore.make();
+    const store = UserStore.make({ cognito: mockCognitoClient });
 
     const { user_id } = await store.createUser({
       first_name: "Test",
@@ -234,7 +221,7 @@ describe("user store test", () => {
   });
 
   it("should be able to hard delete users permanently", async () => {
-    const store = UserStore.make();
+    const store = UserStore.make({ cognito: mockCognitoClient });
 
     const { user_id } = await store.createUser({
       first_name: "Test",

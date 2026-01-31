@@ -8,6 +8,17 @@ import { RoleStore, type Role } from "./role-store";
 import { TrackStore, type Track } from "./track-store";
 import { UserStore, type User } from "./user-store";
 import { CertificationReminderStore } from "./certification-reminder-store";
+import { EmailService } from "./email-service";
+
+interface CertificationReminderDeps {
+  userStore?: UserStore;
+  roleStore?: RoleStore;
+  certificationStore?: CertificationStore;
+  trackStore?: TrackStore;
+  certificationTypeStore?: CertificationTypeStore;
+  certificationReminderStore?: CertificationReminderStore;
+  emailService?: EmailService;
+}
 
 export class CertificationReminder {
   private readonly userStore: UserStore;
@@ -16,18 +27,23 @@ export class CertificationReminder {
   private readonly trackStore: TrackStore;
   private readonly certificationTypeStore: CertificationTypeStore;
   private readonly certificationReminderStore: CertificationReminderStore;
+  private readonly emailService: EmailService;
 
   private certificationTypes: CertificationType[] = [];
   private roles: Role[] = [];
   private tracks: Track[] = [];
 
-  constructor() {
-    this.userStore = UserStore.make();
-    this.roleStore = RoleStore.make();
-    this.certificationStore = CertificationStore.make();
-    this.trackStore = TrackStore.make();
-    this.certificationTypeStore = CertificationTypeStore.make();
-    this.certificationReminderStore = CertificationReminderStore.make();
+  constructor(deps?: CertificationReminderDeps) {
+    this.userStore = deps?.userStore ?? UserStore.make();
+    this.roleStore = deps?.roleStore ?? RoleStore.make();
+    this.certificationStore =
+      deps?.certificationStore ?? CertificationStore.make();
+    this.trackStore = deps?.trackStore ?? TrackStore.make();
+    this.certificationTypeStore =
+      deps?.certificationTypeStore ?? CertificationTypeStore.make();
+    this.certificationReminderStore =
+      deps?.certificationReminderStore ?? CertificationReminderStore.make();
+    this.emailService = deps?.emailService ?? EmailService.make();
   }
 
   /**
@@ -116,14 +132,27 @@ export class CertificationReminder {
           `Sending expired certification reminder for user ${user.user_id}, cert ${cert.certification_id}`,
         );
 
-        await this.certificationReminderStore.createReminder({
-          reminder_id: `${user.user_id}-${cert.certification_id}-expired-${Date.now()}`,
-          user_id: user.user_id,
-          certification_id: cert.certification_id,
-          reminder_type: "expired",
-          sent_at: new Date().toISOString(),
-          email_sent: true,
-        });
+        try {
+          await this.emailService.sendCertificationExpiredEmail({
+            user,
+            certificationName: cert.certification_type_name,
+            expirationDate: dayjs(cert.expires_on).format("MMMM D, YYYY"),
+          });
+
+          await this.certificationReminderStore.createReminder({
+            reminder_id: `${user.user_id}-${cert.certification_id}-expired-${Date.now()}`,
+            user_id: user.user_id,
+            certification_id: cert.certification_id,
+            reminder_type: "expired",
+            sent_at: new Date().toISOString(),
+            email_sent: true,
+          });
+        } catch (error) {
+          console.error(
+            `Failed to send expired certification email for user ${user.user_id}:`,
+            error,
+          );
+        }
       }
     }
 
@@ -140,14 +169,27 @@ export class CertificationReminder {
           `Sending expiring soon certification reminder for user ${user.user_id}, cert ${cert.certification_id}`,
         );
 
-        await this.certificationReminderStore.createReminder({
-          reminder_id: `${user.user_id}-${cert.certification_id}-expiring-${Date.now()}`,
-          user_id: user.user_id,
-          certification_id: cert.certification_id,
-          reminder_type: "expiring_soon",
-          sent_at: new Date().toISOString(),
-          email_sent: true,
-        });
+        try {
+          await this.emailService.sendCertificationExpiringSoonEmail({
+            user,
+            certificationName: cert.certification_type_name,
+            expirationDate: dayjs(cert.expires_on).format("MMMM D, YYYY"),
+          });
+
+          await this.certificationReminderStore.createReminder({
+            reminder_id: `${user.user_id}-${cert.certification_id}-expiring-${Date.now()}`,
+            user_id: user.user_id,
+            certification_id: cert.certification_id,
+            reminder_type: "expiring_soon",
+            sent_at: new Date().toISOString(),
+            email_sent: true,
+          });
+        } catch (error) {
+          console.error(
+            `Failed to send expiring soon certification email for user ${user.user_id}:`,
+            error,
+          );
+        }
       }
     }
 
@@ -164,14 +206,26 @@ export class CertificationReminder {
           `Sending missing certification reminder for user ${user.user_id}, cert type ${missingCert.name}`,
         );
 
-        await this.certificationReminderStore.createReminder({
-          reminder_id: `${user.user_id}-missing-${missingCert.name}-${Date.now()}`,
-          user_id: user.user_id,
-          certification_id: `missing-${missingCert.name}`,
-          reminder_type: "missing",
-          sent_at: new Date().toISOString(),
-          email_sent: true,
-        });
+        try {
+          await this.emailService.sendMissingCertificationEmail({
+            user,
+            certificationName: missingCert.name,
+          });
+
+          await this.certificationReminderStore.createReminder({
+            reminder_id: `${user.user_id}-missing-${missingCert.name}-${Date.now()}`,
+            user_id: user.user_id,
+            certification_id: `missing-${missingCert.name}`,
+            reminder_type: "missing",
+            sent_at: new Date().toISOString(),
+            email_sent: true,
+          });
+        } catch (error) {
+          console.error(
+            `Failed to send missing certification email for user ${user.user_id}:`,
+            error,
+          );
+        }
       }
     }
   }

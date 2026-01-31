@@ -353,7 +353,7 @@ export class CdkStack extends cdk.Stack {
         handler: "handler",
         entry: path.join(__dirname, "../server/certification-reminder.ts"),
         memorySize: 1024,
-        timeout: cdk.Duration.seconds(60),
+        timeout: cdk.Duration.seconds(300),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup: certificationReminderLogGroup,
         bundling: {
@@ -371,6 +371,7 @@ export class CdkStack extends cdk.Stack {
           TRACKS_TABLE_NAME: tracksTable.tableName,
           CERTIFICATION_REMINDERS_TABLE_NAME:
             certificationRemindersTable.tableName,
+          FROM_EMAIL: `noreply@${appDomainName}`,
         },
       },
     );
@@ -383,6 +384,14 @@ export class CdkStack extends cdk.Stack {
     tracksTable.grantReadWriteData(certificationReminderFunction);
     certificationRemindersTable.grantReadWriteData(
       certificationReminderFunction,
+    );
+
+    // Grant SES send email permissions
+    certificationReminderFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["ses:SendEmail", "ses:SendRawEmail"],
+        resources: ["*"],
+      }),
     );
 
     // Create EventBridge rule to trigger Lambda every hour

@@ -42,7 +42,7 @@ export class CertificationTypeStore {
   public static make() {
     if (!CertificationTypeStore.client) {
       const dynamoDbClient = new DynamoDBClient(
-        import.meta.env.MODE === "test"
+        import.meta.env?.MODE === "test"
           ? {
               endpoint: DYNALITE_ENDPOINT,
               region: "local",

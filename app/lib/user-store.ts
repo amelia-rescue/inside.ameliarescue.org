@@ -59,14 +59,15 @@ export class UserStore {
   private static client: DynamoDBDocumentClient;
   private static cognito: CognitoIdentityProviderClient;
   private readonly tableName = "aes_users";
-  private readonly cognitoUserPoolId = process.env.COGNITO_USER_POOL_ID!;
+  private readonly cognitoUserPoolId =
+    process.env.COGNITO_USER_POOL_ID || "inside-amelia-rescue-users";
 
   private constructor() {}
 
-  public static make() {
+  public static make(params?: { cognito?: CognitoIdentityProviderClient }) {
     if (!UserStore.client) {
       const dynamoDbClient = new DynamoDBClient(
-        import.meta.env.MODE === "test"
+        import.meta.env?.MODE === "test"
           ? {
               endpoint: DYNALITE_ENDPOINT,
               region: "local",
@@ -80,7 +81,8 @@ export class UserStore {
       UserStore.client = DynamoDBDocumentClient.from(dynamoDbClient);
     }
     if (!UserStore.cognito) {
-      UserStore.cognito = new CognitoIdentityProviderClient();
+      UserStore.cognito =
+        params?.cognito ?? new CognitoIdentityProviderClient();
     }
     return new UserStore();
   }
