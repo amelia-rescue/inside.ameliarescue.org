@@ -8,6 +8,7 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as apigatewayv2Integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cognito from "aws-cdk-lib/aws-cognito";
@@ -17,6 +18,7 @@ import * as targets from "aws-cdk-lib/aws-route53-targets";
 import * as ses from "aws-cdk-lib/aws-ses";
 import * as events from "aws-cdk-lib/aws-events";
 import * as eventsTargets from "aws-cdk-lib/aws-events-targets";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
@@ -49,6 +51,19 @@ export class CdkStack extends cdk.Stack {
     // some string manipulation that I don't care to write at the moment.
     const sesIdentity = new ses.CfnEmailIdentity(this, "SesEmailIdentity", {
       emailIdentity: appDomainName,
+    });
+
+    // Create session secret in Secrets Manager
+    const sessionSecret = new secretsmanager.Secret(this, "SessionSecret", {
+      secretName: "inside-amelia-rescue/session-secret",
+      description: "Session secret for React Router application",
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({}),
+        generateStringKey: "secret",
+        excludePunctuation: true,
+        passwordLength: 64,
+      },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     // Create Cognito User Pool with Passkey support
@@ -261,6 +276,31 @@ export class CdkStack extends cdk.Stack {
       },
     );
 
+    const websocketConnectionsTable = new dynamodb.Table(
+      this,
+      "WebSocketConnectionsTable",
+      {
+        tableName: "aes_websocket_connections",
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        partitionKey: {
+          name: "connectionId",
+          type: dynamodb.AttributeType.STRING,
+        },
+        timeToLiveAttribute: "ttl",
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    const counterStateTable = new dynamodb.Table(this, "CounterStateTable", {
+      tableName: "aes_counter_state",
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: {
+        name: "counterId",
+        type: dynamodb.AttributeType.STRING,
+      },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Create S3 bucket for file uploads
     const fileUploadsBucket = new s3.Bucket(this, "FileUploadsBucket", {
       enforceSSL: true,
@@ -314,7 +354,7 @@ export class CdkStack extends cdk.Stack {
           COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
           COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPool.userPoolId}`,
           COGNITO_DOMAIN: authDomainName,
-          SESSION_SECRET: `session-secret-${cdk.Stack.of(this).account}`,
+          SESSION_SECRET_ARN: sessionSecret.secretArn,
           APP_URL: `https://${appDomainName}`,
           FILE_CDN_URL: `https://${appDomainName}`,
           USERS_TABLE_NAME: usersTable.tableName,
@@ -336,6 +376,9 @@ export class CdkStack extends cdk.Stack {
     tracksTable.grantReadWriteData(lambdaFunction);
     certificationRemindersTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);
+
+    // Grant Lambda permission to read session secret
+    sessionSecret.grantRead(lambdaFunction);
 
     // Grant Lambda permissions to manage Cognito users
     userPool.grant(
@@ -505,6 +548,90 @@ export class CdkStack extends cdk.Stack {
     // Add Lambda as target for the EventBridge rule
     certificationSnapshotCronRule.addTarget(
       new eventsTargets.LambdaFunction(certificationSnapshotFunction),
+    );
+
+    // Create CloudWatch log group for WebSocket Lambda function
+    const websocketLogGroup = new logs.LogGroup(this, "websocket-logs", {
+      logGroupName: "/aws/lambda/inside-amelia-rescue-websocket",
+      retention: logs.RetentionDays.SEVEN_YEARS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Create consolidated Lambda function for WebSocket (handles connect/disconnect/message)
+    const websocketFunction = new nodejs.NodejsFunction(
+      this,
+      "WebSocketFunction",
+      {
+        functionName: "inside-amelia-rescue-websocket",
+        runtime: lambda.Runtime.NODEJS_24_X,
+        handler: "handler",
+        entry: path.join(__dirname, "../server/websocket.ts"),
+        memorySize: 1024,
+        timeout: cdk.Duration.seconds(30),
+        architecture: cdk.aws_lambda.Architecture.ARM_64,
+        logGroup: websocketLogGroup,
+        bundling: {
+          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          minify: true,
+          sourceMap: true,
+          target: "es2022",
+          format: nodejs.OutputFormat.CJS,
+        },
+        environment: {
+          NODE_ENV: "production",
+          WEBSOCKET_CONNECTIONS_TABLE_NAME: websocketConnectionsTable.tableName,
+          COUNTER_STATE_TABLE_NAME: counterStateTable.tableName,
+        },
+      },
+    );
+
+    // Grant permissions to WebSocket Lambda function
+    websocketConnectionsTable.grantReadWriteData(websocketFunction);
+    counterStateTable.grantReadWriteData(websocketFunction);
+
+    // Create WebSocket API
+    const webSocketApi = new apigatewayv2.WebSocketApi(this, "WebSocketApi", {
+      apiName: "inside-amelia-rescue-websocket-api",
+      description: "WebSocket API for real-time updates",
+      connectRouteOptions: {
+        integration: new WebSocketLambdaIntegration(
+          "ConnectIntegration",
+          websocketFunction,
+        ),
+      },
+      disconnectRouteOptions: {
+        integration: new WebSocketLambdaIntegration(
+          "DisconnectIntegration",
+          websocketFunction,
+        ),
+      },
+      defaultRouteOptions: {
+        integration: new WebSocketLambdaIntegration(
+          "DefaultIntegration",
+          websocketFunction,
+        ),
+      },
+    });
+
+    // Create WebSocket API stage
+    const webSocketStage = new apigatewayv2.WebSocketStage(
+      this,
+      "WebSocketStage",
+      {
+        webSocketApi,
+        stageName: "prod",
+        autoDeploy: true,
+      },
+    );
+
+    // Grant WebSocket Lambda permission to post to connections
+    websocketFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["execute-api:ManageConnections"],
+        resources: [
+          `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${webSocketApi.apiId}/${webSocketStage.stageName}/POST/@connections/*`,
+        ],
+      }),
     );
 
     // Create API Gateway HTTP API
@@ -701,6 +828,19 @@ export class CdkStack extends cdk.Stack {
     new cdk.CfnOutput(this, "ProductionLogoutUrl", {
       description: "Add this URL to Cognito User Pool Client logout URLs",
       value: `https://${appDomainName}/`,
+    });
+
+    new cdk.CfnOutput(this, "WebSocketApiEndpoint", {
+      value: webSocketStage.url,
+      description: "WebSocket API endpoint URL",
+    });
+
+    new cdk.CfnOutput(this, "WebSocketConnectionsTableName", {
+      value: websocketConnectionsTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "CounterStateTableName", {
+      value: counterStateTable.tableName,
     });
   }
 }

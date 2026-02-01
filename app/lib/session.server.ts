@@ -1,38 +1,77 @@
 import { createCookie, redirect } from "react-router";
 import { refreshAccessToken } from "./auth.server";
 import { log } from "./logger";
+import { getSessionSecret } from "./secrets.server";
 
-const SESSION_SECRET =
-  process.env.SESSION_SECRET || "default-secret-change-in-production";
+let sessionSecretPromise: Promise<string> | null = null;
 
-const cookieOptions = {
-  httpOnly: true,
-  path: "/",
-  sameSite: "lax" as const,
-  secrets: [SESSION_SECRET],
-  secure: process.env.NODE_ENV === "production",
-};
+async function getOrInitSessionSecret(): Promise<string> {
+  if (!sessionSecretPromise) {
+    sessionSecretPromise = getSessionSecret();
+  }
+  return sessionSecretPromise;
+}
 
-// Create separate cookies for user data and tokens
-const userCookie = createCookie("__user", {
-  ...cookieOptions,
-  maxAge: 60 * 60 * 24 * 30, // 30 days
-});
+async function getCookieOptions() {
+  const sessionSecret = await getOrInitSessionSecret();
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax" as const,
+    secrets: [sessionSecret],
+    secure: process.env.NODE_ENV === "production",
+  };
+}
 
-const accessTokenCookie = createCookie("__access_token", {
-  ...cookieOptions,
-  maxAge: 60 * 60 * 24, // 1 day
-});
+// Lazy cookie initialization
+let userCookie: ReturnType<typeof createCookie> | null = null;
+let accessTokenCookie: ReturnType<typeof createCookie> | null = null;
+let refreshTokenCookie: ReturnType<typeof createCookie> | null = null;
+let tempDataCookie: ReturnType<typeof createCookie> | null = null;
 
-const refreshTokenCookie = createCookie("__refresh_token", {
-  ...cookieOptions,
-  maxAge: 60 * 60 * 24 * 30, // 30 days
-});
+async function getUserCookie() {
+  if (!userCookie) {
+    const options = await getCookieOptions();
+    userCookie = createCookie("__user", {
+      ...options,
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+  }
+  return userCookie;
+}
 
-const tempDataCookie = createCookie("__temp", {
-  ...cookieOptions,
-  maxAge: 60 * 10, // 10 minutes for temporary auth data
-});
+async function getAccessTokenCookie() {
+  if (!accessTokenCookie) {
+    const options = await getCookieOptions();
+    accessTokenCookie = createCookie("__access_token", {
+      ...options,
+      maxAge: 60 * 60 * 24, // 1 day
+    });
+  }
+  return accessTokenCookie;
+}
+
+async function getRefreshTokenCookie() {
+  if (!refreshTokenCookie) {
+    const options = await getCookieOptions();
+    refreshTokenCookie = createCookie("__refresh_token", {
+      ...options,
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+  }
+  return refreshTokenCookie;
+}
+
+async function getTempDataCookie() {
+  if (!tempDataCookie) {
+    const options = await getCookieOptions();
+    tempDataCookie = createCookie("__temp", {
+      ...options,
+      maxAge: 60 * 10, // 10 minutes for temporary auth data
+    });
+  }
+  return tempDataCookie;
+}
 
 export interface SessionUser {
   user_id: string;
@@ -53,13 +92,19 @@ async function getUserFromCookies(
   request: Request,
 ): Promise<SessionUser | null> {
   const cookieHeader = request.headers.get("Cookie");
-  const userData = (await userCookie.parse(cookieHeader)) as UserData | null;
-  const accessToken = (await accessTokenCookie.parse(cookieHeader)) as
+  const userCookieInstance = await getUserCookie();
+  const accessTokenCookieInstance = await getAccessTokenCookie();
+  const refreshTokenCookieInstance = await getRefreshTokenCookie();
+
+  const userData = (await userCookieInstance.parse(
+    cookieHeader,
+  )) as UserData | null;
+  const accessToken = (await accessTokenCookieInstance.parse(cookieHeader)) as
     | string
     | null;
-  const refreshToken = (await refreshTokenCookie.parse(cookieHeader)) as
-    | string
-    | null;
+  const refreshToken = (await refreshTokenCookieInstance.parse(
+    cookieHeader,
+  )) as string | null;
 
   if (!userData || !accessToken) {
     return null;
@@ -105,21 +150,27 @@ export async function getUser(
 
         // Serialize updated cookies
         const headers = new Headers();
+        const userCookieInstance = await getUserCookie();
+        const accessTokenCookieInstance = await getAccessTokenCookie();
+        const refreshTokenCookieInstance = await getRefreshTokenCookie();
+
         headers.append(
           "Set-Cookie",
-          await userCookie.serialize({
+          await userCookieInstance.serialize({
             user_id: updatedUser.user_id,
             expiresAt: updatedUser.expiresAt,
           }),
         );
         headers.append(
           "Set-Cookie",
-          await accessTokenCookie.serialize(updatedUser.accessToken),
+          await accessTokenCookieInstance.serialize(updatedUser.accessToken),
         );
         if (updatedUser.refreshToken) {
           headers.append(
             "Set-Cookie",
-            await refreshTokenCookie.serialize(updatedUser.refreshToken),
+            await refreshTokenCookieInstance.serialize(
+              updatedUser.refreshToken,
+            ),
           );
         }
 
@@ -165,10 +216,13 @@ export async function createUserSession(
   redirectTo: string = "/",
 ) {
   const headers = new Headers();
+  const userCookieInstance = await getUserCookie();
+  const accessTokenCookieInstance = await getAccessTokenCookie();
+  const refreshTokenCookieInstance = await getRefreshTokenCookie();
 
   headers.append(
     "Set-Cookie",
-    await userCookie.serialize({
+    await userCookieInstance.serialize({
       user_id: user.user_id,
       expiresAt: user.expiresAt,
     }),
@@ -176,13 +230,13 @@ export async function createUserSession(
 
   headers.append(
     "Set-Cookie",
-    await accessTokenCookie.serialize(user.accessToken),
+    await accessTokenCookieInstance.serialize(user.accessToken),
   );
 
   if (user.refreshToken) {
     headers.append(
       "Set-Cookie",
-      await refreshTokenCookie.serialize(user.refreshToken),
+      await refreshTokenCookieInstance.serialize(user.refreshToken),
     );
   }
 
@@ -194,15 +248,21 @@ export async function createUserSession(
  */
 export async function logout(request: Request, redirectTo: string = "/") {
   const headers = new Headers();
+  const userCookieInstance = await getUserCookie();
+  const accessTokenCookieInstance = await getAccessTokenCookie();
+  const refreshTokenCookieInstance = await getRefreshTokenCookie();
 
-  headers.append("Set-Cookie", await userCookie.serialize("", { maxAge: 0 }));
   headers.append(
     "Set-Cookie",
-    await accessTokenCookie.serialize("", { maxAge: 0 }),
+    await userCookieInstance.serialize("", { maxAge: 0 }),
   );
   headers.append(
     "Set-Cookie",
-    await refreshTokenCookie.serialize("", { maxAge: 0 }),
+    await accessTokenCookieInstance.serialize("", { maxAge: 0 }),
+  );
+  headers.append(
+    "Set-Cookie",
+    await refreshTokenCookieInstance.serialize("", { maxAge: 0 }),
   );
 
   return redirect(redirectTo, { headers });
@@ -216,8 +276,9 @@ export async function setSessionData(
   data: Record<string, string>,
 ) {
   const cookieHeader = request.headers.get("Cookie");
+  const tempDataCookieInstance = await getTempDataCookie();
   const existing =
-    ((await tempDataCookie.parse(cookieHeader)) as Record<
+    ((await tempDataCookieInstance.parse(cookieHeader)) as Record<
       string,
       string
     > | null) || {};
@@ -226,7 +287,7 @@ export async function setSessionData(
 
   return {
     headers: {
-      "Set-Cookie": await tempDataCookie.serialize(updated),
+      "Set-Cookie": await tempDataCookieInstance.serialize(updated),
     },
   };
 }
@@ -239,7 +300,8 @@ export async function getSessionData(
   key: string,
 ): Promise<string | undefined> {
   const cookieHeader = request.headers.get("Cookie");
-  const data = (await tempDataCookie.parse(cookieHeader)) as Record<
+  const tempDataCookieInstance = await getTempDataCookie();
+  const data = (await tempDataCookieInstance.parse(cookieHeader)) as Record<
     string,
     string
   > | null;
