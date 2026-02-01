@@ -375,6 +375,7 @@ export class CdkStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           target: "es2022",
+          format: nodejs.OutputFormat.ESM,
         },
         environment: {
           NODE_ENV: "production",
@@ -454,6 +455,7 @@ export class CdkStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           target: "es2022",
+          format: nodejs.OutputFormat.ESM,
         },
         environment: {
           NODE_ENV: "production",

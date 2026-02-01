@@ -59,7 +59,7 @@ export class CertificationSnapshotStore {
   public static make() {
     if (!CertificationSnapshotStore.client) {
       const dynamoDbClient = new DynamoDBClient(
-        import.meta.env?.MODE === "test"
+        process.env.NODE_ENV === "test"
           ? {
               endpoint: DYNALITE_ENDPOINT,
               region: "local",

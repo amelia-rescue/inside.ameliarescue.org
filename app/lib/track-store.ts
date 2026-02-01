@@ -44,7 +44,7 @@ export class TrackStore {
   public static make() {
     if (!TrackStore.client) {
       const dynamoDbClient = new DynamoDBClient(
-        import.meta.env?.MODE === "test"
+        process.env.NODE_ENV === "test"
           ? {
               endpoint: DYNALITE_ENDPOINT,
               region: "local",

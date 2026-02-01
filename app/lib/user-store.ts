@@ -68,7 +68,7 @@ export class UserStore {
   public static make(params?: { cognito?: CognitoIdentityProviderClient }) {
     if (!UserStore.client) {
       const dynamoDbClient = new DynamoDBClient(
-        import.meta.env?.MODE === "test"
+        process.env.NODE_ENV === "test"
           ? {
               endpoint: DYNALITE_ENDPOINT,
               region: "local",

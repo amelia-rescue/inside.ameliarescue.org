@@ -1,5 +1,5 @@
 function _log(level: string, message: string, obj?: any) {
-  if (import.meta.env?.MODE === "test") {
+  if (process.env.NODE_ENV === "test") {
     return;
   }
   console.log(
