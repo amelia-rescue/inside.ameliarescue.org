@@ -91,6 +91,7 @@ export async function getUser(
     // Try to refresh the token if we have a refresh token
     if (user.refreshToken) {
       try {
+        log.info("refreshing access token", { user });
         const tokens = await refreshAccessToken(user.refreshToken);
 
         // Update the user with new tokens

@@ -159,7 +159,10 @@ export default function Security({ loaderData }: Route.ComponentProps) {
             )}
 
             <div className="card-actions mt-4 justify-start">
-              <Link to="/auth/passkeys/add" className="btn btn-primary">
+              <Link
+                to="/auth/passkeys/add?initiate=true"
+                className="btn btn-primary"
+              >
                 <IoKey />
                 Add a Passkey
               </Link>
