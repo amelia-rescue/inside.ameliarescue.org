@@ -31,6 +31,31 @@ interface TrainingStatusRow {
   certifications: Record<string, CertStatus>;
 }
 
+export function calculateComplianceStats(trainingData: TrainingStatusRow[]) {
+  let totalRequiredCerts = 0;
+  let totalValidCerts = 0;
+
+  trainingData.forEach((row) => {
+    Object.values(row.certifications).forEach((status) => {
+      totalRequiredCerts++;
+      if (status === "active" || status === "expiring_soon") {
+        totalValidCerts++;
+      }
+    });
+  });
+
+  const compliancePercentage =
+    totalRequiredCerts > 0
+      ? Math.round((totalValidCerts / totalRequiredCerts) * 100)
+      : 0;
+
+  return {
+    totalRequiredCerts,
+    totalValidCerts,
+    compliancePercentage,
+  };
+}
+
 export async function loader({ context }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
   if (!ctx) {
@@ -114,32 +139,13 @@ export async function loader({ context }: Route.LoaderArgs) {
     );
   });
 
-  // Calculate compliance statistics
-  let totalRequiredCerts = 0;
-  let totalActiveCerts = 0;
-  trainingData.forEach((row) => {
-    Object.values(row.certifications).forEach((status) => {
-      totalRequiredCerts++;
-      if (status === "active") {
-        totalActiveCerts++;
-      }
-    });
-  });
-
-  const compliancePercentage =
-    totalRequiredCerts > 0
-      ? Math.round((totalActiveCerts / totalRequiredCerts) * 100)
-      : 0;
+  const complianceStats = calculateComplianceStats(trainingData);
 
   return {
     trainingData,
     certificationTypes: Array.from(allRequiredCerts).sort(),
     currentUserId: ctx.user.user_id,
-    complianceStats: {
-      totalRequiredCerts,
-      totalActiveCerts,
-      compliancePercentage,
-    },
+    complianceStats,
   };
 }
 
@@ -269,8 +275,8 @@ export default function TrainingStatus() {
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="font-medium">Overall Compliance</span>
             <span className="text-base-content/70">
-              {complianceStats.totalActiveCerts} /{" "}
-              {complianceStats.totalRequiredCerts} active (
+              {complianceStats.totalValidCerts} /{" "}
+              {complianceStats.totalRequiredCerts} valid (
               {complianceStats.compliancePercentage}%)
             </span>
           </div>

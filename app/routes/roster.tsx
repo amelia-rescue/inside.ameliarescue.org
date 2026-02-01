@@ -33,7 +33,73 @@ export default function Roster() {
 
         <div className="divider" />
 
-        <div className="overflow-x-auto">
+        <div className="grid gap-3 sm:hidden">
+          {users.map((user) => (
+            <div key={user.user_id} className="card bg-base-200">
+              <div className="card-body gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="avatar">
+                    <div className="ring-primary ring-offset-base-100 w-10 rounded-full ring ring-offset-2">
+                      {user.profile_picture_url ? (
+                        <img
+                          src={user.profile_picture_url}
+                          alt={`${user.first_name} ${user.last_name}`}
+                        />
+                      ) : (
+                        <div className="bg-neutral text-neutral-content flex h-full w-full items-center justify-center">
+                          <span className="text-sm">
+                            {user.first_name[0]}
+                            {user.last_name[0]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0">
+                    <Link
+                      to={
+                        user.user_id === currentUserId
+                          ? "/profile"
+                          : `/user/${user.user_id}`
+                      }
+                      className="block truncate font-bold hover:underline"
+                    >
+                      {user.first_name} {user.last_name}
+                    </Link>
+                    <div className="text-sm opacity-70">{user.email}</div>
+                    <div className="text-sm opacity-70">
+                      {user.phone || "—"}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold opacity-60">Roles</div>
+                  <div className="mt-1 flex flex-wrap items-start gap-1 whitespace-normal">
+                    {user.membership_roles.length > 0 ? (
+                      user.membership_roles.map((role, index) => (
+                        <span
+                          key={index}
+                          className={`badge badge-sm whitespace-nowrap ${
+                            role.precepting ? "badge-warning" : "badge-primary"
+                          }`}
+                        >
+                          {role.role_name} - {role.track_name}
+                          {role.precepting && " (Precepting)"}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-base-content/50">—</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto sm:block">
           <table className="table">
             <thead>
               <tr>
@@ -81,13 +147,13 @@ export default function Roster() {
                   </td>
                   <td>{user.phone || "—"}</td>
                   <td>{user.email}</td>
-                  <td>
-                    <div className="flex flex-wrap gap-1">
+                  <td className="whitespace-normal">
+                    <div className="flex flex-wrap items-start gap-1">
                       {user.membership_roles.length > 0 ? (
                         user.membership_roles.map((role, index) => (
                           <span
                             key={index}
-                            className={`badge badge-sm ${
+                            className={`badge badge-sm whitespace-nowrap ${
                               role.precepting
                                 ? "badge-warning"
                                 : "badge-primary"

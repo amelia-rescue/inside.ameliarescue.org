@@ -170,7 +170,7 @@ export default function Documents() {
   return (
     <div className="card bg-base-100 shadow">
       <div className="card-body">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <h1 className="card-title text-2xl">Useful Documents</h1>
             <p className="text-sm opacity-70">They're all PDF format</p>
@@ -178,7 +178,7 @@ export default function Documents() {
           {user.website_role === "admin" && (
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="btn btn-primary btn-sm w-full sm:w-auto"
               onClick={openUploadDialog}
             >
               Upload Document
@@ -265,14 +265,14 @@ export default function Documents() {
           {documents.map((doc) => (
             <div key={doc.key} className="card bg-base-200">
               <div className="card-body">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="card-title text-lg">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <h2 className="card-title truncate text-lg">
                       {formatDocumentName(doc.name)}
                     </h2>
                   </div>
                   {doc.url ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:flex-nowrap">
                       <Link
                         to={`/documents/view?key=${encodeURIComponent(doc.key)}&name=${encodeURIComponent(doc.name)}`}
                         className="btn btn-primary btn-sm"

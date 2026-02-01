@@ -102,6 +102,13 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 export default function User() {
   const { user, certification_data } = useLoaderData<typeof loader>();
 
+  const formatDateValue = (value: string | null | undefined) => {
+    if (!value || value === "null") {
+      return "—";
+    }
+    return value;
+  };
+
   return (
     <>
       <div className="card bg-base-100 shadow">
@@ -180,7 +187,75 @@ export default function User() {
           <div className="card-body">
             <h2 className="card-title">Certifications</h2>
 
-            <div className="overflow-x-auto">
+            <div className="grid gap-3 sm:hidden">
+              {certification_data.map((certType) => (
+                <div key={certType.name} className="card bg-base-200">
+                  <div className="card-body gap-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">
+                          {certType.name}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {certType.is_required ? (
+                            <span className="badge badge-sm badge-primary">
+                              Required
+                            </span>
+                          ) : (
+                            <span className="badge badge-sm badge-ghost">
+                              Optional
+                            </span>
+                          )}
+                          {certType.status === "active" ? (
+                            <span className="badge badge-sm badge-success">
+                              Active
+                            </span>
+                          ) : certType.status === "expiring_soon" ? (
+                            <span className="badge badge-sm badge-warning">
+                              Expiring Soon
+                            </span>
+                          ) : certType.status === "expired" ? (
+                            <span className="badge badge-sm badge-error">
+                              Expired
+                            </span>
+                          ) : (
+                            <span className="badge badge-sm badge-ghost">
+                              Missing
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        {certType.existing_cert?.file_url ? (
+                          <a
+                            href={certType.existing_cert.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-xs btn-ghost"
+                          >
+                            View
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <dt className="opacity-70">Issued</dt>
+                      <dd className="font-medium">
+                        {formatDateValue(certType.existing_cert?.issued_on)}
+                      </dd>
+                      <dt className="opacity-70">Expires</dt>
+                      <dd className="font-medium">
+                        {formatDateValue(certType.existing_cert?.expires_on)}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto sm:block">
               <table className="table">
                 <thead>
                   <tr>
@@ -229,8 +304,12 @@ export default function User() {
                             <span className="text-base-content/50">—</span>
                           )}
                         </td>
-                        <td>{certType.existing_cert?.issued_on || "—"}</td>
-                        <td>{certType.existing_cert?.expires_on || "—"}</td>
+                        <td>
+                          {formatDateValue(certType.existing_cert?.issued_on)}
+                        </td>
+                        <td>
+                          {formatDateValue(certType.existing_cert?.expires_on)}
+                        </td>
                         <td>{getStatusBadge()}</td>
                         <td>
                           {certType.existing_cert?.file_url ? (
