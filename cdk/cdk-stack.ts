@@ -268,6 +268,7 @@ export class CdkStack extends cdk.Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+      versioned: true,
       cors: [
         {
           allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.POST],
@@ -375,7 +376,7 @@ export class CdkStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           target: "es2022",
-          format: nodejs.OutputFormat.ESM,
+          format: nodejs.OutputFormat.CJS,
         },
         environment: {
           NODE_ENV: "production",
@@ -455,7 +456,7 @@ export class CdkStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           target: "es2022",
-          format: nodejs.OutputFormat.ESM,
+          format: nodejs.OutputFormat.CJS,
         },
         environment: {
           NODE_ENV: "production",

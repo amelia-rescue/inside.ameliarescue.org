@@ -18,10 +18,8 @@ export default [
   route("account/security", "./routes/security.tsx"),
   route("roster", "./routes/roster.tsx"),
   route("training-status", "./routes/training-status.tsx"),
-  route("protocols", "./routes/protocols.tsx"),
-  route("constitution", "./routes/constitution.tsx"),
-  route("sops", "./routes/sops.tsx"),
-  route("hospital-list", "./routes/hospital-list.tsx"),
+  route("documents", "./routes/documents.tsx"),
+  route("documents/view", "./routes/documents.view.tsx"),
   route("truck-check", "./routes/truck-check.tsx"),
   route("profile", "./routes/profile.tsx"),
   route("user/:user_id", "./routes/user.$user_id.tsx"),
@@ -32,6 +30,10 @@ export default [
     route("callback", "./routes/auth/callback.tsx"),
     route("passkeys/add", "./routes/auth/passkeys.add.tsx"),
   ]),
+  ...prefix("api/documents", [
+    route("get-upload-url", "./routes/api/documents.get-upload-url.tsx"),
+    route("delete", "./routes/api/documents.delete.tsx"),
+  ]),
   ...prefix("api/certifications", [
     route("get-upload-url", "./routes/api/certifications.get-upload-url.tsx"),
     route("save", "./routes/api/certifications.save.tsx"),
@@ -40,6 +42,5 @@ export default [
     route("get-upload-url", "./routes/api/profile-picture.get-upload-url.tsx"),
     route("save", "./routes/api/profile-picture.save.tsx"),
   ]),
-  route("test", "./routes/test.tsx"),
   route("*", "./routes/$.tsx"),
 ] satisfies RouteConfig;

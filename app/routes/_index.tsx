@@ -57,52 +57,14 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         </Link>
 
         <Link
-          to="/protocols"
+          to="/documents"
           className="card bg-base-100 shadow hover:shadow-md"
         >
           <div className="card-body">
-            <h2 className="card-title">Protocols</h2>
+            <h2 className="card-title">Documents</h2>
             <p className="text-sm opacity-70">
-              Operational and medical protocols.
+              Documents that are actually useful.
             </p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/constitution"
-          className="card bg-base-100 shadow hover:shadow-md"
-        >
-          <div className="card-body">
-            <h2 className="card-title">Constitution</h2>
-            <p className="text-sm opacity-70">
-              Organization bylaws and governance.
-            </p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
-            </div>
-          </div>
-        </Link>
-
-        <Link to="/sops" className="card bg-base-100 shadow hover:shadow-md">
-          <div className="card-body">
-            <h2 className="card-title">SOPs</h2>
-            <p className="text-sm opacity-70">Standard operating procedures.</p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/hospital-list"
-          className="card bg-base-100 shadow hover:shadow-md"
-        >
-          <div className="card-body">
-            <h2 className="card-title">Hospital List</h2>
-            <p className="text-sm opacity-70">Regional hospital contacts.</p>
             <div className="card-actions justify-end">
               <span className="btn btn-sm btn-ghost">Open</span>
             </div>

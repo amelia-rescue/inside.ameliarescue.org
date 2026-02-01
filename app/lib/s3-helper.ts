@@ -1,4 +1,11 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectCommand,
+  type _Object,
+  ListObjectVersionsCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export class S3Helper {
@@ -19,6 +26,45 @@ export class S3Helper {
     return new S3Helper(client, bucketName, cloudFrontDomain);
   }
 
+  /**
+   * list all of the objects in the /documents directory
+   */
+  async listDocuments(): Promise<{ url: URL; key: string; name: string }[]> {
+    const command = new ListObjectsV2Command({
+      Bucket: this.bucketName,
+      Prefix: "files/documents",
+    });
+    const response = await this.client.send(command);
+    if (!response.Contents) {
+      return [];
+    }
+    const keys = response.Contents.map((obj) => obj.Key).filter(
+      (key): key is string =>
+        typeof key === "string" && key !== "files/documents/",
+    );
+    return keys.map((key) => {
+      const url = new URL(`https://inside.ameliarescue.org/${key}`);
+      const fileName = key.split("/").pop() || "";
+      const name = fileName.replace(/\.[^/.]+$/, "");
+      return {
+        url,
+        key,
+        name,
+      };
+    });
+  }
+
+  /** list all the versions of a particular key */
+  async listObjectVersions(prefix: string) {
+    let versions: _Object[] = [];
+    const command = new ListObjectVersionsCommand({
+      Bucket: this.bucketName,
+      Prefix: prefix,
+    });
+    const response = await this.client.send(command);
+    return response.Versions || [];
+  }
+
   async getPresignedUploadUrl(
     key: string,
     contentType: string,
@@ -32,6 +78,14 @@ export class S3Helper {
 
     const url = await getSignedUrl(this.client, command, { expiresIn });
     return url;
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    const command = new DeleteObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+    await this.client.send(command);
   }
 
   getFileUrl(key: string): string {
