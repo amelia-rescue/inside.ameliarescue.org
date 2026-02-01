@@ -22,7 +22,10 @@ export const authMiddleware: Route.MiddlewareFunction = async function (
   const user = await userStore.getUser(sessionUser.user_id);
   const preferences = await getPreferences(request);
   context.set(appContext, {
-    user,
+    user: {
+      ...user,
+      ...sessionUser,
+    },
     theme: preferences.theme,
   });
 

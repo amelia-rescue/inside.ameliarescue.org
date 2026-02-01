@@ -301,6 +301,16 @@ export class CdkStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const truckChecksTable = new dynamodb.Table(this, "TruckChecksTable", {
+      tableName: "aes_truck_checks",
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: {
+        name: "id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Create S3 bucket for file uploads
     const fileUploadsBucket = new s3.Bucket(this, "FileUploadsBucket", {
       enforceSSL: true,
@@ -349,6 +359,7 @@ export class CdkStack extends cdk.Stack {
           target: "es2022",
         },
         environment: {
+          NODE_OPTIONS: "--enable-source-maps",
           NODE_ENV: "production",
           COGNITO_USER_POOL_ID: userPool.userPoolId,
           COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
@@ -365,6 +376,7 @@ export class CdkStack extends cdk.Stack {
           CERTIFICATION_REMINDERS_TABLE_NAME:
             certificationRemindersTable.tableName,
           FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
+          TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
         },
       },
     );
@@ -375,6 +387,7 @@ export class CdkStack extends cdk.Stack {
     rolesTable.grantReadWriteData(lambdaFunction);
     tracksTable.grantReadWriteData(lambdaFunction);
     certificationRemindersTable.grantReadWriteData(lambdaFunction);
+    truckChecksTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);
 
     // Grant Lambda permission to read session secret
@@ -422,6 +435,7 @@ export class CdkStack extends cdk.Stack {
           format: nodejs.OutputFormat.CJS,
         },
         environment: {
+          NODE_OPTIONS: "--enable-source-maps",
           NODE_ENV: "production",
           USERS_TABLE_NAME: usersTable.tableName,
           CERTIFICATION_TYPES_TABLE_NAME: certificationTypesTable.tableName,
@@ -431,6 +445,7 @@ export class CdkStack extends cdk.Stack {
           CERTIFICATION_REMINDERS_TABLE_NAME:
             certificationRemindersTable.tableName,
           FROM_EMAIL: `noreply@${appDomainName}`,
+          TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
         },
       },
     );
@@ -444,6 +459,7 @@ export class CdkStack extends cdk.Stack {
     certificationRemindersTable.grantReadWriteData(
       certificationReminderFunction,
     );
+    truckChecksTable.grantReadWriteData(certificationReminderFunction);
 
     // Grant SES send email permissions
     certificationReminderFunction.addToRolePolicy(
@@ -502,6 +518,7 @@ export class CdkStack extends cdk.Stack {
           format: nodejs.OutputFormat.CJS,
         },
         environment: {
+          NODE_OPTIONS: "--enable-source-maps",
           NODE_ENV: "production",
           USERS_TABLE_NAME: usersTable.tableName,
           CERTIFICATION_TYPES_TABLE_NAME: certificationTypesTable.tableName,
@@ -512,6 +529,7 @@ export class CdkStack extends cdk.Stack {
             certificationRemindersTable.tableName,
           CERTIFICATION_SNAPSHOTS_TABLE_NAME:
             certificationSnapshotsTable.tableName,
+          TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
         },
       },
     );
@@ -526,6 +544,7 @@ export class CdkStack extends cdk.Stack {
     certificationSnapshotsTable.grantReadWriteData(
       certificationSnapshotFunction,
     );
+    truckChecksTable.grantReadWriteData(certificationSnapshotFunction);
 
     // Create EventBridge rule to trigger Lambda daily at 6 AM UTC
     const certificationSnapshotCronRule = new events.Rule(
@@ -578,7 +597,24 @@ export class CdkStack extends cdk.Stack {
           format: nodejs.OutputFormat.CJS,
         },
         environment: {
+          NODE_OPTIONS: "--enable-source-maps",
           NODE_ENV: "production",
+          COGNITO_USER_POOL_ID: userPool.userPoolId,
+          COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
+          COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPool.userPoolId}`,
+          COGNITO_DOMAIN: authDomainName,
+          SESSION_SECRET_ARN: sessionSecret.secretArn,
+          APP_URL: `https://${appDomainName}`,
+          FILE_CDN_URL: `https://${appDomainName}`,
+          USERS_TABLE_NAME: usersTable.tableName,
+          CERTIFICATION_TYPES_TABLE_NAME: certificationTypesTable.tableName,
+          USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
+          ROLES_TABLE_NAME: rolesTable.tableName,
+          TRACKS_TABLE_NAME: tracksTable.tableName,
+          CERTIFICATION_REMINDERS_TABLE_NAME:
+            certificationRemindersTable.tableName,
+          FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
+          TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
           WEBSOCKET_CONNECTIONS_TABLE_NAME: websocketConnectionsTable.tableName,
           COUNTER_STATE_TABLE_NAME: counterStateTable.tableName,
         },
@@ -588,6 +624,23 @@ export class CdkStack extends cdk.Stack {
     // Grant permissions to WebSocket Lambda function
     websocketConnectionsTable.grantReadWriteData(websocketFunction);
     counterStateTable.grantReadWriteData(websocketFunction);
+    usersTable.grantReadWriteData(websocketFunction);
+    certificationTypesTable.grantReadWriteData(websocketFunction);
+    userCertificationsTable.grantReadWriteData(websocketFunction);
+    rolesTable.grantReadWriteData(websocketFunction);
+    tracksTable.grantReadWriteData(websocketFunction);
+    certificationRemindersTable.grantReadWriteData(websocketFunction);
+    truckChecksTable.grantReadWriteData(websocketFunction);
+    fileUploadsBucket.grantReadWrite(websocketFunction);
+    sessionSecret.grantRead(websocketFunction);
+    userPool.grant(
+      websocketFunction,
+      "cognito-idp:AdminCreateUser",
+      "cognito-idp:AdminSetUserPassword",
+      "cognito-idp:AdminUpdateUserAttributes",
+      "cognito-idp:AdminGetUser",
+      "cognito-idp:AdminDeleteUser",
+    );
 
     // Create WebSocket API
     const webSocketApi = new apigatewayv2.WebSocketApi(this, "WebSocketApi", {

@@ -29,7 +29,7 @@ let accessTokenCookie: ReturnType<typeof createCookie> | null = null;
 let refreshTokenCookie: ReturnType<typeof createCookie> | null = null;
 let tempDataCookie: ReturnType<typeof createCookie> | null = null;
 
-async function getUserCookie() {
+export async function getUserCookie() {
   if (!userCookie) {
     const options = await getCookieOptions();
     userCookie = createCookie("__user", {

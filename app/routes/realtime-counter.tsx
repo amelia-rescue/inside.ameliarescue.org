@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from "react";
+import { useLoaderData } from "react-router";
 import type { Route } from "./+types/realtime-counter";
+import { appContext } from "~/context";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -8,7 +10,19 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
+export async function loader({ context }: Route.LoaderArgs) {
+  const ctx = context.get(appContext);
+  if (!ctx) {
+    throw new Error("Context not found");
+  }
+  return {
+    userId: ctx.user.user_id,
+    accessToken: ctx.user.accessToken,
+  };
+}
+
 export default function RealtimeCounter() {
+  const { accessToken } = useLoaderData<typeof loader>();
   const [counter, setCounter] = useState<number>(0);
   const [connectionStatus, setConnectionStatus] = useState<
     "connecting" | "connected" | "disconnected" | "error"
@@ -16,10 +30,18 @@ export default function RealtimeCounter() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const url =
+    import.meta.env?.VITE_WEBSOCKET_URL ||
+    "wss://svzzsce7u8.execute-api.us-east-2.amazonaws.com/prod";
+
+  if (typeof url !== "string") {
+    throw new Error("webocket url not defined correctly");
+  }
+
   const connectWebSocket = () => {
-    const wsUrl =
-      import.meta.env.VITE_WEBSOCKET_URL ||
-      "wss://svzzsce7u8.execute-api.us-east-2.amazonaws.com/prod";
+    let wsUrl = new URL(url);
+
+    wsUrl.searchParams.set("access_token", accessToken);
 
     try {
       const ws = new WebSocket(wsUrl);

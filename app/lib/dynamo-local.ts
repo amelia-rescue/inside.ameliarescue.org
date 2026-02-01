@@ -50,6 +50,10 @@ export async function setupDynamo() {
       tableName: "aes_certification_snapshots",
       partitionKey: "snapshot_date",
     },
+    {
+      tableName: "aes_truck_checks",
+      partitionKey: "id",
+    },
   ];
 
   return await _setupDynamo(...schemas);

@@ -1,4 +1,7 @@
-import type { APIGatewayProxyWebsocketHandlerV2 } from "aws-lambda";
+import type {
+  APIGatewayProxyWebsocketEventV2,
+  APIGatewayProxyWebsocketHandlerV2,
+} from "aws-lambda";
 import {
   ApiGatewayManagementApiClient,
   PostToConnectionCommand,
@@ -12,15 +15,19 @@ import {
   UpdateCommand,
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { log } from "~/lib/logger";
+import type { ApiGatewayWebSocketEvent } from "types/apigateway";
+import { getUserInfo } from "~/lib/auth.server";
 
 const dynamoClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
-export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
-  const { connectionId, eventType, domainName, stage } =
-    event.requestContext;
+export const handler = async (event: ApiGatewayWebSocketEvent) => {
+  const { connectionId, eventType, domainName, stage } = event.requestContext;
   const connectionsTableName = process.env.WEBSOCKET_CONNECTIONS_TABLE_NAME;
   const counterTableName = process.env.COUNTER_STATE_TABLE_NAME;
+
+  log.info("event data", { event });
 
   if (!connectionsTableName || !counterTableName) {
     console.error("Required environment variables not set");
@@ -30,16 +37,10 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
   try {
     switch (eventType) {
       case "CONNECT":
-        return await handleConnect(
-          connectionId,
-          connectionsTableName,
-        );
+        return await handleConnect(event, connectionId, connectionsTableName);
 
       case "DISCONNECT":
-        return await handleDisconnect(
-          connectionId,
-          connectionsTableName,
-        );
+        return await handleDisconnect(connectionId, connectionsTableName);
 
       case "MESSAGE":
         return await handleMessage(
@@ -62,24 +63,43 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
 };
 
 async function handleConnect(
+  event: ApiGatewayWebSocketEvent,
   connectionId: string,
   tableName: string,
 ): Promise<{ statusCode: number; body: string }> {
   try {
     const ttl = Math.floor(Date.now() / 1000) + 7200;
 
+    const access_token = event.queryStringParameters?.access_token;
+    if (!access_token) {
+      throw new Error("access token required for authentication");
+    }
+    const userInfo = await getUserInfo(access_token);
+    const user_id = userInfo.sub;
+    if (typeof user_id !== "string") {
+      throw new Error("unable to get user_id from access token");
+    }
+
+    log.info("WebSocket connection with authenticated user", {
+      connectionId,
+      user_id,
+    });
+
+    const item: Record<string, any> = {
+      connectionId,
+      connectedAt: new Date().toISOString(),
+      ttl,
+      user_id,
+    };
+
     await docClient.send(
       new PutCommand({
         TableName: tableName,
-        Item: {
-          connectionId,
-          connectedAt: new Date().toISOString(),
-          ttl,
-        },
+        Item: item,
       }),
     );
 
-    console.log(`Connection established: ${connectionId}`);
+    console.log(`Connection established: ${connectionId}`, { user_id });
     return { statusCode: 200, body: "Connected" };
   } catch (error) {
     console.error("Error storing connection:", error);

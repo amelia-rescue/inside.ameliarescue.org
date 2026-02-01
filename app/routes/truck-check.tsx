@@ -4,15 +4,23 @@ import { Link } from "react-router";
 export default function TruckCheck() {
   return (
     <>
-      <a
-        className="link inline-flex items-center gap-2"
-        href="https://docs.google.com/spreadsheets/d/1UoMQ8duLoCRcgHHra400CMHgpUZm0FC4_MAjKRRfMXM/edit?usp=sharing"
-        target="_blank"
-        rel="noreferrer"
-      >
-        Open in Google Sheets
-        <FiExternalLink aria-hidden="true" className="h-4 w-4" />
-      </a>
+      <p>
+        <a
+          className="link inline-flex items-center gap-2"
+          href="https://docs.google.com/spreadsheets/d/1UoMQ8duLoCRcgHHra400CMHgpUZm0FC4_MAjKRRfMXM/edit?usp=sharing"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open in Google Sheets
+          <FiExternalLink aria-hidden="true" className="h-4 w-4" />
+        </a>
+      </p>
+      <p>
+        <Link to="/truck-checks">
+          <button className="btn btn-primary">Dynamic Truck Check</button>
+        </Link>
+      </p>
+
       <div className="w-full">
         <iframe
           className="mt-4 block h-[75vh] min-h-[600px] w-full"
