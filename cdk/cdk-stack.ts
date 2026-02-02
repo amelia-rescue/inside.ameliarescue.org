@@ -311,6 +311,24 @@ export class CdkStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const truckCheckSchemasTable = new dynamodb.Table(
+      this,
+      "TruckCheckSchemasTable",
+      {
+        tableName: "aes_truck_check_schemas",
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        partitionKey: {
+          name: "document_key",
+          type: dynamodb.AttributeType.STRING,
+        },
+        sortKey: {
+          name: "range_key",
+          type: dynamodb.AttributeType.STRING,
+        },
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
     // Create S3 bucket for file uploads
     const fileUploadsBucket = new s3.Bucket(this, "FileUploadsBucket", {
       enforceSSL: true,
@@ -377,6 +395,7 @@ export class CdkStack extends cdk.Stack {
             certificationRemindersTable.tableName,
           FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
           TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
+          TRUCK_CHECK_SCHEMAS_TABLE_NAME: truckCheckSchemasTable.tableName,
         },
       },
     );
@@ -388,6 +407,7 @@ export class CdkStack extends cdk.Stack {
     tracksTable.grantReadWriteData(lambdaFunction);
     certificationRemindersTable.grantReadWriteData(lambdaFunction);
     truckChecksTable.grantReadWriteData(lambdaFunction);
+    truckCheckSchemasTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);
 
     // Grant Lambda permission to read session secret

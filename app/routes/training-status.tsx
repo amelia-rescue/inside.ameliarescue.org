@@ -2,8 +2,8 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/training-status";
 import { UserStore } from "~/lib/user-store";
 import { TrackStore } from "~/lib/track-store";
-import { CertificationTypeStore } from "~/lib/certification-type-store";
-import { CertificationStore } from "~/lib/certification-store";
+import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
+import { CertificationStore } from "~/lib/certifications/certification-store";
 import { appContext } from "~/context";
 import { useState, useMemo } from "react";
 import {

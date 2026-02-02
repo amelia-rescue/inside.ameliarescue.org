@@ -1,7 +1,7 @@
 import { data } from "react-router";
 import type { Route } from "./+types/certifications.save";
-import { CertificationStore } from "~/lib/certification-store";
-import { CertificationTypeStore } from "~/lib/certification-type-store";
+import { CertificationStore } from "~/lib/certifications/certification-store";
+import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
 import dayjs from "dayjs";
 
 export async function action({ request }: Route.ActionArgs) {

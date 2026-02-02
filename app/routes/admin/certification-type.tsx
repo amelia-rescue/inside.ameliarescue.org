@@ -5,7 +5,7 @@ import {
   certificationTypeSchema,
   CertificationTypeStore,
   type CertificationType,
-} from "~/lib/certification-type-store";
+} from "~/lib/certifications/certification-type-store";
 import { type } from "arktype";
 import { IoWarning } from "react-icons/io5";
 import { useEffect, useRef, useState } from "react";

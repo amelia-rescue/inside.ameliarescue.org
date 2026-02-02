@@ -1,0 +1,1189 @@
+{
+  "version": 1,
+  "title": "Amelia ALS Truck Check",
+  "sections": [
+    {
+      "id": "zoll",
+      "title": "Zoll",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Turns on and self tests",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "All cables (BP, cardiac, pulse ox)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "BP cuffs (adult, s, m, l, peds)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Defib pads (adult/peds)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "EKG electrodes (adult/peds)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Capno (inline/nasal)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Emesis bag",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Spare paper",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Nail polish remover",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Razor",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "monitor-cabinet",
+      "title": "Monitor Cabinet",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "EKG electrodes (adult/peds)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Zoll printer paper",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Spare defib pads peds/adult",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Razors",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Nail polish remover",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Spare monitor battery",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Spare monitor BP cuffs",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "under-bench-seat",
+      "title": "Under Bench Seat",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Pillows",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Pediatric restraint system",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Absorption pads (\"chux pads\")",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Emesis basins",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Toilet paper",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Sani-cloth wipes",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Bedpan",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Urinal",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "linen-cabinet",
+      "title": "Linen Cabinet",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Sheets",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Blankets",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Pillow cases",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Towels",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Wash cloths",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "iv-and-med-supplies",
+      "title": "IV and Med Supplies",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "1 liter normal saline",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "1 liter lactated ringers",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Infusion kit",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Syringes (1cc, 3cc, 5cc, 10cc)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Med admin needles (22ga, 18ga, blunt tip)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Saline syringes",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "IV catheters (24ga-14ga)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "IV Nexxia needles (22ga-18ga)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "IV start kits",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Extension sets",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "IV tubing (10, 15, or 20)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "IV tubing 60",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Pressure bag",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Nasal atomizers",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "EpiRite Syringe",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Alcohol wipes",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "cabinet-above-bench-seat",
+      "title": "Cabinet Above Bench Seat",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Thermometer and probes",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Emesis bags",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Surgical masks",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "N95 masks",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Isolation gowns",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "O8 kits",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Biohazard bags",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Manual BP cuffs",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "miscellaneous",
+      "title": "Miscellaneous",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Trash can",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Lucas device",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Cell phone",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Hospital phone number list",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Clipboard with pen + paper",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Protocol book",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "MCI triage tags",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Onboard suction and catheter",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "trauma-cabinet",
+      "title": "Trauma Cabinet",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "1L irrigation saline",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "1L irrigation water",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Tape clear/silk/paper",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Ice packs",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Hot packs",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Cravats",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Burn sheet",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Trauma sheets",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "ABD combine pad",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Roller gauze (1in - varying sizes)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Petroleum gauze",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "4X4",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "2x2",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Bandaids",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "CAT tourniquets",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Trauma shears",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "o2-cabinet",
+      "title": "O2 Cabinet",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "BVMs (adult,peds,infant)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "CPAP (medium/large)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "NRB (adult,peds,infant)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Nasal Cannula (adult,peds,infant)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "ETCO2 nasal cannula",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "ETCO2 inline connector",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Trach mask",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Nebs (handheld,mask)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "ET tubes",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Suction catheters",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "NPAs",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "OPAs",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Lube",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Pocket masks",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "exterior",
+      "title": "Exterior",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Emergency lighting",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Scene lighting",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Sirens",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Headlights and turn signals",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "cab",
+      "title": "Cab",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Computer",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Fard card",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Bay opener",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "County map",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "ERG",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Portable radio",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Gloves",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Traffic vests",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "No smoking sign",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "State inspection",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Flashlight",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "EZ pass",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "driver-side-front-compartment",
+      "title": "Driver's Side Front Compartment",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Fire extinguisher",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Jumper cables",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Toolbox",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Cones/flares/triangles",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "First aid kit",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "other-outside-compartments",
+      "title": "Other Outside Compartments",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Stair chair",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Backboard",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "C-collars adult/peds",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Spider straps",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Head blocks",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Pediatric backboard",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Reeves stretcher",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Padded board splints",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Traction splints adult/peds",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "fluid-warmer",
+      "title": "Fluid Warmer",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "1 liter normal saline",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "10 drop set",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "1 liter lactated ringers",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Pressure bag",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Sharpie marker",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "red-bag",
+      "title": "Red Bag",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Top compartment",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "I-gel (1,1.5,2,2.5,3,4,5)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "NPAs",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "OPAs",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Tube holder (peds/adult)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "ETCO2 tube connector",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Side compartments",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "ET tubes (2.5-9.0)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "50 mL syringe",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Bougie/stylet",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "NCOOG tube",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Suction catheters",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Red biohazard bags",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Sharps container",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Portable suction",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Charged/plugged in",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Suction tubing",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "DuCanto catheter",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Intubation Kit",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Intubation kit handles",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Blades (Mac & Miller 0-4)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Lube",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Magill forceps",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Surgical masks",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Spare batteries AA & C",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "14ga decompression needle",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Tape",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "EZ IO / SAM IO",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Needles (15,25,45mm)",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Alcohol wipes",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Saline syringes",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Pressure bag",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "IV kit",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Start kits",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "IV straight catheters 24ga-14ga",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Nexxia IV catheters 22ga-18ga",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Extension sets",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "1 liters normal saline",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "10 drop sets",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Normal saline syringes",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Alcohol wipes",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Syringes (1,3,5,10) cc",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "med-admin-needles",
+      "title": "Med Admin Needles",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Other",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Mcgrath battery",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Mcgrath blades (1,2,3,4)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "green-bag",
+      "title": "Green Bag",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Stethoscope",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Adult BP cuff",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Glucometer + strips/lancets",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Pulse oximeter",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "CAT tourniquet",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Trauma shears",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Broselow tape",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Portable O2",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "NRB peds/adult",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Nasal cannula peds/adult",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Handheld neb set",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Adult bvm",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Occlusive dressing",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "4x4",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Roller gauze",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Quick clot",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "NPA/OPA bag",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Hot pack",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Cold pack",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Trauma dressing",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "drugs-record-seal-and-box",
+      "title": "Drugs (Record Seal and Box No.)",
+      "fields": [
+        {
+          "type": "checkbox",
+          "label": "Cardiac meds",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Miscellaneous med box",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "(Former) out of box meds",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Sodium bicarbonate box",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Normal saline",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Dextrose 10",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Dextrose 5",
+          "required": true
+        },
+        {
+          "type": "checkbox",
+          "label": "Controlled substances safe",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "vehicle-info",
+      "title": "Vehicle Information",
+      "fields": [
+        {
+          "type": "text",
+          "label": "Ambulance",
+          "required": true
+        },
+        {
+          "type": "text",
+          "label": "AIC",
+          "required": true
+        },
+        {
+          "type": "text",
+          "label": "Date",
+          "required": true
+        },
+        {
+          "type": "text",
+          "label": "Signature",
+          "required": true
+        },
+        {
+          "type": "text",
+          "label": "Miles",
+          "required": false
+        },
+        {
+          "type": "number",
+          "label": "Fuel",
+          "required": false,
+          "min": 0,
+          "max": 100,
+          "unit": "%"
+        },
+        {
+          "type": "number",
+          "label": "Stretcher O2",
+          "required": false,
+          "min": 0,
+          "max": 3000,
+          "unit": "PSI"
+        },
+        {
+          "type": "number",
+          "label": "Main O2",
+          "required": false,
+          "min": 0,
+          "max": 3000,
+          "unit": "PSI"
+        },
+        {
+          "type": "number",
+          "label": "Portable O2",
+          "required": false,
+          "min": 0,
+          "max": 3000,
+          "unit": "PSI"
+        },
+        {
+          "type": "number",
+          "label": "Number of spare O2 bottles",
+          "required": false,
+          "min": 0
+        },
+        {
+          "type": "text",
+          "label": "Comments",
+          "required": false,
+          "maxLength": 1000
+        }
+      ]
+    }
+  ]
+}

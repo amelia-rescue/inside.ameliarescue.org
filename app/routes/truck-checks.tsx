@@ -1,6 +1,6 @@
 import { appContext } from "~/context";
 import type { Route } from "./+types/truck-checks";
-import { TruckCheckStore } from "~/lib/truck-check-store";
+import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
 import { useFetcher, useLoaderData } from "react-router";
 import { useRef } from "react";
 import { IoWarning } from "react-icons/io5";

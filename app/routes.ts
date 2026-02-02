@@ -14,6 +14,7 @@ export default [
     route("roles", "./routes/admin/roles.tsx"),
     route("tracks", "./routes/admin/tracks.tsx"),
     route("update-user/:user_id", "./routes/admin/update-user.tsx"),
+    route("truck-checks", "./routes/admin/truck-checks.tsx"),
   ]),
   route("account/security", "./routes/security.tsx"),
   route("roster", "./routes/roster.tsx"),

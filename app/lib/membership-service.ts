@@ -1,7 +1,7 @@
 import { RoleStore } from "./role-store";
 import { TrackStore } from "./track-store";
-import { CertificationTypeStore } from "./certification-type-store";
-import { CertificationStore } from "./certification-store";
+import { CertificationTypeStore } from "./certifications/certification-type-store";
+import { CertificationStore } from "./certifications/certification-store";
 
 export class InvalidRoleTrackCombination extends Error {
   constructor(role_id: string, track_id: string) {

@@ -6,7 +6,7 @@ import {
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
-import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
+import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 
 export const certificationTypeSchema = type({
   name: "string",

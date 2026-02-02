@@ -1,4 +1,4 @@
-import { CertificationSnapshotGenerator } from "../app/lib/certification-snapshot";
+import { CertificationSnapshotGenerator } from "../app/lib/certifications/certification-snapshot";
 
 export const handler = async () => {
   console.log("Starting certification snapshot generation");

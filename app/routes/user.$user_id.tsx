@@ -5,8 +5,8 @@ import { UserStore } from "~/lib/user-store";
 import {
   CertificationTypeStore,
   type CertificationType,
-} from "~/lib/certification-type-store";
-import { CertificationStore } from "~/lib/certification-store";
+} from "~/lib/certifications/certification-type-store";
+import { CertificationStore } from "~/lib/certifications/certification-store";
 import { TrackStore } from "~/lib/track-store";
 import { RoleStore } from "~/lib/role-store";
 

@@ -2,7 +2,7 @@ import { data, Link, useFetcher, redirect } from "react-router";
 import type { Route } from "./+types/tracks";
 import { appContext } from "~/context";
 import { trackSchema, TrackStore, type Track } from "~/lib/track-store";
-import { CertificationTypeStore } from "~/lib/certification-type-store";
+import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
 import { type } from "arktype";
 import { IoWarning } from "react-icons/io5";
 import { useEffect, useRef, useState } from "react";

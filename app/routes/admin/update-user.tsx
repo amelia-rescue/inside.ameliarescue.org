@@ -5,10 +5,10 @@ import { userSchema, UserStore } from "~/lib/user-store";
 import {
   CertificationTypeStore,
   type CertificationType,
-} from "~/lib/certification-type-store";
+} from "~/lib/certifications/certification-type-store";
 import { type } from "arktype";
 import { useEffect, useRef, useState } from "react";
-import { CertificationStore } from "~/lib/certification-store";
+import { CertificationStore } from "~/lib/certifications/certification-store";
 import { FiExternalLink } from "react-icons/fi";
 import { CertificationUpload } from "~/components/upload-certification";
 import { RoleStore } from "~/lib/role-store";

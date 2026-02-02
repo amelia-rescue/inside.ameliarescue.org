@@ -4,12 +4,12 @@ import {
   CertificationTypeStore,
   type CertificationType,
 } from "./certification-type-store";
-import { RoleStore, type Role } from "./role-store";
-import { TrackStore, type Track } from "./track-store";
-import { UserStore, type User } from "./user-store";
+import { RoleStore, type Role } from "../role-store";
+import { TrackStore, type Track } from "../track-store";
+import { UserStore, type User } from "../user-store";
 import { CertificationReminderStore } from "./certification-reminder-store";
-import { EmailService } from "./email-service";
-import { log } from "./logger";
+import { EmailService } from "../email-service";
+import { log } from "../logger";
 
 interface CertificationReminderDeps {
   userStore?: UserStore;

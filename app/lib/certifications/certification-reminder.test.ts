@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "./dynamo-local";
+import { setupDynamo, teardownDynamo } from "../dynamo-local";
 import { CertificationReminder } from "./certification-reminder";
-import { UserStore } from "./user-store";
-import { RoleStore } from "./role-store";
-import { TrackStore } from "./track-store";
+import { UserStore } from "../user-store";
+import { RoleStore } from "../role-store";
+import { TrackStore } from "../track-store";
 import { CertificationTypeStore } from "./certification-type-store";
 import { CertificationStore } from "./certification-store";
 import { CertificationReminderStore } from "./certification-reminder-store";
-import { EmailService } from "./email-service";
+import { EmailService } from "../email-service";
 import dayjs from "dayjs";
 
 describe("certification reminder test", () => {

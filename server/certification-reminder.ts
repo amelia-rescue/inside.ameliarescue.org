@@ -1,5 +1,5 @@
 import type { ScheduledHandler } from "aws-lambda";
-import { CertificationReminder } from "../app/lib/certification-reminder.js";
+import { CertificationReminder } from "../app/lib/certifications/certification-reminder.js";
 
 export const handler: ScheduledHandler = async (event) => {
   console.log(

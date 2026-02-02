@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "./dynamo-local";
+import { setupDynamo, teardownDynamo } from "../dynamo-local";
 import {
   CertificationTypeStore,
   CertificationTypeNotFound,

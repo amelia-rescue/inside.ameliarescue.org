@@ -6,7 +6,7 @@ import {
   GetCommand,
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
+import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 
 export interface CertificationSnapshot {
   snapshot_date: string; // YYYY-MM-DD

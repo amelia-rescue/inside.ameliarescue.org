@@ -54,6 +54,11 @@ export async function setupDynamo() {
       tableName: "aes_truck_checks",
       partitionKey: "id",
     },
+    {
+      tableName: "aes_truck_check_schemas",
+      partitionKey: "document_key",
+      sortKey: "range_key",
+    },
   ];
 
   return await _setupDynamo(...schemas);

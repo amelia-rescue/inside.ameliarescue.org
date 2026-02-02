@@ -1,6 +1,6 @@
 import { RoleStore } from "./role-store";
 import { TrackStore } from "./track-store";
-import { CertificationTypeStore } from "./certification-type-store";
+import { CertificationTypeStore } from "./certifications/certification-type-store";
 import { MembershipService } from "./membership-service";
 import { log } from "./logger";
 

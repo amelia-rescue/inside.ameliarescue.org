@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "./dynamo-local";
+import { setupDynamo, teardownDynamo } from "../dynamo-local";
 import { CertificationSnapshotGenerator } from "./certification-snapshot";
-import { UserStore } from "./user-store";
-import { RoleStore } from "./role-store";
-import { TrackStore } from "./track-store";
+import { UserStore } from "../user-store";
+import { RoleStore } from "../role-store";
+import { TrackStore } from "../track-store";
 import { CertificationTypeStore } from "./certification-type-store";
 import { CertificationStore } from "./certification-store";
 import { CertificationReminderStore } from "./certification-reminder-store";

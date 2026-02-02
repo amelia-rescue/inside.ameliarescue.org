@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CertificationType } from "~/lib/certification-type-store";
+import type { CertificationType } from "~/lib/certifications/certification-type-store";
 
 export function CertificationUpload({
   userId,

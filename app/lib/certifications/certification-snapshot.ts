@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
-import { UserStore, type User } from "./user-store";
-import { RoleStore, type Role } from "./role-store";
-import { TrackStore, type Track } from "./track-store";
+import { UserStore, type User } from "../user-store";
+import { RoleStore, type Role } from "../role-store";
+import { TrackStore, type Track } from "../track-store";
 import {
   CertificationTypeStore,
   type CertificationType,
