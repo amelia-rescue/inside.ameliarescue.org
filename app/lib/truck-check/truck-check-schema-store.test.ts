@@ -1,6 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "../dynamo-local";
+import { describe, it, expect } from "vitest";
 import {
   TruckCheckSchemaStore,
   TruckNotFound,
@@ -10,22 +8,13 @@ import {
 } from "./truck-check-schema-store";
 
 describe("truck check schema store test", () => {
-  let dynamo: DynaliteServer;
-
-  beforeEach(async () => {
-    dynamo = await setupDynamo();
-  });
-
-  afterEach(async () => {
-    await teardownDynamo(dynamo);
-  });
-
   describe("Truck operations", () => {
     it("should be able to create and get a truck", async () => {
       const store = TruckCheckSchemaStore.make();
+      const truckId = `truck-${crypto.randomUUID()}`;
 
       const truck: Truck = {
-        truckId: "truck-1",
+        truckId,
         displayName: "Medic 1",
         schemaId: "schema-123",
       };
@@ -33,7 +22,7 @@ describe("truck check schema store test", () => {
       const created = await store.createTruck(truck);
       expect(created).toEqual(truck);
 
-      const retrieved = await store.getTruck("truck-1");
+      const retrieved = await store.getTruck(truckId);
       expect(retrieved).toEqual(truck);
     });
 
@@ -47,9 +36,10 @@ describe("truck check schema store test", () => {
 
     it("should be able to update a truck", async () => {
       const store = TruckCheckSchemaStore.make();
+      const truckId = `truck-${crypto.randomUUID()}`;
 
       const truck: Truck = {
-        truckId: "truck-1",
+        truckId,
         displayName: "Medic 1",
         schemaId: "schema-123",
       };
@@ -63,7 +53,7 @@ describe("truck check schema store test", () => {
 
       expect(updated.displayName).toBe("Medic 1 - Updated");
 
-      const retrieved = await store.getTruck("truck-1");
+      const retrieved = await store.getTruck(truckId);
       expect(retrieved.displayName).toBe("Medic 1 - Updated");
     });
 
@@ -81,17 +71,18 @@ describe("truck check schema store test", () => {
 
     it("should be able to delete a truck", async () => {
       const store = TruckCheckSchemaStore.make();
+      const truckId = `truck-${crypto.randomUUID()}`;
 
       const truck: Truck = {
-        truckId: "truck-1",
+        truckId,
         displayName: "Medic 1",
         schemaId: "schema-123",
       };
 
       await store.createTruck(truck);
-      await store.deleteTruck("truck-1");
+      await store.deleteTruck(truckId);
 
-      await expect(store.getTruck("truck-1")).rejects.toBeInstanceOf(
+      await expect(store.getTruck(truckId)).rejects.toBeInstanceOf(
         TruckNotFound,
       );
     });
@@ -106,20 +97,21 @@ describe("truck check schema store test", () => {
 
     it("should be able to list all trucks", async () => {
       const store = TruckCheckSchemaStore.make();
+      const testId = crypto.randomUUID();
 
       const trucks: Truck[] = [
         {
-          truckId: "truck-1",
+          truckId: `truck-${testId}-1`,
           displayName: "Medic 1",
           schemaId: "schema-1",
         },
         {
-          truckId: "truck-2",
+          truckId: `truck-${testId}-2`,
           displayName: "Medic 2",
           schemaId: "schema-1",
         },
         {
-          truckId: "truck-3",
+          truckId: `truck-${testId}-3`,
           displayName: "QRV 1",
           schemaId: "schema-2",
         },
@@ -128,16 +120,8 @@ describe("truck check schema store test", () => {
       await Promise.all(trucks.map((truck) => store.createTruck(truck)));
 
       const allTrucks = await store.listTrucks();
-      expect(allTrucks.length).toBe(3);
+      expect(allTrucks.length).toBeGreaterThanOrEqual(3);
     });
-
-    it("should return an empty array when listing trucks with none", async () => {
-      const store = TruckCheckSchemaStore.make();
-
-      const trucks = await store.listTrucks();
-      expect(trucks).toEqual([]);
-    });
-
   });
 
   describe("Schema operations", () => {
@@ -268,14 +252,7 @@ describe("truck check schema store test", () => {
       });
 
       const schemas = await store.listSchemas();
-      expect(schemas.length).toBe(3);
-    });
-
-    it("should return an empty array when listing schemas with none", async () => {
-      const store = TruckCheckSchemaStore.make();
-
-      const schemas = await store.listSchemas();
-      expect(schemas).toEqual([]);
+      expect(schemas.length).toBeGreaterThanOrEqual(3);
     });
 
     it("should handle schemas with complex field types", async () => {

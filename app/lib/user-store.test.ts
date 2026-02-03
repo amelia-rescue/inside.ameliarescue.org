@@ -7,12 +7,9 @@ import {
   afterEach,
   vi,
 } from "vitest";
-import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "./dynamo-local";
 import { UserNotFound, UserStore } from "./user-store";
 
 describe("user store test", () => {
-  let dynamo: DynaliteServer;
   let mockCognitoClient: any;
   let cognitoSendSpy: any;
 
@@ -28,21 +25,16 @@ describe("user store test", () => {
     mockCognitoClient = {
       send: cognitoSendSpy,
     };
-
-    dynamo = await setupDynamo();
-  });
-
-  afterEach(async () => {
-    await teardownDynamo(dynamo);
   });
 
   it("should be able to create and get a user", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
+    const uniqueEmail = `test-${crypto.randomUUID()}@example.com`;
 
     const { user_id } = await store.createUser({
       first_name: "Test",
       last_name: "User",
-      email: "test@example.com",
+      email: uniqueEmail,
       website_role: "admin",
       membership_roles: [
         { role_name: "Provider", track_name: "EMT", precepting: false },
@@ -55,12 +47,12 @@ describe("user store test", () => {
       expect.objectContaining({
         input: {
           TemporaryPassword: expect.any(String),
-          Username: "test@example.com",
+          Username: uniqueEmail,
           UserPoolId: "inside-amelia-rescue-users",
           UserAttributes: [
             {
               Name: "email",
-              Value: "test@example.com",
+              Value: uniqueEmail,
             },
             {
               Name: "given_name",
@@ -81,18 +73,19 @@ describe("user store test", () => {
       updated_at: expect.any(String),
       first_name: "Test",
       last_name: "User",
-      email: "test@example.com",
+      email: uniqueEmail,
       website_role: "admin",
     });
   });
 
   it("should be able to create and get a user 2", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
+    const uniqueEmail = `test-${crypto.randomUUID()}@example.com`;
 
     const { user_id } = await store.createUser({
       first_name: "Test",
       last_name: "User",
-      email: "test@example.com",
+      email: uniqueEmail,
       website_role: "admin",
       membership_roles: [
         { role_name: "Provider", track_name: "EMT", precepting: false },
@@ -102,16 +95,17 @@ describe("user store test", () => {
     expect(user.user_id).toBe(user_id);
     expect(user.first_name).toBe("Test");
     expect(user.last_name).toBe("User");
-    expect(user.email).toBe("test@example.com");
+    expect(user.email).toBe(uniqueEmail);
   });
 
   it("should be able to list users", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
+    const testId = crypto.randomUUID();
 
     const usersToCreate = Array.from({ length: 10 }, (_, i) => ({
       first_name: `Test ${i}`,
       last_name: "User",
-      email: `test${i}@example.com`,
+      email: `test-${testId}-${i}@example.com`,
       website_role: "user" as const,
       membership_roles: [
         { role_name: "Junior", track_name: "EMT", precepting: true },
@@ -121,15 +115,16 @@ describe("user store test", () => {
     await Promise.all(usersToCreate.map((user) => store.createUser(user)));
 
     const users = await store.listUsers();
-    expect(users.length).toBe(10);
+    expect(users.length).toBeGreaterThanOrEqual(10);
   });
 
   it("should be able to update users", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
+    const uniqueEmail = `test-${crypto.randomUUID()}@example.com`;
     const { user_id } = await store.createUser({
       first_name: "Test",
       last_name: "User",
-      email: "test@example.com",
+      email: uniqueEmail,
       website_role: "admin",
       membership_roles: [
         { role_name: "Provider", track_name: "EMT", precepting: false },
@@ -157,15 +152,13 @@ describe("user store test", () => {
 
   it("should be able to soft delete users and list them out if includeDeleted is true", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
-
-    const activeId = crypto.randomUUID();
-    const deletedId = crypto.randomUUID();
+    const testId = crypto.randomUUID();
 
     const [activeUser, deletedUser] = await Promise.all([
       store.createUser({
         first_name: "Active",
         last_name: "User",
-        email: "active@example.com",
+        email: `active-${testId}@example.com`,
         website_role: "user",
         membership_roles: [
           { role_name: "Junior", track_name: "EMT", precepting: false },
@@ -174,7 +167,7 @@ describe("user store test", () => {
       store.createUser({
         first_name: "Deleted",
         last_name: "User",
-        email: "deleted@example.com",
+        email: `deleted-${testId}@example.com`,
         website_role: "user",
         membership_roles: [
           { role_name: "Junior", track_name: "EMT", precepting: false },
@@ -187,12 +180,12 @@ describe("user store test", () => {
     await store.softDelete(actualDeletedId);
 
     const withoutDeleted = await store.listUsers();
-    expect(withoutDeleted.map((u) => u.user_id)).toEqual([actualActiveId]);
+    expect(withoutDeleted.map((u) => u.user_id)).toContain(actualActiveId);
+    expect(withoutDeleted.map((u) => u.user_id)).not.toContain(actualDeletedId);
 
     const withDeleted = await store.listUsers(true);
-    expect(withDeleted.map((u) => u.user_id).sort()).toEqual(
-      [actualActiveId, actualDeletedId].sort(),
-    );
+    expect(withDeleted.map((u) => u.user_id)).toContain(actualActiveId);
+    expect(withDeleted.map((u) => u.user_id)).toContain(actualDeletedId);
 
     const deletedUserFromList = withDeleted.find(
       (u) => u.user_id === actualDeletedId,
@@ -202,11 +195,12 @@ describe("user store test", () => {
 
   it("should throw UserNotFound when getting a soft-deleted user", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
+    const uniqueEmail = `test-${crypto.randomUUID()}@example.com`;
 
     const { user_id } = await store.createUser({
       first_name: "Test",
       last_name: "User",
-      email: "test@example.com",
+      email: uniqueEmail,
       website_role: "admin",
       membership_roles: [
         { role_name: "Provider", track_name: "EMT", precepting: false },
@@ -219,11 +213,12 @@ describe("user store test", () => {
 
   it("should be able to hard delete users permanently", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
+    const uniqueEmail = `test-${crypto.randomUUID()}@example.com`;
 
     const { user_id } = await store.createUser({
       first_name: "Test",
       last_name: "User",
-      email: "test@example.com",
+      email: uniqueEmail,
       website_role: "admin",
       membership_roles: [
         { role_name: "Provider", track_name: "EMT", precepting: false },

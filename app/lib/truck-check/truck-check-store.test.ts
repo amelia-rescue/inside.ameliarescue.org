@@ -1,6 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "../dynamo-local";
+import { describe, it, expect } from "vitest";
 import {
   TruckCheckStore,
   TruckCheckNotFound,
@@ -8,33 +6,24 @@ import {
 } from "./truck-check-store";
 
 describe("truck check store test", () => {
-  let dynamo: DynaliteServer;
-
-  beforeEach(async () => {
-    dynamo = await setupDynamo();
-  });
-
-  afterEach(async () => {
-    await teardownDynamo(dynamo);
-  });
-
   it("should be able to create and get a truck check", async () => {
     const store = TruckCheckStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
 
     const truckCheck = await store.createTruckCheck({
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
     });
 
     expect(truckCheck).toMatchObject({
       id: expect.any(String),
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
       created_at: expect.any(String),
       updated_at: expect.any(String),
@@ -43,10 +32,10 @@ describe("truck check store test", () => {
     const retrieved = await store.getTruckCheck(truckCheck.id);
     expect(retrieved).toMatchObject({
       id: truckCheck.id,
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
       created_at: expect.any(String),
       updated_at: expect.any(String),
@@ -87,36 +76,37 @@ describe("truck check store test", () => {
 
   it("should be able to update a truck check", async () => {
     const store = TruckCheckStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
 
     const created = await store.createTruckCheck({
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "full" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
     });
 
     const updated = await store.updateTruckCheck({
       id: created.id,
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good", fuel: "3/4" },
-      contributors: ["user-456", "user-789"],
+      contributors: [userId, "user-789"],
       locked: true,
     });
 
     expect(updated).toMatchObject({
       id: created.id,
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good", fuel: "3/4" },
-      contributors: ["user-456", "user-789"],
+      contributors: [userId, "user-789"],
       locked: true,
     });
 
     const retrieved = await store.getTruckCheck(created.id);
     expect(retrieved.locked).toBe(true);
-    expect(retrieved.contributors).toEqual(["user-456", "user-789"]);
+    expect(retrieved.contributors).toEqual([userId, "user-789"]);
     expect(retrieved.data).toEqual({
       oil_level: "full",
       tire_pressure: "good",
@@ -141,12 +131,13 @@ describe("truck check store test", () => {
 
   it("should be able to delete a truck check", async () => {
     const store = TruckCheckStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
 
     const created = await store.createTruckCheck({
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "full" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
     });
 
@@ -167,27 +158,28 @@ describe("truck check store test", () => {
 
   it("should be able to list all truck checks", async () => {
     const store = TruckCheckStore.make();
+    const testId = crypto.randomUUID();
 
     const checksToCreate: Omit<TruckCheck, "id">[] = [
       {
-        created_by: "user-123",
+        created_by: `user-${testId}-1`,
         truck: "Ambulance 1",
         data: { oil_level: "full" },
-        contributors: ["user-123"],
+        contributors: [`user-${testId}-1`],
         locked: false,
       },
       {
-        created_by: "user-456",
+        created_by: `user-${testId}-2`,
         truck: "Ambulance 2",
         data: { tire_pressure: "good" },
-        contributors: ["user-456"],
+        contributors: [`user-${testId}-2`],
         locked: true,
       },
       {
-        created_by: "user-789",
+        created_by: `user-${testId}-3`,
         truck: "Ambulance 3",
         data: { fuel: "full" },
-        contributors: ["user-789", "user-123"],
+        contributors: [`user-${testId}-3`, `user-${testId}-1`],
         locked: false,
       },
     ];
@@ -197,33 +189,27 @@ describe("truck check store test", () => {
     );
 
     const checks = await store.listTruckChecks();
-    expect(checks.length).toBe(3);
-  });
-
-  it("should return an empty array when listing with no truck checks", async () => {
-    const store = TruckCheckStore.make();
-
-    const checks = await store.listTruckChecks();
-    expect(checks).toEqual([]);
+    expect(checks.length).toBeGreaterThanOrEqual(3);
   });
 
   it("should preserve created_at when updating a truck check", async () => {
     const store = TruckCheckStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
 
     const created = await store.createTruckCheck({
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "full" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
     });
 
     const updated = await store.updateTruckCheck({
       id: created.id,
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { oil_level: "low" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: true,
     });
 
@@ -233,6 +219,7 @@ describe("truck check store test", () => {
 
   it("should handle truck checks with complex data objects", async () => {
     const store = TruckCheckStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
 
     const complexData = {
       fluids: {
@@ -255,10 +242,10 @@ describe("truck check store test", () => {
     };
 
     const truckCheck = await store.createTruckCheck({
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: complexData,
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
     });
 
@@ -270,37 +257,41 @@ describe("truck check store test", () => {
 
   it("should handle multiple contributors", async () => {
     const store = TruckCheckStore.make();
+    const user1 = `user-${crypto.randomUUID()}`;
+    const user2 = `user-${crypto.randomUUID()}`;
+    const user3 = `user-${crypto.randomUUID()}`;
 
     const truckCheck = await store.createTruckCheck({
-      created_by: "user-123",
+      created_by: user1,
       truck: "Ambulance 1",
       data: { initial_check: "complete" },
-      contributors: ["user-123"],
+      contributors: [user1],
       locked: false,
     });
 
-    expect(truckCheck.contributors).toEqual(["user-123"]);
+    expect(truckCheck.contributors).toEqual([user1]);
 
     const updated = await store.updateTruckCheck({
       id: truckCheck.id,
-      created_by: "user-123",
+      created_by: user1,
       truck: "Ambulance 1",
       data: { initial_check: "complete", secondary_check: "complete" },
-      contributors: ["user-123", "user-456", "user-789"],
+      contributors: [user1, user2, user3],
       locked: false,
     });
 
-    expect(updated.contributors).toEqual(["user-123", "user-456", "user-789"]);
+    expect(updated.contributors).toEqual([user1, user2, user3]);
   });
 
   it("should handle locked status changes", async () => {
     const store = TruckCheckStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
 
     const truckCheck = await store.createTruckCheck({
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { status: "in_progress" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
     });
 
@@ -308,10 +299,10 @@ describe("truck check store test", () => {
 
     const locked = await store.updateTruckCheck({
       id: truckCheck.id,
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { status: "complete" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: true,
     });
 
@@ -319,10 +310,10 @@ describe("truck check store test", () => {
 
     const unlocked = await store.updateTruckCheck({
       id: truckCheck.id,
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: { status: "complete" },
-      contributors: ["user-456"],
+      contributors: [userId],
       locked: false,
     });
 
@@ -331,9 +322,10 @@ describe("truck check store test", () => {
 
   it("should handle empty data objects", async () => {
     const store = TruckCheckStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
 
     const truckCheck = await store.createTruckCheck({
-      created_by: "user-456",
+      created_by: userId,
       truck: "Ambulance 1",
       data: {},
       contributors: [],

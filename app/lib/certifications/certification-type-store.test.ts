@@ -1,6 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "../dynamo-local";
+import { describe, it, expect } from "vitest";
 import {
   CertificationTypeStore,
   CertificationTypeNotFound,
@@ -9,36 +7,27 @@ import {
 } from "./certification-type-store";
 
 describe("certification type store test", () => {
-  let dynamo: DynaliteServer;
-
-  beforeEach(async () => {
-    dynamo = await setupDynamo();
-  });
-
-  afterEach(async () => {
-    await teardownDynamo(dynamo);
-  });
-
   it("should be able to create and get a certification type", async () => {
     const store = CertificationTypeStore.make();
+    const uniqueName = `EMT-Basic-${crypto.randomUUID()}`;
 
     const certificationType = await store.createCertificationType({
-      name: "EMT-Basic",
+      name: uniqueName,
       description: "Emergency Medical Technician - Basic Level",
       expires: true,
     });
 
     expect(certificationType).toMatchObject({
-      name: "EMT-Basic",
+      name: uniqueName,
       description: "Emergency Medical Technician - Basic Level",
       expires: true,
       created_at: expect.any(String),
       updated_at: expect.any(String),
     });
 
-    const retrieved = await store.getCertificationType("EMT-Basic");
+    const retrieved = await store.getCertificationType(uniqueName);
     expect(retrieved).toMatchObject({
-      name: "EMT-Basic",
+      name: uniqueName,
       description: "Emergency Medical Technician - Basic Level",
       expires: true,
       created_at: expect.any(String),
@@ -56,16 +45,17 @@ describe("certification type store test", () => {
 
   it("should throw CertificationTypeAlreadyExists when creating a duplicate", async () => {
     const store = CertificationTypeStore.make();
+    const uniqueName = `EMT-Basic-${crypto.randomUUID()}`;
 
     await store.createCertificationType({
-      name: "EMT-Basic",
+      name: uniqueName,
       description: "Emergency Medical Technician - Basic Level",
       expires: true,
     });
 
     await expect(
       store.createCertificationType({
-        name: "EMT-Basic",
+        name: uniqueName,
         description: "Duplicate description",
         expires: true,
       }),
@@ -74,30 +64,31 @@ describe("certification type store test", () => {
 
   it("should be able to list all certification types", async () => {
     const store = CertificationTypeStore.make();
+    const testId = crypto.randomUUID();
 
     const typesToCreate: CertificationType[] = [
       {
-        name: "EMT-Basic",
+        name: `EMT-Basic-${testId}`,
         description: "Basic EMT certification",
         expires: true,
       },
       {
-        name: "EMT-Intermediate",
+        name: `EMT-Intermediate-${testId}`,
         description: "Intermediate EMT certification",
         expires: true,
       },
       {
-        name: "EMT-Paramedic",
+        name: `EMT-Paramedic-${testId}`,
         description: "Paramedic certification",
         expires: true,
       },
       {
-        name: "CPR",
+        name: `CPR-${testId}`,
         description: "CPR certification",
         expires: true,
       },
       {
-        name: "EVOC",
+        name: `EVOC-${testId}`,
         description: "Emergency Vehicle Operations Course",
         expires: true,
       },
@@ -108,37 +99,30 @@ describe("certification type store test", () => {
     );
 
     const types = await store.listCertificationTypes();
-    expect(types.length).toBe(5);
-    expect(types.map((t) => t.name).sort()).toEqual([
-      "CPR",
-      "EMT-Basic",
-      "EMT-Intermediate",
-      "EMT-Paramedic",
-      "EVOC",
+    expect(types.length).toBeGreaterThanOrEqual(5);
+    const testTypes = types.filter((t) => t.name.includes(testId));
+    expect(testTypes.map((t) => t.name).sort()).toEqual([
+      `CPR-${testId}`,
+      `EMT-Basic-${testId}`,
+      `EMT-Intermediate-${testId}`,
+      `EMT-Paramedic-${testId}`,
+      `EVOC-${testId}`,
     ]);
-  });
-
-  it("should return an empty array when listing with no certification types", async () => {
-    const store = CertificationTypeStore.make();
-
-    const types = await store.listCertificationTypes();
-    expect(types).toEqual([]);
   });
 
   it("should handle certification types with special characters in names", async () => {
     const store = CertificationTypeStore.make();
+    const uniqueName = `EMT-Super/Paramedic (Advanced)-${crypto.randomUUID()}`;
 
     const certificationType = await store.createCertificationType({
-      name: "EMT-Super/Paramedic (Advanced)",
+      name: uniqueName,
       description: "Advanced certification with special characters",
       expires: true,
     });
 
-    expect(certificationType.name).toBe("EMT-Super/Paramedic (Advanced)");
+    expect(certificationType.name).toBe(uniqueName);
 
-    const retrieved = await store.getCertificationType(
-      "EMT-Super/Paramedic (Advanced)",
-    );
-    expect(retrieved.name).toBe("EMT-Super/Paramedic (Advanced)");
+    const retrieved = await store.getCertificationType(uniqueName);
+    expect(retrieved.name).toBe(uniqueName);
   });
 });

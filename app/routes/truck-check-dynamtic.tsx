@@ -48,7 +48,8 @@ export default function TruckCheckDynamic() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === "counter-update") {
-            setCounter(data.value);
+            // TODO: Handle counter update
+            console.log("Counter update:", data.value);
           }
         } catch (error) {
           console.error("Error parsing WebSocket message:", error);

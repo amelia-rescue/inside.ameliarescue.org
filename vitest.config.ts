@@ -5,10 +5,11 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   test: {
+    globalSetup: "test/vi.test.setup.global.ts",
     globals: true,
     environment: "happy-dom",
     setupFiles: ["./test/setup.ts"],
-    fileParallelism: false,
+    fileParallelism: true,
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

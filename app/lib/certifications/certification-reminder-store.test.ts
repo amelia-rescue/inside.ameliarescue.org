@@ -1,6 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { DynaliteServer } from "dynalite";
-import { setupDynamo, teardownDynamo } from "../dynamo-local";
+import { describe, it, expect } from "vitest";
 import {
   CertificationReminderStore,
   CertificationReminderNotFound,
@@ -8,32 +6,25 @@ import {
 } from "./certification-reminder-store";
 
 describe("certification reminder store test", () => {
-  let dynamo: DynaliteServer;
-
-  beforeEach(async () => {
-    dynamo = await setupDynamo();
-  });
-
-  afterEach(async () => {
-    await teardownDynamo(dynamo);
-  });
-
   it("should be able to create and get a reminder", async () => {
     const store = CertificationReminderStore.make();
+    const reminderId = `reminder-${crypto.randomUUID()}`;
+    const userId = `user-${crypto.randomUUID()}`;
+    const certId = `cert-${crypto.randomUUID()}`;
 
     const reminder = await store.createReminder({
-      reminder_id: "reminder-123",
-      user_id: "user-456",
-      certification_id: "cert-789",
+      reminder_id: reminderId,
+      user_id: userId,
+      certification_id: certId,
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
       email_sent: true,
     });
 
     expect(reminder).toMatchObject({
-      reminder_id: "reminder-123",
-      user_id: "user-456",
-      certification_id: "cert-789",
+      reminder_id: reminderId,
+      user_id: userId,
+      certification_id: certId,
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
       email_sent: true,
@@ -41,11 +32,11 @@ describe("certification reminder store test", () => {
       updated_at: expect.any(String),
     });
 
-    const retrieved = await store.getReminder("reminder-123");
+    const retrieved = await store.getReminder(reminderId);
     expect(retrieved).toMatchObject({
-      reminder_id: "reminder-123",
-      user_id: "user-456",
-      certification_id: "cert-789",
+      reminder_id: reminderId,
+      user_id: userId,
+      certification_id: certId,
       reminder_type: "expired",
     });
   });
@@ -60,9 +51,10 @@ describe("certification reminder store test", () => {
 
   it("should throw CertificationReminderAlreadyExists when creating a duplicate", async () => {
     const store = CertificationReminderStore.make();
+    const reminderId = `reminder-${crypto.randomUUID()}`;
 
     await store.createReminder({
-      reminder_id: "reminder-123",
+      reminder_id: reminderId,
       user_id: "user-456",
       certification_id: "cert-789",
       reminder_type: "expired",
@@ -71,7 +63,7 @@ describe("certification reminder store test", () => {
 
     await expect(
       store.createReminder({
-        reminder_id: "reminder-123",
+        reminder_id: reminderId,
         user_id: "user-999",
         certification_id: "cert-999",
         reminder_type: "expiring_soon",
@@ -82,10 +74,11 @@ describe("certification reminder store test", () => {
 
   it("should support all reminder types", async () => {
     const store = CertificationReminderStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
 
     const expiredReminder = await store.createReminder({
-      reminder_id: "reminder-expired",
-      user_id: "user-123",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
       certification_id: "cert-1",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
@@ -93,8 +86,8 @@ describe("certification reminder store test", () => {
     expect(expiredReminder.reminder_type).toBe("expired");
 
     const expiringSoonReminder = await store.createReminder({
-      reminder_id: "reminder-expiring",
-      user_id: "user-123",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
       certification_id: "cert-2",
       reminder_type: "expiring_soon",
       sent_at: "2024-01-02T00:00:00Z",
@@ -102,8 +95,8 @@ describe("certification reminder store test", () => {
     expect(expiringSoonReminder.reminder_type).toBe("expiring_soon");
 
     const missingReminder = await store.createReminder({
-      reminder_id: "reminder-missing",
-      user_id: "user-123",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
       certification_id: "missing-EMT-Basic",
       reminder_type: "missing",
       sent_at: "2024-01-03T00:00:00Z",
@@ -113,34 +106,36 @@ describe("certification reminder store test", () => {
 
   it("should be able to get reminders by user and certification", async () => {
     const store = CertificationReminderStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
+    const certId = `cert-${crypto.randomUUID()}`;
 
     await store.createReminder({
-      reminder_id: "reminder-1",
-      user_id: "user-123",
-      certification_id: "cert-456",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
+      certification_id: certId,
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
 
     await store.createReminder({
-      reminder_id: "reminder-2",
-      user_id: "user-123",
-      certification_id: "cert-456",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
+      certification_id: certId,
       reminder_type: "expired",
       sent_at: "2024-01-08T00:00:00Z",
     });
 
     await store.createReminder({
-      reminder_id: "reminder-3",
-      user_id: "user-123",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
       certification_id: "cert-789",
       reminder_type: "expiring_soon",
       sent_at: "2024-01-05T00:00:00Z",
     });
 
     const reminders = await store.getRemindersByUserAndCertification(
-      "user-123",
-      "cert-456",
+      userId,
+      certId,
     );
 
     expect(reminders.length).toBe(2);
@@ -161,44 +156,47 @@ describe("certification reminder store test", () => {
 
   it("should be able to get all reminders by user", async () => {
     const store = CertificationReminderStore.make();
+    const user1 = `user-${crypto.randomUUID()}`;
+    const user2 = `user-${crypto.randomUUID()}`;
 
     await store.createReminder({
-      reminder_id: "reminder-1",
-      user_id: "user-123",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: user1,
       certification_id: "cert-1",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
 
     await store.createReminder({
-      reminder_id: "reminder-2",
-      user_id: "user-123",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: user1,
       certification_id: "cert-2",
       reminder_type: "expiring_soon",
       sent_at: "2024-01-02T00:00:00Z",
     });
 
     await store.createReminder({
-      reminder_id: "reminder-3",
-      user_id: "user-456",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: user2,
       certification_id: "cert-3",
       reminder_type: "missing",
       sent_at: "2024-01-03T00:00:00Z",
     });
 
-    const user123Reminders = await store.getRemindersByUser("user-123");
-    expect(user123Reminders.length).toBe(2);
+    const user1Reminders = await store.getRemindersByUser(user1);
+    expect(user1Reminders.length).toBe(2);
 
-    const user456Reminders = await store.getRemindersByUser("user-456");
-    expect(user456Reminders.length).toBe(1);
-    expect(user456Reminders[0].reminder_type).toBe("missing");
+    const user2Reminders = await store.getRemindersByUser(user2);
+    expect(user2Reminders.length).toBe(1);
+    expect(user2Reminders[0].reminder_type).toBe("missing");
   });
 
   it("should be able to list all reminders", async () => {
     const store = CertificationReminderStore.make();
+    const testId = crypto.randomUUID();
 
     await store.createReminder({
-      reminder_id: "reminder-1",
+      reminder_id: `reminder-${testId}-1`,
       user_id: "user-123",
       certification_id: "cert-1",
       reminder_type: "expired",
@@ -206,7 +204,7 @@ describe("certification reminder store test", () => {
     });
 
     await store.createReminder({
-      reminder_id: "reminder-2",
+      reminder_id: `reminder-${testId}-2`,
       user_id: "user-456",
       certification_id: "cert-2",
       reminder_type: "expiring_soon",
@@ -214,7 +212,7 @@ describe("certification reminder store test", () => {
     });
 
     await store.createReminder({
-      reminder_id: "reminder-3",
+      reminder_id: `reminder-${testId}-3`,
       user_id: "user-789",
       certification_id: "cert-3",
       reminder_type: "missing",
@@ -222,14 +220,15 @@ describe("certification reminder store test", () => {
     });
 
     const allReminders = await store.listAllReminders();
-    expect(allReminders.length).toBe(3);
+    expect(allReminders.length).toBeGreaterThanOrEqual(3);
   });
 
   it("should be able to update a reminder", async () => {
     const store = CertificationReminderStore.make();
+    const reminderId = `reminder-${crypto.randomUUID()}`;
 
     await store.createReminder({
-      reminder_id: "reminder-123",
+      reminder_id: reminderId,
       user_id: "user-456",
       certification_id: "cert-789",
       reminder_type: "expired",
@@ -238,7 +237,7 @@ describe("certification reminder store test", () => {
     });
 
     const updated = await store.updateReminder({
-      reminder_id: "reminder-123",
+      reminder_id: reminderId,
       user_id: "user-456",
       certification_id: "cert-789",
       reminder_type: "expired",
@@ -268,18 +267,19 @@ describe("certification reminder store test", () => {
 
   it("should be able to delete a reminder", async () => {
     const store = CertificationReminderStore.make();
+    const reminderId = `reminder-${crypto.randomUUID()}`;
 
     await store.createReminder({
-      reminder_id: "reminder-123",
+      reminder_id: reminderId,
       user_id: "user-456",
       certification_id: "cert-789",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
 
-    await store.deleteReminder("reminder-123");
+    await store.deleteReminder(reminderId);
 
-    await expect(store.getReminder("reminder-123")).rejects.toBeInstanceOf(
+    await expect(store.getReminder(reminderId)).rejects.toBeInstanceOf(
       CertificationReminderNotFound,
     );
   });
@@ -296,7 +296,7 @@ describe("certification reminder store test", () => {
     const store = CertificationReminderStore.make();
 
     const withFlags = await store.createReminder({
-      reminder_id: "reminder-with-flags",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
       user_id: "user-456",
       certification_id: "cert-789",
       reminder_type: "expired",
@@ -309,7 +309,7 @@ describe("certification reminder store test", () => {
     expect(withFlags.sms_sent).toBe(false);
 
     const withoutFlags = await store.createReminder({
-      reminder_id: "reminder-no-flags",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
       user_id: "user-456",
       certification_id: "cert-123",
       reminder_type: "missing",
@@ -322,25 +322,27 @@ describe("certification reminder store test", () => {
 
   it("should correctly check if reminder of type exists", async () => {
     const store = CertificationReminderStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
+    const certId = `cert-${crypto.randomUUID()}`;
 
     await store.createReminder({
-      reminder_id: "reminder-1",
-      user_id: "user-123",
-      certification_id: "cert-456",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
+      certification_id: certId,
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
 
     const hasExpiredReminder = await store.hasReminderOfType(
-      "user-123",
-      "cert-456",
+      userId,
+      certId,
       "expired",
     );
     expect(hasExpiredReminder).toBe(true);
 
     const hasExpiringSoonReminder = await store.hasReminderOfType(
-      "user-123",
-      "cert-456",
+      userId,
+      certId,
       "expiring_soon",
     );
     expect(hasExpiringSoonReminder).toBe(false);
@@ -360,25 +362,27 @@ describe("certification reminder store test", () => {
 
   it("should only check reminders of the same type", async () => {
     const store = CertificationReminderStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
+    const certId = `cert-${crypto.randomUUID()}`;
 
     await store.createReminder({
-      reminder_id: "reminder-expired",
-      user_id: "user-123",
-      certification_id: "cert-456",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
+      certification_id: certId,
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
 
     const hasExpired = await store.hasReminderOfType(
-      "user-123",
-      "cert-456",
+      userId,
+      certId,
       "expired",
     );
     expect(hasExpired).toBe(true);
 
     const hasExpiring = await store.hasReminderOfType(
-      "user-123",
-      "cert-456",
+      userId,
+      certId,
       "expiring_soon",
     );
     expect(hasExpiring).toBe(false);
@@ -386,46 +390,50 @@ describe("certification reminder store test", () => {
 
   it("should handle multiple reminders for different certifications of the same user", async () => {
     const store = CertificationReminderStore.make();
+    const userId = `user-${crypto.randomUUID()}`;
+    const cert1 = `cert-${crypto.randomUUID()}`;
+    const cert2 = `cert-${crypto.randomUUID()}`;
+    const cert3 = `cert-${crypto.randomUUID()}`;
 
     await store.createReminder({
-      reminder_id: "reminder-1",
-      user_id: "user-123",
-      certification_id: "cert-1",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
+      certification_id: cert1,
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
 
     await store.createReminder({
-      reminder_id: "reminder-2",
-      user_id: "user-123",
-      certification_id: "cert-2",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
+      certification_id: cert2,
       reminder_type: "expiring_soon",
       sent_at: "2024-01-02T00:00:00Z",
     });
 
     await store.createReminder({
-      reminder_id: "reminder-3",
-      user_id: "user-123",
-      certification_id: "cert-3",
+      reminder_id: `reminder-${crypto.randomUUID()}`,
+      user_id: userId,
+      certification_id: cert3,
       reminder_type: "missing",
       sent_at: "2024-01-03T00:00:00Z",
     });
 
     const cert1Reminders = await store.getRemindersByUserAndCertification(
-      "user-123",
-      "cert-1",
+      userId,
+      cert1,
     );
     expect(cert1Reminders.length).toBe(1);
     expect(cert1Reminders[0].reminder_type).toBe("expired");
 
     const cert2Reminders = await store.getRemindersByUserAndCertification(
-      "user-123",
-      "cert-2",
+      userId,
+      cert2,
     );
     expect(cert2Reminders.length).toBe(1);
     expect(cert2Reminders[0].reminder_type).toBe("expiring_soon");
 
-    const allUserReminders = await store.getRemindersByUser("user-123");
+    const allUserReminders = await store.getRemindersByUser(userId);
     expect(allUserReminders.length).toBe(3);
   });
 });
