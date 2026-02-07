@@ -17,7 +17,9 @@ export default function TruckCheck() {
       </p>
       <p>
         <Link to="/truck-checks">
-          <button className="btn btn-primary">Dynamic Truck Check</button>
+          <button className="btn btn-primary">
+            Collaborative Truck Check (work in progress)
+          </button>
         </Link>
       </p>
 

@@ -1,23 +1,38 @@
 import { appContext } from "~/context";
 import type { Route } from "./+types/truck-checks";
 import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
-import { useFetcher, useLoaderData } from "react-router";
+import {
+  redirect,
+  useActionData,
+  useFetcher,
+  useLoaderData,
+} from "react-router";
 import { useRef } from "react";
 import { IoWarning } from "react-icons/io5";
+import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
 
-export async function action({ context }: Route.ActionArgs) {
+export async function action({ context, request }: Route.ActionArgs) {
   const ctx = context.get(appContext);
   if (!ctx) {
     throw new Error("context not found");
   }
+  if (!request) {
+    throw new Error("request not found");
+  }
+  const thing = await request.formData();
+  const truck = thing.get("truck");
+  if (typeof truck !== "string") {
+    throw new Error("truck is not a string");
+  }
   const truckCheckStore = TruckCheckStore.make();
-  await truckCheckStore.createTruckCheck({
+  const truckCheck = await truckCheckStore.createTruckCheck({
     created_by: ctx.user.user_id,
-    truck: "",
+    truck: truck,
     data: {},
     contributors: [ctx.user.user_id],
     locked: false,
   });
+  return redirect(`/truck-checks/${truckCheck.id}`);
 }
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -27,15 +42,26 @@ export async function loader({ context }: Route.LoaderArgs) {
   }
 
   const truckCheckStore = TruckCheckStore.make();
+  const truckCheckSchemaStore = TruckCheckSchemaStore.make();
 
   const previousChecks = await truckCheckStore.listTruckChecks();
+  const trucks = await truckCheckSchemaStore.listTrucks();
 
-  return { user: ctx.user, previousChecks };
+  // Sort checks by created_at descending (newest first)
+  const sortedChecks = [...previousChecks].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+
+  return { user: ctx.user, previousChecks: sortedChecks, trucks };
 }
 
 export default function TruckChecks() {
-  const { user, previousChecks } = useLoaderData<typeof loader>();
+  const { user, previousChecks, trucks } = useLoaderData<typeof loader>();
+  const stuff = useActionData<typeof action>();
+
   const fetcher = useFetcher();
+  const formRef = useRef<HTMLFormElement>(null);
   const modalRef = useRef<HTMLDialogElement>(null);
 
   const toggleModal = () => {
@@ -48,17 +74,19 @@ export default function TruckChecks() {
     }
   };
 
-  const handleStartNewCheck = () => {
-    // TODO: Implement start new check logic
-    console.log("Starting new check...");
-  };
-
   return (
-    <div>
-      <h1>Truck Checks</h1>
-      <button className="btn btn-primary" onClick={toggleModal}>
-        Start New Check
-      </button>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Truck Checks</h1>
+          <p className="mt-2 opacity-70">
+            Collaborative truck inspection checklists
+          </p>
+        </div>
+        <button className="btn btn-primary" onClick={toggleModal}>
+          Start New Check
+        </button>
+      </div>
       <dialog ref={modalRef} id="start-new-check-modal" className="modal">
         <div className="modal-box">
           <form method="dialog">
@@ -66,27 +94,91 @@ export default function TruckChecks() {
               ✕
             </button>
           </form>
-          <h3 className="text-lg font-bold">New Truck Check!</h3>
-          <p className="py-4">
-            Once you create a new check other members will be able to edit it
-            simultaneously.
-          </p>
-          <div className="alert alert-warning">
-            <IoWarning />
-            Truck checks are automatically locked after 24 hours.
-          </div>
-          <div className="modal-action">
-            <button className="btn btn-primary">Start New Check</button>
-          </div>
+          <fetcher.Form method="post" ref={formRef}>
+            <h3 className="text-lg font-bold">New Truck Check!</h3>
+            <p className="py-4">
+              Once you create a new check other members will be able to edit it
+              simultaneously.
+            </p>
+            <div className="alert alert-warning">
+              <IoWarning />
+              Truck checks are automatically locked after 24 hours.
+            </div>
+            <select className="select mt-4" required name="truck">
+              {trucks.map((truck) => (
+                <option key={truck.truckId} value={truck.truckId}>
+                  {truck.displayName}
+                </option>
+              ))}
+            </select>
+            <div className="modal-action">
+              <button
+                onClick={() => fetcher.submit(formRef.current)}
+                className="btn btn-primary"
+              >
+                Start New Check
+              </button>
+            </div>
+          </fetcher.Form>
         </div>
       </dialog>
-      <div>
-        {previousChecks.map((check) => (
-          <div key={check.id}>
-            <h2>{check.truck}</h2>
-            <p>{check.created_at}</p>
+      <div className="space-y-4">
+        {previousChecks.length === 0 ? (
+          <div className="card bg-base-200">
+            <div className="card-body text-center">
+              <p className="opacity-60">
+                No truck checks yet. Start your first check!
+              </p>
+            </div>
           </div>
-        ))}
+        ) : (
+          previousChecks.map((check) => {
+            const truck = trucks.find((t) => t.truckId === check.truck);
+            const checkDate = new Date(check.created_at);
+            const isRecent =
+              Date.now() - checkDate.getTime() < 24 * 60 * 60 * 1000;
+
+            return (
+              <div key={check.id} className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h2 className="card-title">
+                        {truck?.displayName || check.truck}
+                      </h2>
+                      <p className="mt-1 text-sm opacity-70">
+                        {checkDate.toLocaleDateString()} at{" "}
+                        {checkDate.toLocaleTimeString()}
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        {check.locked && (
+                          <span className="badge badge-error">Locked</span>
+                        )}
+                        <span className="text-sm opacity-60">
+                          {check.contributors.length} contributor
+                          {check.contributors.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="text-sm opacity-60">
+                        Check #{check.id.slice(0, 8)}
+                      </span>
+                      {!check.locked && (
+                        <a
+                          href={`/truck-checks/${check.id}`}
+                          className="btn btn-primary btn-sm"
+                        >
+                          Edit
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

@@ -23,8 +23,8 @@ export default [
   route("documents", "./routes/documents.tsx"),
   route("documents/view", "./routes/documents.view.tsx"),
   route("truck-check", "./routes/truck-check.tsx"),
-  route("truck-check-dynamic", "./routes/truck-check-dynamtic.tsx"),
   route("truck-checks", "./routes/truck-checks.tsx"),
+  route("truck-checks/:id", "./routes/truck-check-dynamic.tsx"),
   route("profile", "./routes/profile.tsx"),
   route("user/:user_id", "./routes/user.$user_id.tsx"),
   ...prefix("auth", [
