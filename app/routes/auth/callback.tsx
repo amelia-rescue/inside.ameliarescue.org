@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { redirect, type LoaderFunctionArgs } from "react-router";
 import { exchangeCodeForTokens, getUserInfo } from "~/lib/auth.server";
 import { createUserSession, getSessionData } from "~/lib/session.server";
@@ -34,19 +35,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code, codeVerifier, callbackUrl);
 
+    if (!tokens.refresh_token) {
+      throw new Error("No refresh token received");
+    }
+
     // Get user info
     const userInfo = await getUserInfo(tokens.access_token);
-
-    // Calculate token expiration
-    const expiresAt = Date.now() + (tokens.expires_in || 3600) * 1000;
 
     // Create user session
     return createUserSession(
       {
         user_id: userInfo.sub as string,
+        session_id: crypto.randomUUID(),
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
-        expiresAt,
+        // goes into the ttl'd field in dynamo - must be epoch seconds
+        // this is also 1 hour less than what is configured in cdk-stack.ts
+        // if I ever have to adjust it and forget to do it here there will be problems
+        // too lazy to centralize config
+        expiresAt: dayjs().add(29, "days").add(23, "hours").unix(),
+        accessTokenExpiresAt: dayjs()
+          .add(tokens.expires_in, "seconds")
+          .toISOString(),
       },
       redirectTo,
     );

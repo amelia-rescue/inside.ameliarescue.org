@@ -185,6 +185,15 @@ export class CdkStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const userSessionsTable = new dynamodb.Table(this, "UserSessionsTable", {
+      tableName: "aes_user_sessions",
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "session_id", type: dynamodb.AttributeType.STRING },
+      timeToLiveAttribute: "expires_at",
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     const certificationTypesTable = new dynamodb.Table(
       this,
       "CertificationTypesTable",
@@ -401,6 +410,7 @@ export class CdkStack extends cdk.Stack {
     );
 
     usersTable.grantReadWriteData(lambdaFunction);
+    userSessionsTable.grantReadWriteData(lambdaFunction);
     certificationTypesTable.grantReadWriteData(lambdaFunction);
     userCertificationsTable.grantReadWriteData(lambdaFunction);
     rolesTable.grantReadWriteData(lambdaFunction);

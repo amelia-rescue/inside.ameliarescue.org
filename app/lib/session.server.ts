@@ -2,6 +2,8 @@ import { createCookie, redirect } from "react-router";
 import { refreshAccessToken } from "./auth.server";
 import { log } from "./logger";
 import { getSessionSecret } from "./secrets.server";
+import { SessionStore } from "./session-store";
+import dayjs from "dayjs";
 
 let sessionSecretPromise: Promise<string> | null = null;
 
@@ -25,8 +27,6 @@ async function getCookieOptions() {
 
 // Lazy cookie initialization
 let userCookie: ReturnType<typeof createCookie> | null = null;
-let accessTokenCookie: ReturnType<typeof createCookie> | null = null;
-let refreshTokenCookie: ReturnType<typeof createCookie> | null = null;
 let tempDataCookie: ReturnType<typeof createCookie> | null = null;
 
 export async function getUserCookie() {
@@ -38,28 +38,6 @@ export async function getUserCookie() {
     });
   }
   return userCookie;
-}
-
-async function getAccessTokenCookie() {
-  if (!accessTokenCookie) {
-    const options = await getCookieOptions();
-    accessTokenCookie = createCookie("__access_token", {
-      ...options,
-      maxAge: 60 * 60 * 24, // 1 day
-    });
-  }
-  return accessTokenCookie;
-}
-
-async function getRefreshTokenCookie() {
-  if (!refreshTokenCookie) {
-    const options = await getCookieOptions();
-    refreshTokenCookie = createCookie("__refresh_token", {
-      ...options,
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-    });
-  }
-  return refreshTokenCookie;
 }
 
 async function getTempDataCookie() {
@@ -75,13 +53,16 @@ async function getTempDataCookie() {
 
 export interface SessionUser {
   user_id: string;
+  session_id: string;
   accessToken: string;
-  refreshToken?: string;
+  refreshToken: string;
   expiresAt: number;
+  accessTokenExpiresAt: string;
 }
 
 interface UserData {
   user_id: string;
+  session_id: string;
   expiresAt: number;
 }
 
@@ -93,28 +74,33 @@ async function getUserFromCookies(
 ): Promise<SessionUser | null> {
   const cookieHeader = request.headers.get("Cookie");
   const userCookieInstance = await getUserCookie();
-  const accessTokenCookieInstance = await getAccessTokenCookie();
-  const refreshTokenCookieInstance = await getRefreshTokenCookie();
 
   const userData = (await userCookieInstance.parse(
     cookieHeader,
   )) as UserData | null;
-  const accessToken = (await accessTokenCookieInstance.parse(cookieHeader)) as
-    | string
-    | null;
-  const refreshToken = (await refreshTokenCookieInstance.parse(
-    cookieHeader,
-  )) as string | null;
 
-  if (!userData || !accessToken) {
+  if (!userData) {
+    return null;
+  }
+
+  const sessionStore = SessionStore.make();
+  let storedSession: Awaited<ReturnType<typeof sessionStore.getSession>> | null;
+  try {
+    storedSession = await sessionStore.getSession(
+      userData.user_id,
+      userData.session_id,
+    );
+  } catch (error) {
     return null;
   }
 
   return {
     user_id: userData.user_id,
-    accessToken,
-    refreshToken: refreshToken || undefined,
+    session_id: storedSession.session_id,
+    refreshToken: storedSession.refresh_token,
+    accessToken: storedSession.access_token,
     expiresAt: userData.expiresAt,
+    accessTokenExpiresAt: storedSession.access_token_expires_at,
   };
 }
 
@@ -131,48 +117,67 @@ export async function getUser(
     return { user: null };
   }
 
+  const sessionStore = SessionStore.make();
+  const now = dayjs();
+  try {
+    const storedSession = await sessionStore.getSession(
+      user.user_id,
+      user.session_id,
+    );
+    const expiresAt = dayjs.unix(storedSession.expires_at);
+    if (expiresAt.isBefore(now)) {
+      await sessionStore.deleteSession(user.user_id, user.session_id);
+      return { user: null };
+    }
+  } catch (error) {
+    log.info("session not found when attempting to get user", {
+      user,
+      error,
+    });
+    return { user: null };
+  }
+
   // Check if token is expired
-  if (user.expiresAt && Date.now() > user.expiresAt) {
+  if (dayjs(user.accessTokenExpiresAt).isBefore(now)) {
     // Try to refresh the token if we have a refresh token
     if (user.refreshToken) {
       try {
         log.info("refreshing access token", { user });
         const tokens = await refreshAccessToken(user.refreshToken);
 
+        const updatedSession = await sessionStore.updateSession({
+          user_id: user.user_id,
+          session_id: user.session_id,
+          expires_at: dayjs().add(29, "days").add(23, "hours").unix(),
+          refresh_token: user.refreshToken,
+          access_token: tokens.access_token,
+          access_token_expires_at: dayjs()
+            .add(tokens.expires_in, "seconds")
+            .toISOString(),
+        });
+
         // Update the user with new tokens
         const updatedUser: SessionUser = {
           ...user,
           accessToken: tokens.access_token,
-          expiresAt: Date.now() + (tokens.expires_in || 3600) * 1000,
+          expiresAt: updatedSession.expires_at,
           // Keep existing refresh token or use new one if provided
-          refreshToken: tokens.refresh_token || user.refreshToken,
+          refreshToken: updatedSession.refresh_token,
+          accessTokenExpiresAt: updatedSession.access_token_expires_at,
         };
 
         // Serialize updated cookies
         const headers = new Headers();
         const userCookieInstance = await getUserCookie();
-        const accessTokenCookieInstance = await getAccessTokenCookie();
-        const refreshTokenCookieInstance = await getRefreshTokenCookie();
 
         headers.append(
           "Set-Cookie",
           await userCookieInstance.serialize({
             user_id: updatedUser.user_id,
+            session_id: updatedUser.session_id,
             expiresAt: updatedUser.expiresAt,
           }),
         );
-        headers.append(
-          "Set-Cookie",
-          await accessTokenCookieInstance.serialize(updatedUser.accessToken),
-        );
-        if (updatedUser.refreshToken) {
-          headers.append(
-            "Set-Cookie",
-            await refreshTokenCookieInstance.serialize(
-              updatedUser.refreshToken,
-            ),
-          );
-        }
 
         // Return updated user and combined cookie headers
         return {
@@ -194,7 +199,6 @@ export async function getUser(
 
 /**
  * Require authenticated user, redirect to login if not authenticated
- * Returns user and optional session header if tokens were refreshed
  */
 export async function requireUser(
   request: Request,
@@ -217,28 +221,26 @@ export async function createUserSession(
 ) {
   const headers = new Headers();
   const userCookieInstance = await getUserCookie();
-  const accessTokenCookieInstance = await getAccessTokenCookie();
-  const refreshTokenCookieInstance = await getRefreshTokenCookie();
+
+  const sessionStore = SessionStore.make();
+
+  await sessionStore.createSession({
+    user_id: user.user_id,
+    session_id: user.session_id,
+    expires_at: user.expiresAt,
+    refresh_token: user.refreshToken,
+    access_token: user.accessToken,
+    access_token_expires_at: user.accessTokenExpiresAt,
+  });
 
   headers.append(
     "Set-Cookie",
     await userCookieInstance.serialize({
       user_id: user.user_id,
+      session_id: user.session_id,
       expiresAt: user.expiresAt,
     }),
   );
-
-  headers.append(
-    "Set-Cookie",
-    await accessTokenCookieInstance.serialize(user.accessToken),
-  );
-
-  if (user.refreshToken) {
-    headers.append(
-      "Set-Cookie",
-      await refreshTokenCookieInstance.serialize(user.refreshToken),
-    );
-  }
 
   return redirect(redirectTo, { headers });
 }
@@ -249,20 +251,25 @@ export async function createUserSession(
 export async function logout(request: Request, redirectTo: string = "/") {
   const headers = new Headers();
   const userCookieInstance = await getUserCookie();
-  const accessTokenCookieInstance = await getAccessTokenCookie();
-  const refreshTokenCookieInstance = await getRefreshTokenCookie();
 
+  try {
+    const sessionUser = await getUserFromCookies(request);
+    if (sessionUser) {
+      const sessionStore = SessionStore.make();
+      await sessionStore.deleteSession(
+        sessionUser.user_id,
+        sessionUser.session_id,
+      );
+    }
+  } catch (error) {
+    log.info("session not found when attempting to logout", {
+      userCookieInstance,
+      error,
+    });
+  }
   headers.append(
     "Set-Cookie",
     await userCookieInstance.serialize("", { maxAge: 0 }),
-  );
-  headers.append(
-    "Set-Cookie",
-    await accessTokenCookieInstance.serialize("", { maxAge: 0 }),
-  );
-  headers.append(
-    "Set-Cookie",
-    await refreshTokenCookieInstance.serialize("", { maxAge: 0 }),
   );
 
   return redirect(redirectTo, { headers });

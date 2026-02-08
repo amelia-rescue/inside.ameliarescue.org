@@ -13,6 +13,11 @@ export async function setupDynamo() {
       partitionKey: "user_id",
     },
     {
+      tableName: "aes_user_sessions",
+      partitionKey: "user_id",
+      sortKey: "session_id",
+    },
+    {
       tableName: "aes_roles",
       partitionKey: "name",
     },
