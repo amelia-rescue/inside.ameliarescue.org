@@ -233,6 +233,30 @@ export default function TruckCheckDynamic() {
 
   const status = statusConfig[connectionStatus];
 
+  const isFieldFilled = (value: any): boolean => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value.trim().length > 0;
+    return true;
+  };
+
+  const requiredFields: string[] = [];
+  for (const section of schema.sections) {
+    for (const field of section.fields) {
+      if ((field as any).required) {
+        requiredFields.push(getFieldId(section.id, (field as any).label));
+      }
+    }
+  }
+  const filledRequiredCount = requiredFields.filter((id) =>
+    isFieldFilled(fieldValues[id]),
+  ).length;
+  const requiredTotal = requiredFields.length;
+  const progressPercent =
+    requiredTotal > 0
+      ? Math.round((filledRequiredCount / requiredTotal) * 100)
+      : 100;
+
   const getInitials = (name: string) =>
     name
       .split(" ")
@@ -636,21 +660,19 @@ export default function TruckCheckDynamic() {
             </>
           ) : (
             <>
-              <span className="text-sm opacity-60">
-                {Object.keys(fieldValues).length} field
-                {Object.keys(fieldValues).length !== 1 ? "s" : ""} filled
-              </span>
-              <div className="flex gap-3">
-                <a href="/truck-check" className="btn btn-ghost btn-sm">
-                  Cancel
-                </a>
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={connectionStatus !== "connected"}
-                >
-                  Save Progress
-                </button>
+              <div className="flex flex-1 items-center gap-3">
+                <progress
+                  className="progress progress-primary w-32"
+                  value={filledRequiredCount}
+                  max={requiredTotal}
+                />
+                <span className="text-sm opacity-60">
+                  {filledRequiredCount}/{requiredTotal} required
+                </span>
               </div>
+              <a href="/truck-check" className="btn btn-ghost btn-sm">
+                Back to Truck Checks
+              </a>
             </>
           )}
         </div>
