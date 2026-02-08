@@ -440,7 +440,7 @@ export default function TruckCheckDynamic() {
       {/* Breadcrumb */}
       <div className="mb-4">
         <a
-          href="/truck-checks"
+          href="/truck-check"
           className="link link-hover inline-flex items-center gap-1 text-sm opacity-70"
         >
           <HiOutlineChevronLeft className="h-4 w-4" />
@@ -617,7 +617,7 @@ export default function TruckCheckDynamic() {
           {isLocked ? (
             <>
               <span className="text-sm opacity-60">View-only</span>
-              <a href="/truck-checks" className="btn btn-ghost btn-sm">
+              <a href="/truck-check" className="btn btn-ghost btn-sm">
                 Back to Truck Checks
               </a>
             </>
@@ -628,7 +628,7 @@ export default function TruckCheckDynamic() {
                 {Object.keys(fieldValues).length !== 1 ? "s" : ""} filled
               </span>
               <div className="flex gap-3">
-                <a href="/truck-checks" className="btn btn-ghost btn-sm">
+                <a href="/truck-check" className="btn btn-ghost btn-sm">
                   Cancel
                 </a>
                 <button
