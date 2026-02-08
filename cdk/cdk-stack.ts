@@ -599,6 +599,61 @@ export class CdkStack extends cdk.Stack {
       new eventsTargets.LambdaFunction(certificationSnapshotFunction),
     );
 
+    // Create CloudWatch log group for truck check lock Lambda function
+    const truckCheckLockLogGroup = new logs.LogGroup(
+      this,
+      "truck-check-lock-logs",
+      {
+        logGroupName: "/aws/lambda/inside-amelia-rescue-truck-check-lock",
+        retention: logs.RetentionDays.SEVEN_YEARS,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    // Create Lambda function for truck check lock scheduled task
+    const truckCheckLockFunction = new nodejs.NodejsFunction(
+      this,
+      "TruckCheckLockFunction",
+      {
+        functionName: "inside-amelia-rescue-truck-check-lock",
+        runtime: lambda.Runtime.NODEJS_24_X,
+        handler: "handler",
+        entry: path.join(__dirname, "../server/truck-check-lock.ts"),
+        memorySize: 1024,
+        timeout: cdk.Duration.seconds(60),
+        architecture: cdk.aws_lambda.Architecture.ARM_64,
+        logGroup: truckCheckLockLogGroup,
+        bundling: {
+          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          minify: true,
+          sourceMap: true,
+          target: "es2022",
+          format: nodejs.OutputFormat.CJS,
+        },
+        environment: {
+          NODE_OPTIONS: "--enable-source-maps",
+          NODE_ENV: "production",
+          TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
+        },
+      },
+    );
+
+    // Grant truck check lock Lambda permissions to access DynamoDB table
+    truckChecksTable.grantReadWriteData(truckCheckLockFunction);
+
+    // Create EventBridge rule to trigger truck check lock Lambda every hour
+    const truckCheckLockCronRule = new events.Rule(this, "TruckCheckLockRule", {
+      ruleName: "truck-check-lock-task",
+      description:
+        "Triggers the truck check lock lambda function periodically to lock checks older than 24 hours",
+      schedule: events.Schedule.rate(cdk.Duration.hours(1)),
+    });
+
+    // Add Lambda as target for the EventBridge rule
+    truckCheckLockCronRule.addTarget(
+      new eventsTargets.LambdaFunction(truckCheckLockFunction),
+    );
+
     // Create CloudWatch log group for WebSocket Lambda function
     const websocketLogGroup = new logs.LogGroup(this, "websocket-logs", {
       logGroupName: "/aws/lambda/inside-amelia-rescue-websocket",

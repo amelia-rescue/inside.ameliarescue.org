@@ -16,9 +16,7 @@ export async function action({ context, request }: Route.ActionArgs) {
   if (!ctx) {
     throw new Error("context not found");
   }
-  if (!request) {
-    throw new Error("request not found");
-  }
+
   const thing = await request.formData();
   const truck = thing.get("truck");
   if (typeof truck !== "string") {
@@ -164,14 +162,14 @@ export default function TruckChecks() {
                       <span className="text-sm opacity-60">
                         Check #{check.id.slice(0, 8)}
                       </span>
-                      {!check.locked && (
+                      <div className="flex gap-2">
                         <a
                           href={`/truck-checks/${check.id}`}
-                          className="btn btn-primary btn-sm"
+                          className={`btn btn-sm ${check.locked ? "btn-outline" : "btn-primary"}`}
                         >
-                          Edit
+                          {check.locked ? "View" : "Edit"}
                         </a>
-                      )}
+                      </div>
                     </div>
                   </div>
                 </div>
