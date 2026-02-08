@@ -9,7 +9,10 @@ import {
 } from "react-router";
 import { useRef } from "react";
 import { IoWarning } from "react-icons/io5";
-import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
+import {
+  TruckCheckSchemaStore,
+  type TruckCheckSchema,
+} from "~/lib/truck-check/truck-check-schema-store";
 
 export async function action({ context, request }: Route.ActionArgs) {
   const ctx = context.get(appContext);
@@ -23,12 +26,17 @@ export async function action({ context, request }: Route.ActionArgs) {
     throw new Error("truck is not a string");
   }
   const truckCheckStore = TruckCheckStore.make();
+  const truckCheckSchemaStore = TruckCheckSchemaStore.make();
+  const truckRecord = await truckCheckSchemaStore.getTruck(truck);
+  const schema = await truckCheckSchemaStore.getSchema(truckRecord.schemaId);
   const truckCheck = await truckCheckStore.createTruckCheck({
     created_by: ctx.user.user_id,
     truck: truck,
     data: {},
     contributors: [ctx.user.user_id],
     locked: false,
+    schema_id: schema.schemaId,
+    schema_created_at: schema.createdAt,
   });
   return redirect(`/truck-checks/${truckCheck.id}`);
 }

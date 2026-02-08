@@ -2,7 +2,10 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { appContext } from "~/context";
 import type { Route } from "./+types/truck-check-dynamic";
 import { useLoaderData } from "react-router";
-import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
+import {
+  truckCheckSchema,
+  TruckCheckStore,
+} from "~/lib/truck-check/truck-check-store";
 import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
 import {
   HiOutlineUsers,
@@ -29,7 +32,13 @@ export async function loader({ context, params }: Route.LoaderArgs) {
 
   const truckCheck = await truckCheckStore.getTruckCheck(params.id);
   const truck = await truckCheckSchemaStore.getTruck(truckCheck.truck);
-  const schema = await truckCheckSchemaStore.getSchema(truck.schemaId);
+  const schema =
+    truckCheck.schema_id && truckCheck.schema_created_at
+      ? await truckCheckSchemaStore.getSchemaVersion(
+          truckCheck.schema_id,
+          truckCheck.schema_created_at,
+        )
+      : await truckCheckSchemaStore.getSchema(truck.schemaId);
 
   return {
     user: ctx.user,
@@ -452,9 +461,13 @@ export default function TruckCheckDynamic() {
       <div className="mb-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold">{schema.title}</h1>
+            <h1 className="text-3xl font-bold">{truck.displayName}</h1>
             <p className="mt-1 text-sm opacity-70">
-              {truck.displayName} &middot;{" "}
+              schema {truckCheck.schema_id}
+              {truckCheck.schema_created_at}
+            </p>
+            <p className="mt-1 text-sm opacity-70">
+              {" "}
               {new Date(truckCheck.created_at).toLocaleDateString(undefined, {
                 weekday: "short",
                 year: "numeric",

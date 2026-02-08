@@ -16,6 +16,8 @@ export const truckCheckSchema = type({
   data: "Record<string, unknown>",
   contributors: "string[]",
   locked: "boolean",
+  "schema_id?": "string",
+  "schema_created_at?": "string",
 });
 truckCheckSchema.onUndeclaredKey("delete");
 
