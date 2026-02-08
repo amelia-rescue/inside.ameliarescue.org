@@ -21,18 +21,22 @@ export class EmailService {
     user: User;
     certificationName: string;
     expirationDate: string;
+    isRequired?: boolean;
   }): Promise<void> {
-    const { user, certificationName, expirationDate } = params;
+    const { user, certificationName, expirationDate, isRequired } = params;
     const userName = `${user.first_name} ${user.last_name}`;
     const roles = user.membership_roles.map((r) => r.role_name).join(", ");
     const subject = "Certification Expired - Action Required";
+    const actionLine = isRequired
+      ? `Please upload this certification to maintain your status as ${roles}.`
+      : "Please upload a renewed certification at your earliest convenience.";
     const htmlBody = `
       <html>
         <body>
           <h2>Certification Expired</h2>
           <p>Hi ${userName},</p>
           <p>Your <strong>${certificationName}</strong> certification expired on <strong>${expirationDate}</strong>.</p>
-          <p>Please upload this certification to maintain your status as ${roles}.</p>
+          <p>${actionLine}</p>
           <p>Thank you,<br/>https://inside.ameliarescue.org</p>
         </body>
       </html>
@@ -42,7 +46,7 @@ Hi ${userName},
 
 Your ${certificationName} certification expired on ${expirationDate}.
 
-Please upload this certification to maintain your status as ${roles}.
+${actionLine}
 
 Thank you,
 https://inside.ameliarescue.org
@@ -55,18 +59,22 @@ https://inside.ameliarescue.org
     user: User;
     certificationName: string;
     expirationDate: string;
+    isRequired?: boolean;
   }): Promise<void> {
-    const { user, certificationName, expirationDate } = params;
+    const { user, certificationName, expirationDate, isRequired } = params;
     const userName = `${user.first_name} ${user.last_name}`;
     const roles = user.membership_roles.map((r) => r.role_name).join(", ");
     const subject = "Certification Expiring Soon - Reminder";
+    const actionLine = isRequired
+      ? `Please upload this certification to maintain your status as ${roles}.`
+      : "Please upload a renewed certification at your earliest convenience.";
     const htmlBody = `
       <html>
         <body>
           <h2>Certification Expiring Soon</h2>
           <p>Hi ${userName},</p>
           <p>Your <strong>${certificationName}</strong> certification will expire on <strong>${expirationDate}</strong>.</p>
-          <p>Please upload this certification to maintain your status as ${roles}.</p>
+          <p>${actionLine}</p>
           <p>Thank you,<br/>https://inside.ameliarescue.org</p>
         </body>
       </html>
@@ -76,7 +84,7 @@ Hi ${userName},
 
 Your ${certificationName} certification will expire on ${expirationDate}.
 
-Please upload this certification to maintain your status as ${roles}.
+${actionLine}
 
 Thank you,
 https://inside.ameliarescue.org

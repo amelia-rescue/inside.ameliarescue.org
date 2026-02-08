@@ -67,60 +67,83 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <h1 className="mb-6 text-3xl font-bold">User Administration</h1>
-
-      <div className="mb-6 flex gap-4">
-        <Link to="/admin/create-user" className="btn btn-primary">
-          Create New User
-        </Link>
-        <Link to="/admin/certification-type" className="btn btn-secondary">
-          Manage Certification Types
-        </Link>
-        <Link to="/admin/roles" className="btn btn-secondary">
-          Manage Roles
-        </Link>
-        <Link to="/admin/tracks" className="btn btn-secondary">
-          Manage Tracks
-        </Link>
-        <Link to="/admin/truck-checks" className="btn btn-secondary">
-          Manage Truck Checks
-        </Link>
+      <div className="mb-6">
+        <div className="flex flex-wrap gap-3">
+          <Link to="/admin/create-user" className="btn btn-primary">
+            Create New User
+          </Link>
+          <Link to="/admin/certification-type" className="btn btn-secondary">
+            Manage Certification Types
+          </Link>
+          <Link to="/admin/roles" className="btn btn-secondary">
+            Manage Roles
+          </Link>
+          <Link to="/admin/tracks" className="btn btn-secondary">
+            Manage Tracks
+          </Link>
+          <Link to="/admin/truck-checks" className="btn btn-secondary">
+            Manage Truck Checks
+          </Link>
+        </div>
       </div>
 
-      <div className="bg-base-200 rounded-lg p-6 shadow">
-        <h2 className="mb-4 text-xl font-semibold">Users</h2>
-        <ul className="divide-base-300 divide-y">
-          {users.map((user) => (
-            <li
-              key={user.user_id}
-              className="flex items-center justify-between py-3"
-            >
-              <div>
-                <span className="font-medium">{`${user.first_name} ${user.last_name}`}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="badge badge-neutral">{user.website_role}</span>
-                <Link
-                  to={`/admin/update-user/${user.user_id}`}
-                  className="btn btn-sm btn-ghost"
-                >
-                  Edit
-                </Link>
-                <button
-                  onClick={() =>
-                    openDeleteModal(
-                      user.user_id,
-                      `${user.first_name} ${user.last_name}`,
-                    )
-                  }
-                  className="btn btn-sm btn-error btn-ghost"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">User Administration</h1>
+      </div>
+
+      <div className="card bg-base-100 shadow-xl">
+        <div className="card-body">
+          <h2 className="card-title">Users ({users.length})</h2>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Website Role</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.user_id}>
+                    <td>
+                      <div className="font-medium">
+                        {user.first_name} {user.last_name}
+                      </div>
+                      <div className="text-sm opacity-60">{user.email}</div>
+                    </td>
+                    <td>
+                      <span className="badge badge-neutral">
+                        {user.website_role}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Link
+                          to={`/admin/update-user/${user.user_id}`}
+                          className="btn btn-sm btn-ghost"
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          onClick={() =>
+                            openDeleteModal(
+                              user.user_id,
+                              `${user.first_name} ${user.last_name}`,
+                            )
+                          }
+                          className="btn btn-sm btn-error btn-ghost"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <dialog id="delete_modal" className="modal">

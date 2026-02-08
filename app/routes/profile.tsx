@@ -13,6 +13,7 @@ import { TrackStore } from "~/lib/track-store";
 import { RoleStore } from "~/lib/role-store";
 import { CertificationUpload } from "~/components/upload-certification";
 import { ProfilePictureUpload } from "~/components/profile-picture-upload";
+import { CertificationReminderStore } from "~/lib/certifications/certification-reminder-store";
 
 // todo: come up with a better name
 async function getCertificationData(user_id: string) {
@@ -89,8 +90,17 @@ export async function loader({ context }: Route.LoaderArgs) {
   if (!ctx) {
     throw new Error("No user found");
   }
-  const certification_data = await getCertificationData(ctx.user.user_id);
-  return { user: ctx.user, certification_data };
+  const certificationReminderStore = CertificationReminderStore.make();
+  const [certification_data, reminders] = await Promise.all([
+    getCertificationData(ctx.user.user_id),
+    certificationReminderStore.getRemindersByUser(ctx.user.user_id),
+  ]);
+
+  const sortedReminders = [...reminders].sort(
+    (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
+  );
+
+  return { user: ctx.user, certification_data, reminders: sortedReminders };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -119,8 +129,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function Profile() {
-  const { user } = useLoaderData<typeof loader>();
-  const { certification_data } = useLoaderData<typeof loader>();
+  const { user, certification_data, reminders } =
+    useLoaderData<typeof loader>();
   const ref = useRef<HTMLDialogElement>(null);
   const certModalRef = useRef<HTMLDialogElement>(null);
   const profilePicModalRef = useRef<HTMLDialogElement>(null);
@@ -475,6 +485,139 @@ export default function Profile() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <div className="card bg-base-100 shadow">
+          <div className="card-body">
+            <h2 className="card-title">Reminders Sent</h2>
+            {reminders.length === 0 ? (
+              <p className="py-4 text-center opacity-60">
+                No reminders have been sent yet.
+              </p>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:hidden">
+                  {reminders.map((reminder) => (
+                    <div
+                      key={reminder.reminder_id}
+                      className="card bg-base-200"
+                    >
+                      <div className="card-body gap-2 p-4">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`badge badge-sm ${
+                              reminder.reminder_type === "expired"
+                                ? "badge-error"
+                                : reminder.reminder_type === "expiring_soon"
+                                  ? "badge-warning"
+                                  : "badge-ghost"
+                            }`}
+                          >
+                            {reminder.reminder_type === "expiring_soon"
+                              ? "Expiring Soon"
+                              : reminder.reminder_type.charAt(0).toUpperCase() +
+                                reminder.reminder_type.slice(1)}
+                          </span>
+                          <span className="text-xs opacity-50">
+                            {new Date(reminder.sent_at).toLocaleDateString(
+                              undefined,
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              },
+                            )}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium">
+                          {reminder.certification_name}
+                        </p>
+                        <div className="flex gap-2">
+                          {reminder.email_sent && (
+                            <span className="badge badge-outline badge-xs">
+                              Email
+                            </span>
+                          )}
+                          {reminder.sms_sent && (
+                            <span className="badge badge-outline badge-xs">
+                              SMS
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto sm:block">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Certification</th>
+                        <th>Delivery</th>
+                        <th>Sent</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reminders.map((reminder) => (
+                        <tr key={reminder.reminder_id}>
+                          <td>
+                            <span
+                              className={`badge badge-sm ${
+                                reminder.reminder_type === "expired"
+                                  ? "badge-error"
+                                  : reminder.reminder_type === "expiring_soon"
+                                    ? "badge-warning"
+                                    : "badge-ghost"
+                              }`}
+                            >
+                              {reminder.reminder_type === "expiring_soon"
+                                ? "Expiring Soon"
+                                : reminder.reminder_type
+                                    .charAt(0)
+                                    .toUpperCase() +
+                                  reminder.reminder_type.slice(1)}
+                            </span>
+                          </td>
+                          <td>{reminder.certification_name}</td>
+                          <td>
+                            <div className="flex gap-1.5">
+                              {reminder.email_sent && (
+                                <span className="badge badge-outline badge-sm">
+                                  Email
+                                </span>
+                              )}
+                              {reminder.sms_sent && (
+                                <span className="badge badge-outline badge-sm">
+                                  SMS
+                                </span>
+                              )}
+                              {!reminder.email_sent && !reminder.sms_sent && (
+                                <span className="opacity-50">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            {new Date(reminder.sent_at).toLocaleDateString(
+                              undefined,
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              },
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

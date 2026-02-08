@@ -149,6 +149,7 @@ describe("certification reminder test", () => {
       }),
       certificationName: "CPR",
       expirationDate: expect.any(String),
+      isRequired: true,
     });
 
     // Verify reminder was stored
@@ -202,6 +203,7 @@ describe("certification reminder test", () => {
       }),
       certificationName: "CPR",
       expirationDate: expect.any(String),
+      isRequired: true,
     });
 
     // Verify reminder was stored

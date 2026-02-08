@@ -14,6 +14,7 @@ export const certificationReminderSchema = type({
   reminder_id: "string",
   user_id: "string",
   certification_id: "string",
+  certification_name: "string",
   reminder_type: "'expired' | 'expiring_soon' | 'missing'",
   sent_at: "string",
   "email_sent?": "boolean",

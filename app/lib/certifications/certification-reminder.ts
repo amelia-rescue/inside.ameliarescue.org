@@ -137,17 +137,23 @@ export class CertificationReminder {
           certification_id: cert.certification_id,
         });
 
+        const isRequired = Array.from(requiredCertification).some(
+          (rc) => rc.name === cert.certification_type_name,
+        );
+
         try {
           await this.emailService.sendCertificationExpiredEmail({
             user,
             certificationName: cert.certification_type_name,
             expirationDate: dayjs(cert.expires_on).format("MMMM D, YYYY"),
+            isRequired,
           });
 
           await this.certificationReminderStore.createReminder({
             reminder_id: `${user.user_id}-${cert.certification_id}-expired-${Date.now()}`,
             user_id: user.user_id,
             certification_id: cert.certification_id,
+            certification_name: cert.certification_type_name,
             reminder_type: "expired",
             sent_at: new Date().toISOString(),
             email_sent: true,
@@ -175,17 +181,23 @@ export class CertificationReminder {
           certification_id: cert.certification_id,
         });
 
+        const isRequired = Array.from(requiredCertification).some(
+          (rc) => rc.name === cert.certification_type_name,
+        );
+
         try {
           await this.emailService.sendCertificationExpiringSoonEmail({
             user,
             certificationName: cert.certification_type_name,
             expirationDate: dayjs(cert.expires_on).format("MMMM D, YYYY"),
+            isRequired,
           });
 
           await this.certificationReminderStore.createReminder({
             reminder_id: `${user.user_id}-${cert.certification_id}-expiring-${Date.now()}`,
             user_id: user.user_id,
             certification_id: cert.certification_id,
+            certification_name: cert.certification_type_name,
             reminder_type: "expiring_soon",
             sent_at: new Date().toISOString(),
             email_sent: true,
@@ -223,6 +235,7 @@ export class CertificationReminder {
             reminder_id: `${user.user_id}-missing-${missingCert.name}-${Date.now()}`,
             user_id: user.user_id,
             certification_id: `missing-${missingCert.name}`,
+            certification_name: missingCert.name,
             reminder_type: "missing",
             sent_at: new Date().toISOString(),
             email_sent: true,

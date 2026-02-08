@@ -1,7 +1,16 @@
 import { appContext } from "~/context";
 import type { Route } from "./+types/_index";
 import { Link } from "react-router";
-import { FiExternalLink } from "react-icons/fi";
+import {
+  FiUsers,
+  FiBookOpen,
+  FiFileText,
+  FiTruck,
+  FiShoppingBag,
+  FiSettings,
+  FiExternalLink,
+  FiChevronRight,
+} from "react-icons/fi";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -25,97 +34,158 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   const { user } = loaderData;
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Tools & Documents</h1>
-        <p className="mt-2 opacity-70">
-          Quick access to the most-used resources.
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link to="/roster" className="card bg-base-100 shadow hover:shadow-md">
-          <div className="card-body">
-            <h2 className="card-title">Membership roster</h2>
-            <p className="text-sm opacity-70">View members and contact info.</p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
-            </div>
+      {/* Quick Actions Grid */}
+      <div className="mb-12">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-2xl font-semibold">Quick Actions</h2>
+          <div className="badge badge-primary badge-outline">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
           </div>
-        </Link>
+        </div>
 
-        <Link
-          to="/training-status"
-          className="card bg-base-100 shadow hover:shadow-md"
-        >
-          <div className="card-body">
-            <h2 className="card-title">Training status</h2>
-            <p className="text-sm opacity-70">Track member training & certs.</p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/documents"
-          className="card bg-base-100 shadow hover:shadow-md"
-        >
-          <div className="card-body">
-            <h2 className="card-title">Documents</h2>
-            <p className="text-sm opacity-70">
-              Documents that are actually useful.
-            </p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/truck-check"
-          className="card bg-base-100 shadow hover:shadow-md"
-        >
-          <div className="card-body">
-            <h2 className="card-title">Truck check</h2>
-            <p className="text-sm opacity-70">Checklist and documentation.</p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
-            </div>
-          </div>
-        </Link>
-
-        <a
-          href="https://weewoo.study/shop"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="card bg-base-100 shadow hover:shadow-md"
-        >
-          <div className="card-body">
-            <h2 className="card-title flex items-center gap-2">
-              Swag
-              <FiExternalLink className="h-4 w-4" />
-            </h2>
-            <p className="text-sm opacity-70">Stay fresh.</p>
-            <div className="card-actions justify-end">
-              <span className="btn btn-sm btn-ghost">Open</span>
-            </div>
-          </div>
-        </a>
-
-        {user.website_role === "admin" && (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Link
-            to="/admin"
-            className="card bg-error-content shadow hover:shadow-md"
+            to="/roster"
+            className="card bg-base-100 group shadow-xl transition-all duration-300 hover:shadow-2xl"
           >
-            <div className="card-body text-primary">
-              <h2 className="card-title">Admin</h2>
-              <p className="text-sm opacity-70">Manage users and certs.</p>
+            <div className="card-body">
+              <div className="mb-2 flex items-center gap-4">
+                <div className="bg-primary/10 text-primary rounded-full p-3 transition-transform group-hover:scale-110">
+                  <FiUsers className="h-6 w-6" />
+                </div>
+                <h2 className="card-title">Roster</h2>
+              </div>
+              <p className="mb-4 text-sm opacity-70">
+                Who even volunteers here?
+              </p>
               <div className="card-actions justify-end">
-                <span className="btn btn-sm btn-ghost">Open</span>
+                <span className="btn btn-sm btn-primary group-hover:btn-primary-content">
+                  Open <FiChevronRight className="ml-1 h-3 w-3" />
+                </span>
               </div>
             </div>
           </Link>
-        )}
+
+          <Link
+            to="/training-status"
+            className="card bg-base-100 group shadow-xl transition-all duration-300 hover:shadow-2xl"
+          >
+            <div className="card-body">
+              <div className="mb-2 flex items-center gap-4">
+                <div className="bg-secondary/10 text-secondary rounded-full p-3 transition-transform group-hover:scale-110">
+                  <FiBookOpen className="h-6 w-6" />
+                </div>
+                <h2 className="card-title">Training Status</h2>
+              </div>
+              <p className="mb-4 text-sm opacity-70">
+                Track certifications and training status across the team.
+              </p>
+              <div className="card-actions justify-end">
+                <span className="btn btn-sm btn-secondary group-hover:btn-secondary-content">
+                  Open <FiChevronRight className="ml-1 h-3 w-3" />
+                </span>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            to="/documents"
+            className="card bg-base-100 group shadow-xl transition-all duration-300 hover:shadow-2xl"
+          >
+            <div className="card-body">
+              <div className="mb-2 flex items-center gap-4">
+                <div className="bg-accent/10 text-accent rounded-full p-3 transition-transform group-hover:scale-110">
+                  <FiFileText className="h-6 w-6" />
+                </div>
+                <h2 className="card-title">Documents</h2>
+              </div>
+              <p className="mb-4 text-sm opacity-70">
+                SOPs, guides, and protocols.
+              </p>
+              <div className="card-actions justify-end">
+                <span className="btn btn-sm btn-accent group-hover:btn-accent-content">
+                  Open <FiChevronRight className="ml-1 h-3 w-3" />
+                </span>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            to="/truck-check"
+            className="card bg-base-100 group shadow-xl transition-all duration-300 hover:shadow-2xl"
+          >
+            <div className="card-body">
+              <div className="mb-2 flex items-center gap-4">
+                <div className="bg-info/10 text-info rounded-full p-3 transition-transform group-hover:scale-110">
+                  <FiTruck className="h-6 w-6" />
+                </div>
+                <h2 className="card-title">Truck Checks</h2>
+              </div>
+              <p className="mb-4 text-sm opacity-70">
+                Collaborative vehicle inspections and equipment checks.
+              </p>
+              <div className="card-actions justify-end">
+                <span className="btn btn-sm btn-info group-hover:btn-info-content">
+                  Open <FiChevronRight className="ml-1 h-3 w-3" />
+                </span>
+              </div>
+            </div>
+          </Link>
+
+          <a
+            href="https://weewoo.study/shop"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="card bg-base-100 group shadow-xl transition-all duration-300 hover:shadow-2xl"
+          >
+            <div className="card-body">
+              <div className="mb-2 flex items-center gap-4">
+                <div className="bg-warning/10 text-warning rounded-full p-3 transition-transform group-hover:scale-110">
+                  <FiShoppingBag className="h-6 w-6" />
+                </div>
+                <h2 className="card-title flex items-center gap-2">
+                  Swag Store
+                  <FiExternalLink className="h-4 w-4 opacity-60" />
+                </h2>
+              </div>
+              <p className="mb-4 text-sm opacity-70">Stay fresh.</p>
+              <div className="card-actions justify-end">
+                <span className="btn btn-sm btn-warning group-hover:btn-warning-content">
+                  Shop <FiChevronRight className="ml-1 h-3 w-3" />
+                </span>
+              </div>
+            </div>
+          </a>
+
+          {user.website_role === "admin" && (
+            <Link
+              to="/admin"
+              className="card bg-error group shadow-xl transition-all duration-300 hover:shadow-2xl"
+            >
+              <div className="card-body">
+                <div className="mb-2 flex items-center gap-4">
+                  <div className="bg-error-content/10 text-error-content rounded-full p-3 transition-transform group-hover:scale-110">
+                    <FiSettings className="h-6 w-6" />
+                  </div>
+                  <h2 className="card-title text-error-content">Admin</h2>
+                </div>
+                <p className="text-error-content mb-4 text-sm opacity-90">
+                  System management and user administration.
+                </p>
+                <div className="card-actions justify-end">
+                  <span className="btn btn-sm btn-error-content group-hover:bg-error-content group-hover:text-error">
+                    Manage <FiChevronRight className="ml-1 h-3 w-3" />
+                  </span>
+                </div>
+              </div>
+            </Link>
+          )}
+        </div>
       </div>
     </>
   );

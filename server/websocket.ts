@@ -25,13 +25,12 @@ const docClient = DynamoDBDocumentClient.from(dynamoClient);
 export const handler = async (event: ApiGatewayWebSocketEvent) => {
   const { connectionId, eventType, domainName, stage } = event.requestContext;
   const connectionsTableName = process.env.WEBSOCKET_CONNECTIONS_TABLE_NAME;
-  const counterTableName = process.env.COUNTER_STATE_TABLE_NAME;
   const truckChecksTableName = process.env.TRUCK_CHECKS_TABLE_NAME;
   const usersTableName = process.env.USERS_TABLE_NAME;
 
   log.info("event data", { event });
 
-  if (!connectionsTableName || !counterTableName) {
+  if (!connectionsTableName) {
     console.error("Required environment variables not set");
     return { statusCode: 500, body: "Configuration error" };
   }
@@ -57,7 +56,6 @@ export const handler = async (event: ApiGatewayWebSocketEvent) => {
           domainName,
           stage,
           connectionsTableName,
-          counterTableName,
           truckChecksTableName,
           usersTableName,
         );
@@ -270,7 +268,6 @@ async function handleMessage(
   domainName: string,
   stage: string,
   connectionsTableName: string,
-  counterTableName: string,
   truckChecksTableName: string | undefined,
   usersTableName: string | undefined,
 ): Promise<{ statusCode: number; body: string }> {
@@ -282,89 +279,7 @@ async function handleMessage(
     const body = event.body ? JSON.parse(event.body) : {};
     const action = body.action;
 
-    if (action === "increment") {
-      const result = await docClient.send(
-        new UpdateCommand({
-          TableName: counterTableName,
-          Key: { counterId: "global" },
-          UpdateExpression:
-            "SET #value = if_not_exists(#value, :zero) + :inc, updatedAt = :now",
-          ExpressionAttributeNames: {
-            "#value": "value",
-          },
-          ExpressionAttributeValues: {
-            ":inc": 1,
-            ":zero": 0,
-            ":now": new Date().toISOString(),
-          },
-          ReturnValues: "ALL_NEW",
-        }),
-      );
-
-      const newValue = result.Attributes?.value || 0;
-
-      const connectionsResult = await docClient.send(
-        new ScanCommand({
-          TableName: connectionsTableName,
-        }),
-      );
-
-      const connections = connectionsResult.Items || [];
-
-      const broadcastPromises = connections.map(async (connection) => {
-        try {
-          await apiGatewayClient.send(
-            new PostToConnectionCommand({
-              ConnectionId: connection.connectionId,
-              Data: JSON.stringify({
-                type: "counter-update",
-                value: newValue,
-              }),
-            }),
-          );
-        } catch (error: any) {
-          if (error.statusCode === 410) {
-            console.log(`Stale connection: ${connection.connectionId}`);
-            await docClient.send(
-              new DeleteCommand({
-                TableName: connectionsTableName,
-                Key: { connectionId: connection.connectionId },
-              }),
-            );
-          } else {
-            console.error(
-              `Error sending to ${connection.connectionId}:`,
-              error,
-            );
-          }
-        }
-      });
-
-      await Promise.all(broadcastPromises);
-
-      return { statusCode: 200, body: "Counter incremented" };
-    } else if (action === "get-current") {
-      const result = await docClient.send(
-        new GetCommand({
-          TableName: counterTableName,
-          Key: { counterId: "global" },
-        }),
-      );
-
-      const currentValue = result.Item?.value || 0;
-
-      await apiGatewayClient.send(
-        new PostToConnectionCommand({
-          ConnectionId: connectionId,
-          Data: JSON.stringify({
-            type: "counter-update",
-            value: currentValue,
-          }),
-        }),
-      );
-
-      return { statusCode: 200, body: "Current value sent" };
-    } else if (action === "join-truck-check") {
+    if (action === "join-truck-check") {
       return await handleJoinTruckCheck(
         apiGatewayClient,
         connectionId,

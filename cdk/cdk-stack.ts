@@ -300,16 +300,6 @@ export class CdkStack extends cdk.Stack {
       },
     );
 
-    const counterStateTable = new dynamodb.Table(this, "CounterStateTable", {
-      tableName: "aes_counter_state",
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      partitionKey: {
-        name: "counterId",
-        type: dynamodb.AttributeType.STRING,
-      },
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
     const truckChecksTable = new dynamodb.Table(this, "TruckChecksTable", {
       tableName: "aes_truck_checks",
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -701,14 +691,12 @@ export class CdkStack extends cdk.Stack {
           FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
           TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
           WEBSOCKET_CONNECTIONS_TABLE_NAME: websocketConnectionsTable.tableName,
-          COUNTER_STATE_TABLE_NAME: counterStateTable.tableName,
         },
       },
     );
 
     // Grant permissions to WebSocket Lambda function
     websocketConnectionsTable.grantReadWriteData(websocketFunction);
-    counterStateTable.grantReadWriteData(websocketFunction);
     usersTable.grantReadWriteData(websocketFunction);
     certificationTypesTable.grantReadWriteData(websocketFunction);
     userCertificationsTable.grantReadWriteData(websocketFunction);
@@ -975,10 +963,6 @@ export class CdkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "WebSocketConnectionsTableName", {
       value: websocketConnectionsTable.tableName,
-    });
-
-    new cdk.CfnOutput(this, "CounterStateTableName", {
-      value: counterStateTable.tableName,
     });
   }
 }

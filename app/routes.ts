@@ -19,7 +19,6 @@ export default [
   route("account/security", "./routes/security.tsx"),
   route("roster", "./routes/roster.tsx"),
   route("training-status", "./routes/training-status.tsx"),
-  route("realtime-counter", "./routes/realtime-counter.tsx"),
   route("documents", "./routes/documents.tsx"),
   route("documents/view", "./routes/documents.view.tsx"),
   route("truck-check", "./routes/truck-check.tsx"),

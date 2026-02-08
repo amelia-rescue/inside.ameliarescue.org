@@ -25,6 +25,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-123",
       user_id: "user-456",
       certification_id: "cert-789",
+      certification_name: "cert-789",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
       email_sent: true,
@@ -65,6 +66,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-123",
       user_id: "user-456",
       certification_id: "cert-789",
+      certification_name: "cert-789",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -74,6 +76,7 @@ describe("certification reminder store test", () => {
         reminder_id: "reminder-123",
         user_id: "user-999",
         certification_id: "cert-999",
+        certification_name: "cert-999",
         reminder_type: "expiring_soon",
         sent_at: "2024-01-02T00:00:00Z",
       }),
@@ -87,6 +90,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-expired",
       user_id: "user-123",
       certification_id: "cert-1",
+      certification_name: "cert-1",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -96,6 +100,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-expiring",
       user_id: "user-123",
       certification_id: "cert-2",
+      certification_name: "cert-2",
       reminder_type: "expiring_soon",
       sent_at: "2024-01-02T00:00:00Z",
     });
@@ -105,6 +110,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-missing",
       user_id: "user-123",
       certification_id: "missing-EMT-Basic",
+      certification_name: "missing-EMT-Basic",
       reminder_type: "missing",
       sent_at: "2024-01-03T00:00:00Z",
     });
@@ -118,6 +124,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-1",
       user_id: "user-123",
       certification_id: "cert-456",
+      certification_name: "cert-456",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -126,6 +133,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-2",
       user_id: "user-123",
       certification_id: "cert-456",
+      certification_name: "cert-456",
       reminder_type: "expired",
       sent_at: "2024-01-08T00:00:00Z",
     });
@@ -134,6 +142,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-3",
       user_id: "user-123",
       certification_id: "cert-789",
+      certification_name: "cert-789",
       reminder_type: "expiring_soon",
       sent_at: "2024-01-05T00:00:00Z",
     });
@@ -166,6 +175,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-1",
       user_id: "user-123",
       certification_id: "cert-1",
+      certification_name: "cert-1",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -174,6 +184,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-2",
       user_id: "user-123",
       certification_id: "cert-2",
+      certification_name: "cert-2",
       reminder_type: "expiring_soon",
       sent_at: "2024-01-02T00:00:00Z",
     });
@@ -182,6 +193,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-3",
       user_id: "user-456",
       certification_id: "cert-3",
+      certification_name: "cert-3",
       reminder_type: "missing",
       sent_at: "2024-01-03T00:00:00Z",
     });
@@ -201,6 +213,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-1",
       user_id: "user-123",
       certification_id: "cert-1",
+      certification_name: "cert-1",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -209,6 +222,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-2",
       user_id: "user-456",
       certification_id: "cert-2",
+      certification_name: "cert-2",
       reminder_type: "expiring_soon",
       sent_at: "2024-01-02T00:00:00Z",
     });
@@ -217,6 +231,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-3",
       user_id: "user-789",
       certification_id: "cert-3",
+      certification_name: "cert-3",
       reminder_type: "missing",
       sent_at: "2024-01-03T00:00:00Z",
     });
@@ -232,6 +247,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-123",
       user_id: "user-456",
       certification_id: "cert-789",
+      certification_name: "cert-789",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
       email_sent: false,
@@ -241,6 +257,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-123",
       user_id: "user-456",
       certification_id: "cert-789",
+      certification_name: "cert-789",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
       email_sent: true,
@@ -260,6 +277,7 @@ describe("certification reminder store test", () => {
         reminder_id: "non-existent",
         user_id: "user-456",
         certification_id: "cert-789",
+        certification_name: "cert-789",
         reminder_type: "expired",
         sent_at: "2024-01-01T00:00:00Z",
       }),
@@ -273,6 +291,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-123",
       user_id: "user-456",
       certification_id: "cert-789",
+      certification_name: "cert-789",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -299,6 +318,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-with-flags",
       user_id: "user-456",
       certification_id: "cert-789",
+      certification_name: "cert-789",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
       email_sent: true,
@@ -312,6 +332,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-no-flags",
       user_id: "user-456",
       certification_id: "cert-123",
+      certification_name: "cert-123",
       reminder_type: "missing",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -327,6 +348,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-1",
       user_id: "user-123",
       certification_id: "cert-456",
+      certification_name: "cert-456",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -365,6 +387,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-expired",
       user_id: "user-123",
       certification_id: "cert-456",
+      certification_name: "cert-456",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -391,6 +414,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-1",
       user_id: "user-123",
       certification_id: "cert-1",
+      certification_name: "cert-1",
       reminder_type: "expired",
       sent_at: "2024-01-01T00:00:00Z",
     });
@@ -399,6 +423,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-2",
       user_id: "user-123",
       certification_id: "cert-2",
+      certification_name: "cert-2",
       reminder_type: "expiring_soon",
       sent_at: "2024-01-02T00:00:00Z",
     });
@@ -407,6 +432,7 @@ describe("certification reminder store test", () => {
       reminder_id: "reminder-3",
       user_id: "user-123",
       certification_id: "cert-3",
+      certification_name: "cert-3",
       reminder_type: "missing",
       sent_at: "2024-01-03T00:00:00Z",
     });
