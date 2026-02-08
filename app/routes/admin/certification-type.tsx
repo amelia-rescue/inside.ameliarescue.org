@@ -75,6 +75,7 @@ export default function CreateCertificationType({
   loaderData,
 }: Route.ComponentProps) {
   const { certificationTypes } = loaderData;
+  certificationTypes.sort((a, b) => a.name.localeCompare(b.name));
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
