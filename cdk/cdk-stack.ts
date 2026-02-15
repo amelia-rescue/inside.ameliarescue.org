@@ -798,6 +798,16 @@ export class CdkStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
+    const staticBucketOrigin = origins.S3BucketOrigin.withOriginAccessControl(
+      staticBucket,
+      {
+        originAccessLevels: [
+          cloudfront.AccessLevel.READ,
+          cloudfront.AccessLevel.LIST,
+        ],
+      },
+    );
+
     // Create CloudFront distribution (needs to be created before User Pool Client for callback URLs)
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
@@ -819,12 +829,23 @@ export class CdkStack extends cdk.Stack {
       },
       additionalBehaviors: {
         "/assets/*": {
-          origin: origins.S3BucketOrigin.withOriginAccessControl(staticBucket, {
-            originAccessLevels: [
-              cloudfront.AccessLevel.READ,
-              cloudfront.AccessLevel.LIST,
-            ],
-          }),
+          origin: staticBucketOrigin,
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
+        "/favicon.ico": {
+          origin: staticBucketOrigin,
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
+        "/robots.txt": {
+          origin: staticBucketOrigin,
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
@@ -885,13 +906,10 @@ export class CdkStack extends cdk.Stack {
 
     // Deploy static assets to S3
     new s3deploy.BucketDeployment(this, "DeployStaticAssets", {
-      sources: [
-        s3deploy.Source.asset(path.join(__dirname, "../build/client/assets")),
-      ],
+      sources: [s3deploy.Source.asset(path.join(__dirname, "../build/client"))],
       destinationBucket: staticBucket,
-      destinationKeyPrefix: "assets",
       distribution,
-      distributionPaths: ["/assets/*"],
+      distributionPaths: ["/assets/*", "/favicon.ico", "/robots.txt"],
     });
 
     // Note: APP_URL is determined at runtime from request headers
