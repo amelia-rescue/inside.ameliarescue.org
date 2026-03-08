@@ -9,6 +9,7 @@ import {
   useRouteError,
   useRouteLoaderData,
   useFetcher,
+  useLocation,
   data,
 } from "react-router";
 import { useEffect } from "react";
@@ -59,7 +60,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const loaderData = useRouteLoaderData<typeof loader>("root");
   const error = useRouteError();
   const fetcher = useFetcher();
+  const location = useLocation();
   const theme = loaderData?.theme || "forest";
+  const isWideContentRoute = location.pathname === "/training-status";
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -155,7 +158,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
+          <main
+            className={`mx-auto w-full flex-1 px-4 py-10 ${
+              isWideContentRoute ? "max-w-[1800px]" : "max-w-5xl"
+            }`}
+          >
             {children}
           </main>
 

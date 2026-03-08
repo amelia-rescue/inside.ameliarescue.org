@@ -248,129 +248,137 @@ export default function TrainingStatus() {
   });
 
   return (
-    <div className="card bg-base-100 shadow">
-      <div className="card-body">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="card-title text-2xl">Training Status</h1>
-            <p className="text-sm opacity-70">
-              {trainingData.length} members tracked
-            </p>
+    <div className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+      <div className="card bg-base-100 shadow">
+        <div className="card-body gap-6 p-4 sm:p-6 lg:p-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="card-title text-2xl">Training Status</h1>
+              <p className="text-sm opacity-70">
+                {trainingData.length} members tracked
+              </p>
+            </div>
+
+            <div className="form-control w-full lg:w-auto">
+              <input
+                type="text"
+                placeholder="Search members..."
+                className="input input-bordered w-full lg:w-80"
+                value={globalFilter ?? ""}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="form-control w-full sm:w-auto">
-            <input
-              type="text"
-              placeholder="Search members..."
-              className="input input-bordered w-full sm:w-64"
-              value={globalFilter ?? ""}
-              onChange={(e) => setGlobalFilter(e.target.value)}
+          <div className="divider my-0" />
+
+          <div className="mb-2">
+            <div className="mb-2 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="font-medium">Overall Compliance</span>
+              <span className="text-base-content/70">
+                {complianceStats.totalValidCerts} /{" "}
+                {complianceStats.totalRequiredCerts} valid (
+                {complianceStats.compliancePercentage}%)
+              </span>
+            </div>
+            <progress
+              className="progress progress-success w-full"
+              value={complianceStats.compliancePercentage}
+              max="100"
             />
           </div>
+
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="badge badge-success badge-sm">
+                <FaCheckCircle />
+              </span>
+              <span>Active</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="badge badge-warning badge-sm">
+                <FaExclamationTriangle />
+              </span>
+              <span>Expiring Soon</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="badge badge-error badge-sm">
+                <FaTimesCircle />
+              </span>
+              <span>Expired</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="badge badge-error badge-sm">
+                <FaMinusCircle />
+              </span>
+              <span>Missing</span>
+            </div>
+          </div>
+
+          <div className="rounded-box border-base-300/60 w-full overflow-x-auto border">
+            <table className="table-sm table w-full min-w-max">
+              <thead>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className="text-center whitespace-nowrap"
+                      >
+                        {header.isPlaceholder ? null : (
+                          <div
+                            className={
+                              header.column.getCanSort()
+                                ? "flex cursor-pointer items-center justify-center gap-1 select-none"
+                                : "flex items-center justify-center"
+                            }
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                            {header.column.getCanSort() && (
+                              <span className="text-xs opacity-50">
+                                {{
+                                  asc: "↑",
+                                  desc: "↓",
+                                }[header.column.getIsSorted() as string] ?? "↕"}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody>
+                {table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="hover">
+                    {row.getVisibleCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className="text-center whitespace-nowrap"
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {table.getRowModel().rows.length === 0 && (
+            <div className="text-base-content/50 py-8 text-center">
+              No members found matching your search.
+            </div>
+          )}
         </div>
-
-        <div className="divider" />
-
-        <div className="mb-6">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="font-medium">Overall Compliance</span>
-            <span className="text-base-content/70">
-              {complianceStats.totalValidCerts} /{" "}
-              {complianceStats.totalRequiredCerts} valid (
-              {complianceStats.compliancePercentage}%)
-            </span>
-          </div>
-          <progress
-            className="progress progress-success w-full"
-            value={complianceStats.compliancePercentage}
-            max="100"
-          />
-        </div>
-
-        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:gap-4">
-          <div className="flex items-center gap-2">
-            <span className="badge badge-success badge-sm">
-              <FaCheckCircle />
-            </span>
-            <span>Active</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="badge badge-warning badge-sm">
-              <FaExclamationTriangle />
-            </span>
-            <span>Expiring Soon</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="badge badge-error badge-sm">
-              <FaTimesCircle />
-            </span>
-            <span>Expired</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="badge badge-error badge-sm">
-              <FaMinusCircle />
-            </span>
-            <span>Missing</span>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="table-sm table">
-            <thead>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="text-center">
-                      {header.isPlaceholder ? null : (
-                        <div
-                          className={
-                            header.column.getCanSort()
-                              ? "flex cursor-pointer items-center justify-center gap-1 select-none"
-                              : "flex items-center justify-center"
-                          }
-                          onClick={header.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                          {header.column.getCanSort() && (
-                            <span className="text-xs opacity-50">
-                              {{
-                                asc: "↑",
-                                desc: "↓",
-                              }[header.column.getIsSorted() as string] ?? "↕"}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover">
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="text-center">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {table.getRowModel().rows.length === 0 && (
-          <div className="text-base-content/50 py-8 text-center">
-            No members found matching your search.
-          </div>
-        )}
       </div>
     </div>
   );
