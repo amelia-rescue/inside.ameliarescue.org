@@ -16,6 +16,7 @@ import {
   HiOutlineSignalSlash,
   HiOutlineChevronLeft,
 } from "react-icons/hi2";
+import { UserStore, type User } from "~/lib/user-store";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Truck Check - Inside Amelia Rescue" }];
@@ -29,6 +30,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
 
   const truckCheckStore = TruckCheckStore.make();
   const truckCheckSchemaStore = TruckCheckSchemaStore.make();
+  const userStore = UserStore.make();
 
   const truckCheck = await truckCheckStore.getTruckCheck(params.id);
   const truck = await truckCheckSchemaStore.getTruck(truckCheck.truck);
@@ -40,12 +42,23 @@ export async function loader({ context, params }: Route.LoaderArgs) {
         )
       : await truckCheckSchemaStore.getSchema(truck.schemaId);
 
+  let previousContributors: User[] = [];
+  if (truckCheck.locked) {
+    const contributors = await Promise.all(
+      truckCheck.contributors.map((contributor) =>
+        userStore.getUser(contributor),
+      ),
+    );
+    previousContributors = contributors.map((user) => user);
+  }
+
   return {
     user: ctx.user,
     accessToken: ctx.user.accessToken,
     truckCheck,
     truck,
     schema,
+    previousContributors,
   };
 }
 
@@ -61,7 +74,7 @@ function getFieldId(sectionId: string, fieldLabel: string): string {
 }
 
 export default function TruckCheckDynamic() {
-  const { user, accessToken, truckCheck, truck, schema } =
+  const { user, accessToken, truckCheck, truck, schema, previousContributors } =
     useLoaderData<typeof loader>();
 
   const isLocked = truckCheck.locked;
@@ -594,6 +607,56 @@ export default function TruckCheckDynamic() {
         </div>
       )}
 
+      {isLocked && previousContributors.length > 0 && (
+        <div className="mb-10">
+          <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+            <HiOutlineUsers className="h-5 w-5 opacity-60" />
+            Contributors
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {previousContributors.map((c) => (
+              <div
+                key={c.user_id}
+                className={`badge gap-1.5 py-3 ${
+                  c.user_id === user.user_id ? "badge-primary" : "badge-outline"
+                }`}
+              >
+                <HiOutlineUser className="h-3.5 w-3.5" />
+                {c.first_name} {c.last_name}
+                {c.user_id === user.user_id && (
+                  <span className="opacity-60">(you)</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!isLocked && contributors.length > 0 && (
+        <div className="mb-10">
+          <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+            <HiOutlineUsers className="h-5 w-5 opacity-60" />
+            Contributors
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {contributors.map((c) => (
+              <div
+                key={c.userId}
+                className={`badge gap-1.5 py-3 ${
+                  c.userId === user.user_id ? "badge-primary" : "badge-outline"
+                }`}
+              >
+                <HiOutlineUser className="h-3.5 w-3.5" />
+                {c.userName}
+                {c.userId === user.user_id && (
+                  <span className="opacity-60">(you)</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Form Sections */}
       <div className="space-y-4">
         {schema.sections.map((section: any) => (
@@ -620,33 +683,6 @@ export default function TruckCheckDynamic() {
           </div>
         ))}
       </div>
-
-      {/* Contributors */}
-      {contributors.length > 0 && (
-        <div className="mt-10">
-          <div className="divider" />
-          <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold">
-            <HiOutlineUsers className="h-5 w-5 opacity-60" />
-            Contributors
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {contributors.map((c) => (
-              <div
-                key={c.userId}
-                className={`badge gap-1.5 py-3 ${
-                  c.userId === user.user_id ? "badge-primary" : "badge-outline"
-                }`}
-              >
-                <HiOutlineUser className="h-3.5 w-3.5" />
-                {c.userName}
-                {c.userId === user.user_id && (
-                  <span className="opacity-60">(you)</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Sticky Action Bar */}
       <div className="bg-base-100/80 fixed right-0 bottom-0 left-0 z-10 border-t backdrop-blur-sm">
