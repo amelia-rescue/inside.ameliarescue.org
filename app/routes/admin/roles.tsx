@@ -93,6 +93,18 @@ export default function ManageRoles({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
+      <div className="breadcrumbs text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/admin">Admin</Link>
+          </li>
+          <li>Roles</li>
+        </ul>
+      </div>
+
       <div className="card bg-base-100 shadow-lg">
         <div className="card-body">
           <h2 className="card-title mb-4">New Role</h2>

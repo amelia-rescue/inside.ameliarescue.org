@@ -249,6 +249,15 @@ export default function TrainingStatus() {
 
   return (
     <div className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>Training Status</li>
+        </ul>
+      </div>
+
       <div className="card bg-base-100 shadow">
         <div className="card-body gap-6 p-4 sm:p-6 lg:p-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

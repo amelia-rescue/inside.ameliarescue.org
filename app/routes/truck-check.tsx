@@ -6,6 +6,7 @@ import {
   useActionData,
   useFetcher,
   useLoaderData,
+  Link,
 } from "react-router";
 import { useRef } from "react";
 import { IoWarning } from "react-icons/io5";
@@ -82,6 +83,15 @@ export default function TruckCheck() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>Truck Checks</li>
+        </ul>
+      </div>
+
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Truck Checks</h1>

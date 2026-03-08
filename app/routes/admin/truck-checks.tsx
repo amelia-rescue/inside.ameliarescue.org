@@ -295,6 +295,18 @@ export default function ManageTruckChecks({
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/admin">Admin</Link>
+          </li>
+          <li>Truck Checks</li>
+        </ul>
+      </div>
+
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Manage Truck Checks</h1>
         <p className="mt-2 opacity-70">

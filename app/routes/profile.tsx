@@ -171,6 +171,15 @@ export default function Profile() {
 
   return (
     <>
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>Profile</li>
+        </ul>
+      </div>
+
       <div className="card bg-base-100 shadow">
         <div className="card-body">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">

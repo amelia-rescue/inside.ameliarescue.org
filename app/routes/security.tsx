@@ -55,6 +55,18 @@ export default function Security({ loaderData }: Route.ComponentProps) {
   const { user } = loaderData;
   return (
     <>
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/profile">Profile</Link>
+          </li>
+          <li>Account Security</li>
+        </ul>
+      </div>
+
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Account Security</h1>
         <Link to="/profile" className="btn btn-ghost btn-sm">

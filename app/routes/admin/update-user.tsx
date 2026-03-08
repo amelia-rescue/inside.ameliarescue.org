@@ -195,6 +195,18 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/admin">Admin</Link>
+          </li>
+          <li>Update User</li>
+        </ul>
+      </div>
+
       <div className="card bg-base-100 shadow-lg">
         <div className="card-body">
           <h2 className="card-title mb-4">Update User Information</h2>

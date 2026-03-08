@@ -1,4 +1,4 @@
-import { useLoaderData, redirect } from "react-router";
+import { Link, useLoaderData, redirect } from "react-router";
 import type { Route } from "./+types/user.$user_id";
 import { appContext } from "~/context";
 import { UserStore } from "~/lib/user-store";
@@ -115,6 +115,20 @@ export default function User() {
 
   return (
     <>
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/roster">Roster</Link>
+          </li>
+          <li>
+            {user.first_name} {user.last_name}
+          </li>
+        </ul>
+      </div>
+
       <div className="card bg-base-100 shadow">
         <div className="card-body">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">

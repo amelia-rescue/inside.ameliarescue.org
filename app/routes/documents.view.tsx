@@ -1,4 +1,9 @@
-import { redirect, type LoaderFunctionArgs, useLoaderData } from "react-router";
+import {
+  Link,
+  redirect,
+  type LoaderFunctionArgs,
+  useLoaderData,
+} from "react-router";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -31,33 +36,47 @@ export default function DocumentView() {
   };
 
   return (
-    <div className="card bg-base-100 shadow">
-      <div className="card-body">
-        <h1 className="card-title text-2xl">{name}</h1>
+    <>
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/documents">Documents</Link>
+          </li>
+          <li>{name}</li>
+        </ul>
+      </div>
 
-        <div className="divider" />
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          <h1 className="card-title text-2xl">{name}</h1>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-end">
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-primary btn-sm"
-            >
-              Open in New Tab
-            </a>
-          </div>
+          <div className="divider" />
 
-          <div className="w-full" style={{ height: "calc(100vh - 300px)" }}>
-            <iframe
-              src={pdfUrl}
-              className="border-base-300 h-full w-full rounded-lg border-2"
-              title={name}
-            />
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-end">
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary btn-sm"
+              >
+                Open in New Tab
+              </a>
+            </div>
+
+            <div className="w-full" style={{ height: "calc(100vh - 300px)" }}>
+              <iframe
+                src={pdfUrl}
+                className="border-base-300 h-full w-full rounded-lg border-2"
+                title={name}
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

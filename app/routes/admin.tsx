@@ -67,6 +67,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
+      <div className="breadcrumbs mb-4 text-sm">
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>Admin</li>
+        </ul>
+      </div>
+
       <div className="mb-6">
         <div className="flex flex-wrap gap-3">
           <Link to="/admin/create-user" className="btn btn-primary">
