@@ -118,6 +118,16 @@ export default function TruckCheckDynamic() {
   const [fieldValues, setFieldValues] = useState<Record<string, any>>(
     truckCheck.data || {},
   );
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(
+        schema.sections.map((section: any) => [section.id, true]),
+      ),
+  );
+  const [pendingJumpTarget, setPendingJumpTarget] = useState<{
+    fieldId: string;
+    sectionId: string;
+  } | null>(null);
   const [lastUpdate, setLastUpdate] = useState<{
     fieldId: string;
     userName: string;
@@ -252,6 +262,31 @@ export default function TruckCheckDynamic() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!pendingJumpTarget) return;
+    if (!openSections[pendingJumpTarget.sectionId]) return;
+
+    const attemptJump = () => {
+      const element = document.getElementById(pendingJumpTarget.fieldId);
+      if (!element) {
+        window.requestAnimationFrame(attemptJump);
+        return;
+      }
+
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLSelectElement ||
+        element instanceof HTMLTextAreaElement
+      ) {
+        element.focus();
+      }
+      setPendingJumpTarget(null);
+    };
+
+    window.requestAnimationFrame(attemptJump);
+  }, [openSections, pendingJumpTarget]);
+
   const statusConfig = {
     connected: {
       color: "bg-green-500",
@@ -285,13 +320,39 @@ export default function TruckCheckDynamic() {
   };
 
   const requiredFields: string[] = [];
-  for (const section of schema.sections) {
-    for (const field of section.fields) {
-      if ((field as any).required) {
-        requiredFields.push(getFieldId(section.id, (field as any).label));
-      }
-    }
-  }
+  const requiredFieldDetails: Array<{
+    fieldId: string;
+    sectionId: string;
+    sectionTitle: string;
+    fieldLabel: string;
+  }> = [];
+  const sectionProgress = schema.sections.map((section: any) => {
+    const requiredSectionFields = section.fields
+      .filter((field: any) => field.required)
+      .map((field: any): string => {
+        const fieldId = getFieldId(section.id, field.label);
+        requiredFields.push(fieldId);
+        requiredFieldDetails.push({
+          fieldId,
+          sectionId: section.id,
+          sectionTitle: section.title,
+          fieldLabel: field.label,
+        });
+        return fieldId;
+      });
+
+    const completedRequiredCount = requiredSectionFields.filter(
+      (fieldId: string) => isFieldFilled(fieldValues[fieldId]),
+    ).length;
+
+    return {
+      sectionId: section.id,
+      requiredCount: requiredSectionFields.length,
+      completedRequiredCount,
+      remainingRequiredCount:
+        requiredSectionFields.length - completedRequiredCount,
+    };
+  });
   const filledRequiredCount = requiredFields.filter((id) =>
     isFieldFilled(fieldValues[id]),
   ).length;
@@ -309,21 +370,60 @@ export default function TruckCheckDynamic() {
       .toUpperCase()
       .slice(0, 2);
 
+  const firstIncompleteField = requiredFieldDetails.find(
+    ({ fieldId }) => !isFieldFilled(fieldValues[fieldId]),
+  );
+
+  const jumpToField = useCallback(
+    (fieldId: string, sectionId: string) => {
+      setPendingJumpTarget({ fieldId, sectionId });
+      setOpenSections((prev) => ({ ...prev, [sectionId]: true }));
+    },
+    [setOpenSections],
+  );
+
+  const handleJumpToNextIncomplete = useCallback(() => {
+    if (requiredFieldDetails.length === 0) return;
+
+    const activeFieldId =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement.id
+        : null;
+    const activeIndex = requiredFieldDetails.findIndex(
+      ({ fieldId }) => fieldId === activeFieldId,
+    );
+
+    const orderedCandidates =
+      activeIndex >= 0
+        ? [
+            ...requiredFieldDetails.slice(activeIndex + 1),
+            ...requiredFieldDetails.slice(0, activeIndex + 1),
+          ]
+        : requiredFieldDetails;
+
+    const nextIncompleteField = orderedCandidates.find(
+      ({ fieldId }) => !isFieldFilled(fieldValues[fieldId]),
+    );
+
+    if (!nextIncompleteField) return;
+
+    jumpToField(nextIncompleteField.fieldId, nextIncompleteField.sectionId);
+  }, [fieldValues, isFieldFilled, jumpToField, requiredFieldDetails]);
+
   const renderField = (field: any, sectionId: string) => {
     const fieldId = getFieldId(sectionId, field.label);
     const value = fieldValues[fieldId];
     const isRemoteUpdate = lastUpdate?.fieldId === fieldId;
     const isLocked = truckCheck.locked;
+    const fieldContainerClass = `form-control rounded-lg border border-base-300 p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`;
 
     switch (field.type) {
       case "checkbox":
         return (
-          <div
-            key={fieldId}
-            className={`form-control rounded-lg p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`}
-          >
+          <div key={fieldId} className={fieldContainerClass}>
             <label className="label cursor-pointer justify-start gap-3">
               <input
+                id={fieldId}
                 type="checkbox"
                 className="checkbox"
                 checked={!!value}
@@ -348,10 +448,7 @@ export default function TruckCheckDynamic() {
 
       case "text":
         return (
-          <div
-            key={fieldId}
-            className={`form-control rounded-lg p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`}
-          >
+          <div key={fieldId} className={fieldContainerClass}>
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -364,6 +461,7 @@ export default function TruckCheckDynamic() {
               )}
             </label>
             <input
+              id={fieldId}
               type="text"
               placeholder={field.placeholder}
               maxLength={field.maxLength}
@@ -384,10 +482,7 @@ export default function TruckCheckDynamic() {
 
       case "number":
         return (
-          <div
-            key={fieldId}
-            className={`form-control rounded-lg p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`}
-          >
+          <div key={fieldId} className={fieldContainerClass}>
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -401,6 +496,7 @@ export default function TruckCheckDynamic() {
             </label>
             <div className="flex items-center gap-2">
               <input
+                id={fieldId}
                 type="number"
                 min={field.min}
                 max={field.max}
@@ -432,10 +528,7 @@ export default function TruckCheckDynamic() {
 
       case "select":
         return (
-          <div
-            key={fieldId}
-            className={`form-control rounded-lg p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`}
-          >
+          <div key={fieldId} className={fieldContainerClass}>
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -448,6 +541,7 @@ export default function TruckCheckDynamic() {
               )}
             </label>
             <select
+              id={fieldId}
               className="select select-bordered w-full"
               value={value || ""}
               disabled={isLocked}
@@ -472,7 +566,7 @@ export default function TruckCheckDynamic() {
 
       case "photo":
         return (
-          <div key={fieldId} className="form-control rounded-lg p-2">
+          <div key={fieldId} className={fieldContainerClass}>
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -480,6 +574,7 @@ export default function TruckCheckDynamic() {
               </span>
             </label>
             <input
+              id={fieldId}
               type="file"
               accept="image/*"
               multiple
@@ -527,58 +622,73 @@ export default function TruckCheckDynamic() {
 
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">{truck.displayName}</h1>
-            <p className="mt-1 text-sm opacity-70">
-              schema {truckCheck.schema_id}
-              {truckCheck.schema_created_at}
-            </p>
-            <p className="mt-1 text-sm opacity-70">
-              {" "}
-              {new Date(truckCheck.created_at).toLocaleDateString(undefined, {
-                weekday: "short",
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </p>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <h1 className="text-3xl leading-tight font-bold">
+              {truck.displayName}
+            </h1>
+            <div className="space-y-1 text-sm opacity-70">
+              <p className="break-words">
+                schema {truckCheck.schema_id}
+                {truckCheck.schema_created_at}
+              </p>
+              <p>
+                {new Date(truckCheck.created_at).toLocaleDateString(undefined, {
+                  weekday: "short",
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
           </div>
-          <div className="flex items-start gap-3">
-            {!isLocked && (
-              <div
-                className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${
-                  connectionStatus === "connected"
-                    ? "bg-success/10 text-success"
-                    : connectionStatus === "error"
-                      ? "bg-error/10 text-error"
-                      : "bg-warning/10 text-warning"
-                }`}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span
+                className={`badge gap-1 ${truckCheck.locked ? "badge-error" : "badge-success"}`}
               >
-                <span className="relative flex h-3 w-3">
-                  {status.pulse && (
-                    <span
-                      className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${status.color}`}
-                    />
-                  )}
-                  <span
-                    className={`relative inline-flex h-3 w-3 rounded-full ${status.color}`}
-                  />
-                </span>
-                {connectionStatus === "connected" ? (
-                  <HiOutlineSignal className="h-4 w-4" />
-                ) : (
-                  <HiOutlineSignalSlash className="h-4 w-4" />
+                {truckCheck.locked && (
+                  <HiOutlineLockClosed className="h-3.5 w-3.5" />
                 )}
-                {status.text}
-              </div>
-            )}
+                {truckCheck.locked ? "Locked" : "Active"}
+              </span>
+              {!isLocked && (
+                <div
+                  className={`flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
+                    connectionStatus === "connected"
+                      ? "bg-success/10 text-success"
+                      : connectionStatus === "error"
+                        ? "bg-error/10 text-error"
+                        : "bg-warning/10 text-warning"
+                  }`}
+                >
+                  <span className="relative flex h-3 w-3">
+                    {status.pulse && (
+                      <span
+                        className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${status.color}`}
+                      />
+                    )}
+                    <span
+                      className={`relative inline-flex h-3 w-3 rounded-full ${status.color}`}
+                    />
+                  </span>
+                  {connectionStatus === "connected" ? (
+                    <HiOutlineSignal className="h-4 w-4" />
+                  ) : (
+                    <HiOutlineSignalSlash className="h-4 w-4" />
+                  )}
+                  {status.text}
+                </div>
+              )}
+            </div>
+
             {canDeleteTruckCheck && (
-              <Form method="post">
+              <Form method="post" className="sm:self-start">
                 <input type="hidden" name="intent" value="delete" />
                 <button
                   type="submit"
-                  className="btn btn-error btn-outline btn-sm"
+                  className="btn btn-error btn-outline btn-sm w-full sm:w-auto"
                   onClick={(event) => {
                     if (
                       !window.confirm(
@@ -594,16 +704,6 @@ export default function TruckCheckDynamic() {
               </Form>
             )}
           </div>
-        </div>
-        <div className="mt-3 flex items-center gap-2 text-sm">
-          <span
-            className={`badge gap-1 ${truckCheck.locked ? "badge-error" : "badge-success"}`}
-          >
-            {truckCheck.locked && (
-              <HiOutlineLockClosed className="h-3.5 w-3.5" />
-            )}
-            {truckCheck.locked ? "Locked" : "Active"}
-          </span>
         </div>
       </div>
 
@@ -717,9 +817,44 @@ export default function TruckCheckDynamic() {
             key={section.id}
             className="collapse-arrow bg-base-200 collapse rounded-xl"
           >
-            <input type="checkbox" defaultChecked />
+            <input
+              type="checkbox"
+              checked={!!openSections[section.id]}
+              onChange={() =>
+                setOpenSections((prev) => ({
+                  ...prev,
+                  [section.id]: !prev[section.id],
+                }))
+              }
+            />
             <div className="collapse-title text-xl font-medium">
-              {section.title}
+              <div className="flex items-center justify-between gap-3 pr-8">
+                <span>{section.title}</span>
+                {(() => {
+                  const progress = sectionProgress.find(
+                    ({ sectionId }) => sectionId === section.id,
+                  );
+
+                  if (!progress || progress.requiredCount === 0) {
+                    return (
+                      <span className="badge badge-outline badge-sm shrink-0 whitespace-nowrap">
+                        Optional
+                      </span>
+                    );
+                  }
+
+                  return progress.remainingRequiredCount === 0 ? (
+                    <span className="badge badge-success badge-sm shrink-0 whitespace-nowrap">
+                      {progress.completedRequiredCount}/{progress.requiredCount}{" "}
+                      required
+                    </span>
+                  ) : (
+                    <span className="badge badge-warning badge-sm shrink-0 whitespace-nowrap">
+                      {progress.remainingRequiredCount} remaining
+                    </span>
+                  );
+                })()}
+              </div>
               {section.description && (
                 <p className="mt-1 text-sm font-normal opacity-70">
                   {section.description}
@@ -758,9 +893,18 @@ export default function TruckCheckDynamic() {
                 <span className="text-sm opacity-60">
                   {filledRequiredCount}/{requiredTotal} required
                 </span>
+                {firstIncompleteField && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleJumpToNextIncomplete}
+                  >
+                    Next incomplete
+                  </button>
+                )}
               </div>
               <a href="/truck-check" className="btn btn-ghost btn-sm">
-                Back to Truck Checks
+                Exit
               </a>
             </>
           )}
