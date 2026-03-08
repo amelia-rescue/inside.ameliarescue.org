@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { appContext } from "~/context";
 import type { Route } from "./+types/truck-check-dynamic";
-import { useLoaderData } from "react-router";
+import { Form, redirect, useLoaderData } from "react-router";
 import {
   truckCheckSchema,
   TruckCheckStore,
@@ -20,6 +20,35 @@ import { UserStore, type User } from "~/lib/user-store";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Truck Check - Inside Amelia Rescue" }];
+}
+
+export async function action({ context, params, request }: Route.ActionArgs) {
+  const ctx = context.get(appContext);
+  if (!ctx) {
+    throw new Error("Context not found");
+  }
+
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent !== "delete") {
+    throw new Error("Invalid intent");
+  }
+
+  const truckCheckStore = TruckCheckStore.make();
+  const truckCheck = await truckCheckStore.getTruckCheck(params.id);
+
+  if (truckCheck.locked) {
+    throw new Error("Locked truck checks cannot be deleted");
+  }
+
+  if (truckCheck.created_by !== ctx.user.user_id) {
+    throw new Error("Only the creator can delete this truck check");
+  }
+
+  await truckCheckStore.deleteTruckCheck(truckCheck.id);
+
+  return redirect("/truck-check");
 }
 
 export async function loader({ context, params }: Route.LoaderArgs) {
@@ -78,6 +107,8 @@ export default function TruckCheckDynamic() {
     useLoaderData<typeof loader>();
 
   const isLocked = truckCheck.locked;
+  const canDeleteTruckCheck =
+    !isLocked && truckCheck.created_by === user.user_id;
 
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     isLocked ? "disconnected" : "connecting",
@@ -513,34 +544,56 @@ export default function TruckCheckDynamic() {
               })}
             </p>
           </div>
-          {!isLocked && (
-            <div
-              className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${
-                connectionStatus === "connected"
-                  ? "bg-success/10 text-success"
-                  : connectionStatus === "error"
-                    ? "bg-error/10 text-error"
-                    : "bg-warning/10 text-warning"
-              }`}
-            >
-              <span className="relative flex h-3 w-3">
-                {status.pulse && (
+          <div className="flex items-start gap-3">
+            {!isLocked && (
+              <div
+                className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${
+                  connectionStatus === "connected"
+                    ? "bg-success/10 text-success"
+                    : connectionStatus === "error"
+                      ? "bg-error/10 text-error"
+                      : "bg-warning/10 text-warning"
+                }`}
+              >
+                <span className="relative flex h-3 w-3">
+                  {status.pulse && (
+                    <span
+                      className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${status.color}`}
+                    />
+                  )}
                   <span
-                    className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${status.color}`}
+                    className={`relative inline-flex h-3 w-3 rounded-full ${status.color}`}
                   />
+                </span>
+                {connectionStatus === "connected" ? (
+                  <HiOutlineSignal className="h-4 w-4" />
+                ) : (
+                  <HiOutlineSignalSlash className="h-4 w-4" />
                 )}
-                <span
-                  className={`relative inline-flex h-3 w-3 rounded-full ${status.color}`}
-                />
-              </span>
-              {connectionStatus === "connected" ? (
-                <HiOutlineSignal className="h-4 w-4" />
-              ) : (
-                <HiOutlineSignalSlash className="h-4 w-4" />
-              )}
-              {status.text}
-            </div>
-          )}
+                {status.text}
+              </div>
+            )}
+            {canDeleteTruckCheck && (
+              <Form method="post">
+                <input type="hidden" name="intent" value="delete" />
+                <button
+                  type="submit"
+                  className="btn btn-error btn-outline btn-sm"
+                  onClick={(event) => {
+                    if (
+                      !window.confirm(
+                        "Delete this truck check? This action cannot be undone.",
+                      )
+                    ) {
+                      event.preventDefault();
+                    }
+                  }}
+                >
+                  Delete Truck Check
+                </button>
+              </Form>
+            )}
+          </div>
         </div>
         <div className="mt-3 flex items-center gap-2 text-sm">
           <span
