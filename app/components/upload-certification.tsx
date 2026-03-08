@@ -4,9 +4,11 @@ import type { CertificationType } from "~/lib/certifications/certification-type-
 export function CertificationUpload({
   userId,
   certificationType,
+  onUploadSuccess,
 }: {
   userId: string;
   certificationType: CertificationType;
+  onUploadSuccess?: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | undefined>();
@@ -80,6 +82,7 @@ export function CertificationUpload({
 
       setUploadSuccess(true);
       form.reset();
+      onUploadSuccess?.();
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Upload failed");
     } finally {

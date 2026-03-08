@@ -1,7 +1,7 @@
-import { useFetcher, useLoaderData, Link } from "react-router";
+import { useFetcher, useLoaderData, Link, useRevalidator } from "react-router";
 import type { Route } from "./+types/profile";
 import { appContext } from "~/context";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { ArkErrors, type } from "arktype";
 import { UserStore } from "~/lib/user-store";
 import {
@@ -15,7 +15,6 @@ import { CertificationUpload } from "~/components/upload-certification";
 import { ProfilePictureUpload } from "~/components/profile-picture-upload";
 import { CertificationReminderStore } from "~/lib/certifications/certification-reminder-store";
 
-// todo: come up with a better name
 async function getCertificationData(user_id: string) {
   const certificationTypeStore = CertificationTypeStore.make();
   const certificationStore = CertificationStore.make();
@@ -131,6 +130,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function Profile() {
   const { user, certification_data, reminders } =
     useLoaderData<typeof loader>();
+  const revalidator = useRevalidator();
   const ref = useRef<HTMLDialogElement>(null);
   const certModalRef = useRef<HTMLDialogElement>(null);
   const profilePicModalRef = useRef<HTMLDialogElement>(null);
@@ -140,6 +140,12 @@ export default function Profile() {
   const [selectedCertType, setSelectedCertType] =
     useState<CertificationType | null>(null);
   const [showProfilePicModal, setShowProfilePicModal] = useState(false);
+
+  const handleCertificationUploadSuccess = useCallback(() => {
+    certModalRef.current?.close();
+    setSelectedCertType(null);
+    revalidator.revalidate();
+  }, [revalidator]);
 
   const formatPhoneNumber = (value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -637,6 +643,7 @@ export default function Profile() {
             <CertificationUpload
               userId={user.user_id}
               certificationType={selectedCertType}
+              onUploadSuccess={handleCertificationUploadSuccess}
             />
           )}
         </div>
