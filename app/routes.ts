@@ -41,6 +41,9 @@ export default [
     route("get-upload-url", "./routes/api/certifications.get-upload-url.tsx"),
     route("save", "./routes/api/certifications.save.tsx"),
   ]),
+  ...prefix("api/training-status", [
+    route("export", "./routes/api/training-status.export.tsx"),
+  ]),
   ...prefix("api/profile-picture", [
     route("get-upload-url", "./routes/api/profile-picture.get-upload-url.tsx"),
     route("save", "./routes/api/profile-picture.save.tsx"),

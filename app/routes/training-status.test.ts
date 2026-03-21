@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateComplianceStats } from "./training-status";
+import { calculateComplianceStats } from "~/lib/certifications/training-status-export";
 
 describe("calculateComplianceStats", () => {
   it("counts expiring_soon certifications as valid for compliance", () => {

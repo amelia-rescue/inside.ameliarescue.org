@@ -1,9 +1,5 @@
 import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/training-status";
-import { UserStore } from "~/lib/user-store";
-import { TrackStore } from "~/lib/track-store";
-import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
-import { CertificationStore } from "~/lib/certifications/certification-store";
 import { appContext } from "~/context";
 import { useState, useMemo } from "react";
 import {
@@ -21,40 +17,11 @@ import {
   FaTimesCircle,
   FaMinusCircle,
 } from "react-icons/fa";
-
-type CertStatus = "active" | "expiring_soon" | "expired" | "missing";
-
-interface TrainingStatusRow {
-  user_id: string;
-  name: string;
-  roles: Array<{ label: string; precepting: boolean }>;
-  certifications: Record<string, CertStatus>;
-}
-
-export function calculateComplianceStats(trainingData: TrainingStatusRow[]) {
-  let totalRequiredCerts = 0;
-  let totalValidCerts = 0;
-
-  trainingData.forEach((row) => {
-    Object.values(row.certifications).forEach((status) => {
-      totalRequiredCerts++;
-      if (status === "active" || status === "expiring_soon") {
-        totalValidCerts++;
-      }
-    });
-  });
-
-  const compliancePercentage =
-    totalRequiredCerts > 0
-      ? Math.round((totalValidCerts / totalRequiredCerts) * 100)
-      : 0;
-
-  return {
-    totalRequiredCerts,
-    totalValidCerts,
-    compliancePercentage,
-  };
-}
+import {
+  loadTrainingStatusData,
+  type CertStatus,
+  type TrainingStatusRow,
+} from "~/lib/certifications/training-status-export";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
@@ -62,88 +29,12 @@ export async function loader({ context }: Route.LoaderArgs) {
     throw new Error("No user found");
   }
 
-  const userStore = UserStore.make();
-  const trackStore = TrackStore.make();
-  const certTypeStore = CertificationTypeStore.make();
-  const certStore = CertificationStore.make();
-
-  const [users, tracks, certTypes] = await Promise.all([
-    userStore.listUsers(),
-    trackStore.listTracks(),
-    certTypeStore.listCertificationTypes(),
-  ]);
-
-  // Get all certifications for all users
-  const allCertifications = await Promise.all(
-    users.map((user) => certStore.listCertificationsByUser(user.user_id)),
-  );
-
-  // Build training status data
-  const trainingData: TrainingStatusRow[] = users.map((user, userIndex) => {
-    const userCerts = allCertifications[userIndex];
-
-    // Get all required certifications for this user's roles
-    const requiredCertNames = new Set<string>();
-    for (const assignment of user.membership_roles) {
-      const track = tracks.find((t) => t.name === assignment.track_name);
-      if (track) {
-        track.required_certifications.forEach((certName) =>
-          requiredCertNames.add(certName),
-        );
-      }
-    }
-
-    // Calculate status for each required certification
-    const certifications: Record<string, CertStatus> = {};
-    requiredCertNames.forEach((certName) => {
-      const userCert = userCerts.find(
-        (cert) => cert.certification_type_name === certName,
-      );
-
-      if (!userCert) {
-        certifications[certName] = "missing";
-      } else if (userCert.expires_on) {
-        const expiresOn = new Date(userCert.expires_on);
-        const now = new Date();
-        const threeMonthsFromNow = new Date();
-        threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
-
-        if (expiresOn < now) {
-          certifications[certName] = "expired";
-        } else if (expiresOn < threeMonthsFromNow) {
-          certifications[certName] = "expiring_soon";
-        } else {
-          certifications[certName] = "active";
-        }
-      } else {
-        certifications[certName] = "active";
-      }
-    });
-
-    return {
-      user_id: user.user_id,
-      name: `${user.first_name} ${user.last_name}`,
-      roles: user.membership_roles.map((r) => ({
-        label: `${r.role_name} - ${r.track_name}`,
-        precepting: r.precepting,
-      })),
-      certifications,
-    };
-  });
-
-  // Get unique list of all required certifications across all users
-  const allRequiredCerts = new Set<string>();
-  trainingData.forEach((row) => {
-    Object.keys(row.certifications).forEach((cert) =>
-      allRequiredCerts.add(cert),
-    );
-  });
-
-  const complianceStats = calculateComplianceStats(trainingData);
+  const { trainingData, certificationTypes, complianceStats } =
+    await loadTrainingStatusData();
 
   return {
     trainingData,
-    certificationTypes: Array.from(allRequiredCerts).sort(),
+    certificationTypes,
     currentUserId: ctx.user.user_id,
     complianceStats,
   };
@@ -268,14 +159,22 @@ export default function TrainingStatus() {
               </p>
             </div>
 
-            <div className="form-control w-full lg:w-auto">
-              <input
-                type="text"
-                placeholder="Search members..."
-                className="input input-bordered w-full lg:w-80"
-                value={globalFilter ?? ""}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-              />
+            <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:items-center">
+              <a
+                href="/api/training-status/export"
+                className="btn btn-secondary w-full lg:w-auto"
+              >
+                Export to CSV
+              </a>
+              <div className="form-control w-full lg:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search members..."
+                  className="input input-bordered w-full lg:w-80"
+                  value={globalFilter ?? ""}
+                  onChange={(e) => setGlobalFilter(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 

@@ -150,7 +150,10 @@ export class CdkStack extends cdk.Stack {
           "http://localhost:5173/auth/callback",
           `https://${appDomainName}/auth/callback`,
         ],
-        logoutUrls: ["http://localhost:5173", `https://${appDomainName}/`],
+        logoutUrls: [
+          "http://localhost:5173/auth/logout-complete",
+          `https://${appDomainName}/auth/logout-complete`,
+        ],
       },
       generateSecret: false, // Public client for web apps
       preventUserExistenceErrors: true,
@@ -588,6 +591,74 @@ export class CdkStack extends cdk.Stack {
     // Add Lambda as target for the EventBridge rule
     certificationSnapshotCronRule.addTarget(
       new eventsTargets.LambdaFunction(certificationSnapshotFunction),
+    );
+
+    const trainingStatusSnapshotLogGroup = new logs.LogGroup(
+      this,
+      "training-status-snapshot-logs",
+      {
+        logGroupName:
+          "/aws/lambda/inside-amelia-rescue-training-status-snapshot",
+        retention: logs.RetentionDays.SEVEN_YEARS,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    const trainingStatusSnapshotFunction = new nodejs.NodejsFunction(
+      this,
+      "TrainingStatusSnapshotFunction",
+      {
+        functionName: "inside-amelia-rescue-training-status-snapshot",
+        runtime: lambda.Runtime.NODEJS_24_X,
+        handler: "handler",
+        entry: path.join(__dirname, "../server/training-status-snapshot.ts"),
+        memorySize: 1024,
+        timeout: cdk.Duration.seconds(300),
+        architecture: cdk.aws_lambda.Architecture.ARM_64,
+        logGroup: trainingStatusSnapshotLogGroup,
+        bundling: {
+          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          minify: true,
+          sourceMap: true,
+          target: "es2022",
+          format: nodejs.OutputFormat.CJS,
+        },
+        environment: {
+          NODE_OPTIONS: "--enable-source-maps",
+          NODE_ENV: "production",
+          USERS_TABLE_NAME: usersTable.tableName,
+          USER_CERTIFICATIONS_TABLE_NAME: userCertificationsTable.tableName,
+          TRACKS_TABLE_NAME: tracksTable.tableName,
+          FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
+          FILE_CDN_URL: `https://${appDomainName}`,
+        },
+      },
+    );
+
+    usersTable.grantReadData(trainingStatusSnapshotFunction);
+    userCertificationsTable.grantReadData(trainingStatusSnapshotFunction);
+    tracksTable.grantReadData(trainingStatusSnapshotFunction);
+    fileUploadsBucket.grantWrite(trainingStatusSnapshotFunction);
+
+    const trainingStatusSnapshotCronRule = new events.Rule(
+      this,
+      "TrainingStatusSnapshotRule",
+      {
+        ruleName: "training-status-snapshot-task",
+        description:
+          "Triggers the training status CSV snapshot lambda function monthly",
+        schedule: events.Schedule.cron({
+          minute: "0",
+          hour: "6",
+          day: "1",
+          month: "*",
+          year: "*",
+        }),
+      },
+    );
+
+    trainingStatusSnapshotCronRule.addTarget(
+      new eventsTargets.LambdaFunction(trainingStatusSnapshotFunction),
     );
 
     // Create CloudWatch log group for truck check lock Lambda function

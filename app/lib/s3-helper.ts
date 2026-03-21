@@ -80,6 +80,21 @@ export class S3Helper {
     return url;
   }
 
+  async putObject(
+    key: string,
+    body: string,
+    contentType: string,
+  ): Promise<void> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    });
+
+    await this.client.send(command);
+  }
+
   async deleteObject(key: string): Promise<void> {
     const command = new DeleteObjectCommand({
       Bucket: this.bucketName,
