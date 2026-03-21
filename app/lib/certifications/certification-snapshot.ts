@@ -9,6 +9,10 @@ import {
 import { CertificationStore } from "./certification-store";
 import { CertificationReminderStore } from "./certification-reminder-store";
 import {
+  buildTrainingStatusData,
+  type TrainingStatusRow,
+} from "./training-status-export";
+import {
   CertificationSnapshotStore,
   type CertificationSnapshot,
 } from "./certification-snapshot-store";
@@ -54,52 +58,60 @@ export class CertificationSnapshotGenerator {
   private async generateSnapshot(): Promise<CertificationSnapshot> {
     const snapshotDate = dayjs().format("YYYY-MM-DD");
 
-    // Load all data
     const users = await this.userStore.listUsers();
     const roles = await this.roleStore.listRoles();
     const tracks = await this.trackStore.listTracks();
     const certificationTypes =
       await this.certificationTypeStore.listCertificationTypes();
-
-    // Calculate compliance for each user
-    const userCompliance = await Promise.all(
+    const certificationsByUserEntries = await Promise.all(
       users.map(async (user) => {
-        const isCompliant = await this.isUserCompliant(
-          user,
-          roles,
-          tracks,
-          certificationTypes,
-        );
-        return { user, isCompliant };
+        const certifications =
+          await this.certificationStore.listCertificationsByUser(user.user_id);
+
+        return [user.user_id, certifications] as const;
       }),
     );
+    const certificationsByUserId = Object.fromEntries(
+      certificationsByUserEntries,
+    );
+    const trainingStatusData = buildTrainingStatusData({
+      users,
+      tracks,
+      certificationsByUserId,
+    });
+    const userCompliance = users.map((user) => {
+      const trainingStatusRow = trainingStatusData.trainingData.find(
+        (row) => row.user_id === user.user_id,
+      );
+
+      return {
+        user,
+        isCompliant: this.isTrainingStatusRowCompliant(trainingStatusRow),
+      };
+    });
 
     const totalUsers = users.length;
-    const compliantUsers = userCompliance.filter((uc) => uc.isCompliant).length;
     const overallComplianceRate =
-      totalUsers > 0 ? compliantUsers / totalUsers : 0;
+      trainingStatusData.complianceStats.totalRequiredCerts > 0
+        ? trainingStatusData.complianceStats.totalValidCerts /
+          trainingStatusData.complianceStats.totalRequiredCerts
+        : 0;
 
-    // Calculate compliance by role
     const complianceByRole = await this.calculateComplianceByRole(
       userCompliance,
       roles,
     );
 
-    // Calculate compliance by track
     const complianceByTrack = await this.calculateComplianceByTrack(
       userCompliance,
       tracks,
     );
 
-    // Calculate cert type stats
     const certTypeStats = await this.calculateCertTypeStats(
-      users,
       certificationTypes,
-      roles,
-      tracks,
+      trainingStatusData.exportRows,
     );
 
-    // Calculate reminder stats
     const reminderStats = await this.calculateReminderStats();
 
     return {
@@ -114,80 +126,16 @@ export class CertificationSnapshotGenerator {
     };
   }
 
-  private async isUserCompliant(
-    user: User,
-    roles: Role[],
-    tracks: Track[],
-    certificationTypes: CertificationType[],
-  ): Promise<boolean> {
-    // Get required certifications for this user
-    const requiredCerts = this.getRequiredCertifications(
-      user,
-      roles,
-      tracks,
-      certificationTypes,
-    );
-
-    if (requiredCerts.size === 0) {
-      return true; // No requirements = compliant
+  private isTrainingStatusRowCompliant(
+    trainingStatusRow: TrainingStatusRow | undefined,
+  ): boolean {
+    if (!trainingStatusRow) {
+      return true;
     }
 
-    // Get user's certifications
-    const userCerts = await this.certificationStore.listCertificationsByUser(
-      user.user_id,
+    return Object.values(trainingStatusRow.certifications).every(
+      (status) => status === "active" || status === "expiring_soon",
     );
-
-    // Check if all required certs are present and not expired
-    for (const requiredCert of requiredCerts) {
-      const cert = userCerts.find(
-        (c) => c.certification_type_name === requiredCert.name,
-      );
-
-      if (!cert) {
-        return false; // Missing required cert
-      }
-
-      if (cert.expires_on && dayjs(cert.expires_on).isBefore(dayjs())) {
-        return false; // Expired cert
-      }
-    }
-
-    return true;
-  }
-
-  private getRequiredCertifications(
-    user: User,
-    roles: Role[],
-    tracks: Track[],
-    certificationTypes: CertificationType[],
-  ): Set<CertificationType> {
-    const userRoles = roles.filter((role) =>
-      user.membership_roles.some(
-        (userRole) => userRole.role_name === role.name,
-      ),
-    );
-
-    const userTracks = new Set<Track>();
-    for (const userRole of userRoles) {
-      userRole.allowed_tracks.forEach((trackName) => {
-        const track = tracks.find((t) => t.name === trackName);
-        if (track) {
-          userTracks.add(track);
-        }
-      });
-    }
-
-    const requiredCerts = new Set<CertificationType>();
-    userTracks.forEach((track) => {
-      track.required_certifications.forEach((certName) => {
-        const cert = certificationTypes.find((ct) => ct.name === certName);
-        if (cert) {
-          requiredCerts.add(cert);
-        }
-      });
-    });
-
-    return requiredCerts;
   }
 
   private async calculateComplianceByRole(
@@ -235,66 +183,53 @@ export class CertificationSnapshotGenerator {
   }
 
   private async calculateCertTypeStats(
-    users: User[],
     certificationTypes: CertificationType[],
-    roles: Role[],
-    tracks: Track[],
+    exportRows: Array<{
+      certification_type: string;
+      required: boolean;
+      status: string;
+      expires_on: string;
+      file_url: string;
+    }>,
   ) {
     return await Promise.all(
       certificationTypes.map(async (certType) => {
-        // Get all certs of this type
-        const allCerts = (
-          await Promise.all(
-            users.map((u) =>
-              this.certificationStore.listCertificationsByUser(u.user_id),
-            ),
-          )
-        )
-          .flat()
-          .filter((c) => c.certification_type_name === certType.name);
-
-        const totalCount = allCerts.length;
-        const expiredCount = allCerts.filter(
-          (c) => c.expires_on && dayjs(c.expires_on).isBefore(dayjs()),
+        const certRows = exportRows.filter(
+          (row) => row.certification_type === certType.name,
+        );
+        const currentCertRows = certRows.filter((row) => row.file_url);
+        const totalCount = currentCertRows.length;
+        const expiredCount = currentCertRows.filter(
+          (row) => row.status === "expired",
         ).length;
+        const expiringSoonCount = currentCertRows.filter(
+          (row) => row.status === "expiring_soon",
+        ).length;
+        const missingCount = certRows.filter(
+          (row) => row.required && row.status === "missing",
+        ).length;
+        const activeCerts = currentCertRows.filter(
+          (row) => row.status === "active" || row.status === "expiring_soon",
+        );
+        const activeCertsWithValidExpiration = activeCerts.filter((row) => {
+          if (!row.expires_on) {
+            return false;
+          }
 
-        const expiringSoonCount = allCerts.filter((c) => {
-          if (!c.expires_on) return false;
-          return (
-            dayjs(c.expires_on).isBefore(dayjs().add(3, "months")) &&
-            dayjs(c.expires_on).isAfter(dayjs())
-          );
-        }).length;
-
-        // Calculate missing count (users who need this cert but don't have it)
-        const usersNeedingCert = users.filter((user) => {
-          const requiredCerts = this.getRequiredCertifications(
-            user,
-            roles,
-            tracks,
-            certificationTypes,
-          );
-          return Array.from(requiredCerts).some(
-            (rc) => rc.name === certType.name,
-          );
+          return dayjs(row.expires_on).isValid();
         });
 
-        const usersWithCert = new Set(allCerts.map((c) => c.user_id));
-        const missingCount = usersNeedingCert.filter(
-          (u) => !usersWithCert.has(u.user_id),
-        ).length;
-
-        // Calculate average days to expiration for non-expired certs
-        const activeCerts = allCerts.filter(
-          (c) => c.expires_on && dayjs(c.expires_on).isAfter(dayjs()),
-        );
-
         let avgDaysToExpiration: number | null = null;
-        if (activeCerts.length > 0) {
-          const totalDays = activeCerts.reduce((sum, cert) => {
-            return sum + dayjs(cert.expires_on).diff(dayjs(), "days");
-          }, 0);
-          avgDaysToExpiration = Math.round(totalDays / activeCerts.length);
+        if (activeCertsWithValidExpiration.length > 0) {
+          const totalDays = activeCertsWithValidExpiration.reduce(
+            (sum, cert) => {
+              return sum + dayjs(cert.expires_on).diff(dayjs(), "days");
+            },
+            0,
+          );
+          avgDaysToExpiration = Math.round(
+            totalDays / activeCertsWithValidExpiration.length,
+          );
         }
 
         return {

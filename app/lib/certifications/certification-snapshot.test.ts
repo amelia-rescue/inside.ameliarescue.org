@@ -420,4 +420,144 @@ describe("certification snapshot test", () => {
     expect(crewCompliance?.compliant_count).toBe(2);
     expect(crewCompliance?.compliance_rate).toBe(0.5);
   });
+
+  it("should calculate overall compliance using required-cert validity, not fully compliant users", async () => {
+    await roleStore.createRole({
+      name: "Dual Track",
+      description: "Dual track role",
+      allowed_tracks: ["ALS"],
+    });
+
+    await trackStore.createTrack({
+      name: "ALS",
+      description: "Advanced Life Support",
+      required_certifications: ["ACLS", "PALS"],
+    });
+
+    await certificationTypeStore.createCertificationType({
+      name: "ACLS",
+      description: "Advanced Cardiac Life Support",
+      expires: true,
+    });
+
+    await certificationTypeStore.createCertificationType({
+      name: "PALS",
+      description: "Pediatric Advanced Life Support",
+      expires: true,
+    });
+
+    const user = await userStore.createUser({
+      first_name: "Partial",
+      last_name: "Compliance",
+      email: "partial@example.com",
+      website_role: "user",
+      membership_roles: [
+        { role_name: "Dual Track", track_name: "ALS", precepting: false },
+      ],
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-acls-only",
+      user_id: user.user_id,
+      certification_type_name: "ACLS",
+      file_url: "https://example.com/acls.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
+    });
+
+    const generator = new CertificationSnapshotGenerator({ userStore });
+    const snapshot = await generator.generateAndSaveSnapshot();
+
+    expect(snapshot.overall_compliance_rate).toBe(0.5);
+
+    const alsCompliance = snapshot.compliance_by_track.find(
+      (track) => track.track_name === "ALS",
+    );
+    expect(alsCompliance?.compliance_rate).toBe(0);
+  });
+
+  it("should only require certifications from the user's assigned membership track", async () => {
+    await roleStore.createRole({
+      name: "Flexible Role",
+      description: "Role with multiple allowed tracks",
+      allowed_tracks: ["BLS", "ALS"],
+    });
+
+    await trackStore.createTrack({
+      name: "ALS",
+      description: "Advanced Life Support",
+      required_certifications: ["ACLS"],
+    });
+
+    await certificationTypeStore.createCertificationType({
+      name: "ACLS",
+      description: "Advanced Cardiac Life Support",
+      expires: true,
+    });
+
+    const user = await userStore.createUser({
+      first_name: "Track",
+      last_name: "Specific",
+      email: "track-specific@example.com",
+      website_role: "user",
+      membership_roles: [
+        { role_name: "Flexible Role", track_name: "BLS", precepting: false },
+      ],
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-bls-cpr",
+      user_id: user.user_id,
+      certification_type_name: "CPR",
+      file_url: "https://example.com/cpr.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: dayjs().add(1, "year").toISOString(),
+    });
+
+    const generator = new CertificationSnapshotGenerator({ userStore });
+    const snapshot = await generator.generateAndSaveSnapshot();
+
+    expect(snapshot.overall_compliance_rate).toBe(1);
+
+    const aclsStats = snapshot.cert_type_stats.find(
+      (stat) => stat.cert_name === "ACLS",
+    );
+    expect(aclsStats?.missing_count).toBe(0);
+  });
+
+  it("should not produce NaN avg_days_to_expiration for invalid expiration dates", async () => {
+    await certificationTypeStore.createCertificationType({
+      name: "Orientation",
+      description: "Orientation certification",
+      expires: false,
+    });
+
+    const user = await userStore.createUser({
+      first_name: "No",
+      last_name: "Expiry",
+      email: "no-expiry@example.com",
+      website_role: "user",
+      membership_roles: [],
+    });
+
+    await certificationStore.createCertification({
+      certification_id: "cert-orientation",
+      user_id: user.user_id,
+      certification_type_name: "Orientation",
+      file_url: "https://example.com/orientation.pdf",
+      uploaded_at: dayjs().toISOString(),
+      expires_on: "not-a-date",
+    });
+
+    const generator = new CertificationSnapshotGenerator({ userStore });
+    const snapshot = await generator.generateAndSaveSnapshot();
+
+    const orientationStats = snapshot.cert_type_stats.find(
+      (stat) => stat.cert_name === "Orientation",
+    );
+
+    expect(orientationStats).toBeDefined();
+    expect(orientationStats?.total_count).toBe(1);
+    expect(orientationStats?.avg_days_to_expiration).toBeNull();
+  });
 });

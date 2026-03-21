@@ -1,19 +1,18 @@
 import { CertificationSnapshotGenerator } from "../app/lib/certifications/certification-snapshot";
+import { log } from "~/lib/logger";
 
 export const handler = async () => {
-  console.log("Starting certification snapshot generation");
+  log.info("Starting certification snapshot generation");
 
   try {
     const generator = new CertificationSnapshotGenerator();
     const snapshot = await generator.generateAndSaveSnapshot();
 
-    console.log(
-      `Successfully generated snapshot for ${snapshot.snapshot_date}`,
-    );
-    console.log(`Total users: ${snapshot.total_users}`);
-    console.log(
-      `Overall compliance rate: ${(snapshot.overall_compliance_rate * 100).toFixed(1)}%`,
-    );
+    log.info("Successfully generated certification snapshot", {
+      snapshot_date: snapshot.snapshot_date,
+      total_users: snapshot.total_users,
+      overall_compliance_rate: snapshot.overall_compliance_rate,
+    });
 
     return {
       statusCode: 200,
@@ -25,7 +24,7 @@ export const handler = async () => {
       }),
     };
   } catch (error) {
-    console.error("Error generating snapshot:", error);
+    log.error("Error generating certification snapshot", { error });
     throw error;
   }
 };
