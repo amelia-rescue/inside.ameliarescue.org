@@ -207,7 +207,7 @@ async function broadcastToTruckCheck(
   connectionsTableName: string,
   truckCheckId: string,
   message: Record<string, any>,
-  excludeConnectionId: string | undefined,
+  excludeConnectionId?: string,
 ): Promise<void> {
   const result = await docClient.send(
     new ScanCommand({
@@ -494,7 +494,6 @@ async function handleUpdateField(
       updatedBy: connection.user_id,
       updatedByName: connection.userName || "Unknown",
     },
-    connectionId,
   );
 
   return { statusCode: 200, body: "Field updated" };
