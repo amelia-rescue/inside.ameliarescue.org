@@ -98,8 +98,36 @@ interface ConnectedUser {
   userName: string;
 }
 
+type TriStateCheckboxValue = true | "not-present" | null;
+
 function getFieldId(sectionId: string, fieldLabel: string): string {
   return `${sectionId}-${fieldLabel.replace(/\s+/g, "-").toLowerCase()}`;
+}
+
+function normalizeTriStateCheckboxValue(value: any): TriStateCheckboxValue {
+  if (value === true) {
+    return true;
+  }
+
+  if (value === "not-present") {
+    return "not-present";
+  }
+
+  return null;
+}
+
+function getNextTriStateCheckboxValue(value: any): TriStateCheckboxValue {
+  const normalizedValue = normalizeTriStateCheckboxValue(value);
+
+  if (normalizedValue === null) {
+    return true;
+  }
+
+  if (normalizedValue === true) {
+    return "not-present";
+  }
+
+  return null;
 }
 
 export default function TruckCheckDynamic() {
@@ -418,21 +446,55 @@ export default function TruckCheckDynamic() {
     const fieldContainerClass = `form-control rounded-lg border border-base-300 p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`;
 
     switch (field.type) {
-      case "checkbox":
+      case "checkbox": {
+        const checkboxValue = normalizeTriStateCheckboxValue(value);
+        const checkboxStateLabel =
+          checkboxValue === true
+            ? "Present"
+            : checkboxValue === "not-present"
+              ? "Not present"
+              : "Unchecked";
+        const checkboxStateIcon =
+          checkboxValue === true
+            ? "✓"
+            : checkboxValue === "not-present"
+              ? "✕"
+              : "";
+        const checkboxButtonClass = `flex h-6 w-6 items-center justify-center rounded border-2 text-sm font-bold transition-colors ${
+          checkboxValue === true
+            ? "border-success bg-success text-success-content"
+            : checkboxValue === "not-present"
+              ? "border-error bg-error text-error-content"
+              : "border-base-content/30 bg-base-100 text-base-content/50"
+        } ${isLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`;
+
         return (
           <div key={fieldId} className={fieldContainerClass}>
-            <label className="label cursor-pointer justify-start gap-3">
-              <input
+            <div className="label justify-start gap-3">
+              <button
                 id={fieldId}
-                type="checkbox"
-                className="checkbox"
-                checked={!!value}
+                type="button"
+                role="checkbox"
+                aria-checked={
+                  checkboxValue === "not-present"
+                    ? "mixed"
+                    : checkboxValue === true
+                }
+                aria-label={`${field.label}: ${checkboxStateLabel}`}
+                className={checkboxButtonClass}
                 disabled={isLocked}
-                onChange={(e) => handleFieldChange(fieldId, e.target.checked)}
-              />
+                onClick={() =>
+                  handleFieldChange(
+                    fieldId,
+                    getNextTriStateCheckboxValue(checkboxValue),
+                  )
+                }
+              >
+                {checkboxStateIcon}
+              </button>
               <span className="label-text">{field.label}</span>
               {field.required && <span className="text-error">*</span>}
-            </label>
+            </div>
             {isRemoteUpdate && (
               <span className="label-text-alt text-info ml-9 text-xs italic">
                 Updated by {lastUpdate.userName}
@@ -445,6 +507,7 @@ export default function TruckCheckDynamic() {
             )}
           </div>
         );
+      }
 
       case "text":
         return (
