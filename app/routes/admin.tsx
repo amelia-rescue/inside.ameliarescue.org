@@ -1,8 +1,9 @@
-import { Form, Link, redirect } from "react-router";
+import { data, Link, redirect, useFetcher } from "react-router";
 import type { Route } from "./+types/admin";
 import { appContext } from "~/context";
 import { UserStore } from "~/lib/user-store";
-import { useState } from "react";
+import { showToast } from "~/components/toaster";
+import { useEffect, useRef, useState } from "react";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -42,14 +43,28 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "delete" && typeof userId === "string") {
     const userStore = UserStore.make();
-    await userStore.softDelete(userId);
+    try {
+      await userStore.softDelete(userId);
+      return data({ success: true });
+    } catch (error) {
+      if (error instanceof Error) {
+        return data({ success: false, error: error.message }, { status: 500 });
+      }
+
+      return data(
+        { success: false, error: "Failed to delete user" },
+        { status: 500 },
+      );
+    }
   }
 
-  return redirect("/admin");
+  return data({ success: false, error: "Invalid request" }, { status: 400 });
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
   const { users } = loaderData;
+  const fetcher = useFetcher<typeof action>();
+  const hasShownToast = useRef(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleteUserName, setDeleteUserName] = useState<string>("");
 
@@ -64,6 +79,37 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     setDeleteUserName("");
     (document.getElementById("delete_modal") as HTMLDialogElement)?.close();
   };
+
+  useEffect(() => {
+    const isIdle = fetcher.state === "idle";
+
+    if (!isIdle) {
+      hasShownToast.current = false;
+      return;
+    }
+
+    if (!fetcher.data || hasShownToast.current) {
+      return;
+    }
+
+    if ("success" in fetcher.data && fetcher.data.success === true) {
+      hasShownToast.current = true;
+      closeDeleteModal();
+      showToast({
+        message: "User deleted successfully!",
+        type: "alert-success",
+      });
+      return;
+    }
+
+    if ("error" in fetcher.data && typeof fetcher.data.error === "string") {
+      hasShownToast.current = true;
+      showToast({
+        message: fetcher.data.error,
+        type: "alert-error",
+      });
+    }
+  }, [fetcher.state, fetcher.data]);
 
   return (
     <>
@@ -166,18 +212,17 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             <button onClick={closeDeleteModal} className="btn btn-ghost">
               Cancel
             </button>
-            <Form
-              method="post"
-              onSubmit={() => {
-                closeDeleteModal();
-              }}
-            >
+            <fetcher.Form method="post">
               <input type="hidden" name="intent" value="delete" />
               <input type="hidden" name="userId" value={deleteUserId || ""} />
-              <button type="submit" className="btn btn-error">
+              <button
+                type="submit"
+                className="btn btn-error"
+                disabled={fetcher.state !== "idle"}
+              >
                 Delete User
               </button>
-            </Form>
+            </fetcher.Form>
           </div>
         </div>
         <form method="dialog" className="modal-backdrop">

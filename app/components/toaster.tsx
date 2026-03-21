@@ -28,7 +28,7 @@ function removeToast(id: number) {
   emitToasts();
 }
 
-export function showToast({ duration = 3000, ...toast }: ToastInput) {
+export function showToast({ duration = 10000, ...toast }: ToastInput) {
   if (typeof window === "undefined") {
     return;
   }
