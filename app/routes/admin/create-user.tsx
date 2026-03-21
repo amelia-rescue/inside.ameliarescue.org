@@ -102,6 +102,9 @@ export async function action({ request }: Route.ActionArgs) {
     return data({ error: user.summary, formValues }, { status: 400 });
   }
 
+  // normalize emails to be all lowercase on account creation
+  user.email = user.email.toLowerCase();
+
   try {
     const store = UserStore.make();
     await store.createUser(user);

@@ -105,6 +105,7 @@ export class CdkStack extends cdk.Stack {
           mutable: true,
         },
       },
+      // signInCaseSensitive: false, // unfortunately you can not set this after creation
       passwordPolicy: {
         minLength: 8,
         requireLowercase: false,
