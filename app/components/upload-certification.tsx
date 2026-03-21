@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CertificationType } from "~/lib/certifications/certification-type-store";
+import { showToast } from "./toaster";
 
 export function CertificationUpload({
   userId,
@@ -83,6 +84,11 @@ export function CertificationUpload({
       setUploadSuccess(true);
       form.reset();
       onUploadSuccess?.();
+      showToast({
+        message: "Certification uploaded successfully",
+        type: "alert-success",
+        duration: 5000,
+      });
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Upload failed");
     } finally {
@@ -101,12 +107,6 @@ export function CertificationUpload({
         {uploadError && (
           <div className="alert alert-error mb-4">
             <span>{uploadError}</span>
-          </div>
-        )}
-
-        {uploadSuccess && (
-          <div className="alert alert-success mb-4">
-            <span>Certification uploaded successfully!</span>
           </div>
         )}
 

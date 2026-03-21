@@ -19,6 +19,7 @@ import "./app.css";
 import { authMiddleware } from "./middleware/auth";
 import { requestLogger } from "./middleware/logger";
 import { appContext } from "./context";
+import { Toaster } from "./components/toaster";
 
 export const middleware: Route.MiddlewareFunction[] = [
   requestLogger,
@@ -175,6 +176,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </aside>
           </footer>
         </div>
+        <Toaster />
         <ScrollRestoration />
         <Scripts />
       </body>

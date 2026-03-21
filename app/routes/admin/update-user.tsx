@@ -1,4 +1,4 @@
-import { data, Link, useFetcher, redirect } from "react-router";
+import { data, Link, useFetcher, redirect, useRevalidator } from "react-router";
 import type { Route } from "./+types/update-user";
 import { appContext } from "~/context";
 import { userSchema, UserStore } from "~/lib/user-store";
@@ -7,12 +7,13 @@ import {
   type CertificationType,
 } from "~/lib/certifications/certification-type-store";
 import { type } from "arktype";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CertificationStore } from "~/lib/certifications/certification-store";
 import { FiExternalLink } from "react-icons/fi";
 import { CertificationUpload } from "~/components/upload-certification";
 import { RoleStore } from "~/lib/role-store";
 import { TrackStore } from "~/lib/track-store";
+import { showToast } from "~/components/toaster";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -468,6 +469,13 @@ function UploadModal(props: {
     ref.current?.showModal();
   }
 
+  const revalidator = useRevalidator();
+
+  const handleCertificationUploadSuccess = useCallback(() => {
+    revalidator.revalidate();
+    ref.current?.close();
+  }, [revalidator]);
+
   return (
     <>
       <button className="btn" onClick={handleClick}>
@@ -486,6 +494,7 @@ function UploadModal(props: {
             key={certType.name}
             userId={userId}
             certificationType={certType}
+            onUploadSuccess={handleCertificationUploadSuccess}
           />
         </div>
       </dialog>
