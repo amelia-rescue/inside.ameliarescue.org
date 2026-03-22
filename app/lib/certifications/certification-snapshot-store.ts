@@ -2,7 +2,6 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
   PutCommand,
-  QueryCommand,
   GetCommand,
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
@@ -106,9 +105,9 @@ export class CertificationSnapshotStore {
     startDate: string,
     endDate: string,
   ): Promise<CertificationSnapshot[]> {
-    const command = new QueryCommand({
+    const command = new ScanCommand({
       TableName: this.tableName,
-      KeyConditionExpression: "snapshot_date BETWEEN :start AND :end",
+      FilterExpression: "snapshot_date BETWEEN :start AND :end",
       ExpressionAttributeValues: {
         ":start": startDate,
         ":end": endDate,
@@ -116,7 +115,9 @@ export class CertificationSnapshotStore {
     });
 
     const result = await CertificationSnapshotStore.client.send(command);
-    return (result.Items || []) as CertificationSnapshot[];
+    return ((result.Items || []) as CertificationSnapshot[]).sort((a, b) =>
+      a.snapshot_date.localeCompare(b.snapshot_date),
+    );
   }
 
   public async getLatestSnapshot(): Promise<CertificationSnapshot | null> {

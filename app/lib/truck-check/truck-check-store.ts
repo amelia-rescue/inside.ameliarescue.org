@@ -129,11 +129,21 @@ export class TruckCheckStore {
     await TruckCheckStore.client.send(command);
   }
 
-  public async listTruckChecks(): Promise<DocumentTruckCheck[]> {
+  public async listTruckChecks(
+    lastEvaluatedKey?: Record<string, unknown>,
+  ): Promise<{
+    lastEvaluatedKey?: Record<string, unknown>;
+    truckChecks: DocumentTruckCheck[];
+  }> {
     const command = new ScanCommand({
       TableName: this.tableName,
+      ExclusiveStartKey: lastEvaluatedKey,
+      Limit: 100,
     });
     const response = await TruckCheckStore.client.send(command);
-    return (response.Items || []) as unknown as DocumentTruckCheck[];
+    return {
+      lastEvaluatedKey: response.LastEvaluatedKey,
+      truckChecks: (response.Items || []) as unknown as DocumentTruckCheck[],
+    };
   }
 }

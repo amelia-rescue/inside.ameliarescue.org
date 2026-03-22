@@ -396,6 +396,8 @@ export class CdkStack extends cdk.Stack {
           TRACKS_TABLE_NAME: tracksTable.tableName,
           CERTIFICATION_REMINDERS_TABLE_NAME:
             certificationRemindersTable.tableName,
+          CERTIFICATION_SNAPSHOTS_TABLE_NAME:
+            certificationSnapshotsTable.tableName,
           FILE_UPLOADS_BUCKET_NAME: fileUploadsBucket.bucketName,
           TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
           TRUCK_CHECK_SCHEMAS_TABLE_NAME: truckCheckSchemasTable.tableName,
@@ -410,6 +412,7 @@ export class CdkStack extends cdk.Stack {
     rolesTable.grantReadWriteData(lambdaFunction);
     tracksTable.grantReadWriteData(lambdaFunction);
     certificationRemindersTable.grantReadWriteData(lambdaFunction);
+    certificationSnapshotsTable.grantReadData(lambdaFunction);
     truckChecksTable.grantReadWriteData(lambdaFunction);
     truckCheckSchemasTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);

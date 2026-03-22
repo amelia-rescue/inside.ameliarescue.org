@@ -217,6 +217,26 @@ describe("user store test", () => {
     await expect(store.getUser(user_id)).rejects.toBeInstanceOf(UserNotFound);
   });
 
+  it("should get a soft-deleted user when includeDeleted is true", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+
+    const { user_id } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
+      email: "test@example.com",
+      website_role: "admin",
+      membership_roles: [
+        { role_name: "Provider", track_name: "EMT", precepting: false },
+      ],
+    });
+
+    await store.softDelete(user_id);
+
+    const user = await store.getUser(user_id, { includeDeleted: true });
+    expect(user.user_id).toBe(user_id);
+    expect(user.deleted_at).toBeTruthy();
+  });
+
   it("should be able to hard delete users permanently", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
 

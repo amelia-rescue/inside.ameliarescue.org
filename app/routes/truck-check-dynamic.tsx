@@ -75,7 +75,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   if (truckCheck.locked) {
     const contributors = await Promise.all(
       truckCheck.contributors.map((contributor) =>
-        userStore.getUser(contributor),
+        userStore.getUser(contributor, { includeDeleted: true }),
       ),
     );
     previousContributors = contributors.map((user) => user);

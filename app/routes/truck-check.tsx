@@ -8,7 +8,7 @@ import {
   useLoaderData,
   Link,
 } from "react-router";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IoWarning } from "react-icons/io5";
 import {
   TruckCheckSchemaStore,
@@ -21,25 +21,47 @@ export async function action({ context, request }: Route.ActionArgs) {
     throw new Error("context not found");
   }
 
-  const thing = await request.formData();
-  const truck = thing.get("truck");
-  if (typeof truck !== "string") {
-    throw new Error("truck is not a string");
+  const intents = ["create", "scroll"];
+
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+  if (!intents.includes(intent as unknown as string)) {
+    throw new Error("invalid intent");
   }
-  const truckCheckStore = TruckCheckStore.make();
-  const truckCheckSchemaStore = TruckCheckSchemaStore.make();
-  const truckRecord = await truckCheckSchemaStore.getTruck(truck);
-  const schema = await truckCheckSchemaStore.getSchema(truckRecord.schemaId);
-  const truckCheck = await truckCheckStore.createTruckCheck({
-    created_by: ctx.user.user_id,
-    truck: truck,
-    data: {},
-    contributors: [ctx.user.user_id],
-    locked: false,
-    schema_id: schema.schemaId,
-    schema_created_at: schema.createdAt,
-  });
-  return redirect(`/truck-checks/${truckCheck.id}`);
+
+  if (intent === "create") {
+    const truck = formData.get("truck");
+    if (typeof truck !== "string") {
+      throw new Error("truck is not a string");
+    }
+    const truckCheckStore = TruckCheckStore.make();
+    const truckCheckSchemaStore = TruckCheckSchemaStore.make();
+    const truckRecord = await truckCheckSchemaStore.getTruck(truck);
+    const schema = await truckCheckSchemaStore.getSchema(truckRecord.schemaId);
+    const truckCheck = await truckCheckStore.createTruckCheck({
+      created_by: ctx.user.user_id,
+      truck: truck,
+      data: {},
+      contributors: [ctx.user.user_id],
+      locked: false,
+      schema_id: schema.schemaId,
+      schema_created_at: schema.createdAt,
+    });
+    return redirect(`/truck-checks/${truckCheck.id}`);
+  }
+
+  if (intent === "scroll") {
+    const lastEvaluatedKeyJson = formData.get("lastEvaluatedKey");
+    const lastEvaluatedKey = lastEvaluatedKeyJson
+      ? (JSON.parse(lastEvaluatedKeyJson as string) as Record<string, unknown>)
+      : undefined;
+    const truckCheckStore = TruckCheckStore.make();
+    const result = await truckCheckStore.listTruckChecks(lastEvaluatedKey);
+    return {
+      truckChecks: result.truckChecks,
+      lastEvaluatedKey: result.lastEvaluatedKey,
+    };
+  }
 }
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -51,7 +73,8 @@ export async function loader({ context }: Route.LoaderArgs) {
   const truckCheckStore = TruckCheckStore.make();
   const truckCheckSchemaStore = TruckCheckSchemaStore.make();
 
-  const previousChecks = await truckCheckStore.listTruckChecks();
+  const { truckChecks: previousChecks, lastEvaluatedKey } =
+    await truckCheckStore.listTruckChecks();
   const trucks = await truckCheckSchemaStore.listTrucks();
 
   // Sort checks by created_at descending (newest first)
@@ -60,11 +83,17 @@ export async function loader({ context }: Route.LoaderArgs) {
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 
-  return { user: ctx.user, previousChecks: sortedChecks, trucks };
+  return {
+    user: ctx.user,
+    truckChecks: sortedChecks,
+    trucks,
+    lastEvaluatedKey,
+  };
 }
 
 export default function TruckCheck() {
-  const { user, previousChecks, trucks } = useLoaderData<typeof loader>();
+  const { user, truckChecks, trucks, lastEvaluatedKey } =
+    useLoaderData<typeof loader>();
   const stuff = useActionData<typeof action>();
 
   const fetcher = useFetcher();
@@ -80,6 +109,36 @@ export default function TruckCheck() {
       }
     }
   };
+
+  const truckCheckFetcher = useFetcher<typeof action>();
+  const [allChecks, setAllChecks] = useState(truckChecks);
+  const [currentLastKey, setCurrentLastKey] = useState<
+    Record<string, unknown> | undefined
+  >(lastEvaluatedKey);
+
+  useEffect(() => {
+    setAllChecks(truckChecks);
+    setCurrentLastKey(lastEvaluatedKey);
+  }, [truckChecks, lastEvaluatedKey]);
+
+  useEffect(() => {
+    const data = truckCheckFetcher.data as
+      | {
+          truckChecks: typeof truckChecks;
+          lastEvaluatedKey?: Record<string, unknown>;
+        }
+      | undefined;
+    if (!data) return;
+    setAllChecks((prev) => {
+      const existingIds = new Set(prev.map((c) => c.id));
+      const newChecks = data.truckChecks.filter((c) => !existingIds.has(c.id));
+      return [...prev, ...newChecks].sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+    });
+    setCurrentLastKey(data.lastEvaluatedKey);
+  }, [truckCheckFetcher.data]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -144,7 +203,7 @@ export default function TruckCheck() {
         </div>
       </dialog>
       <div className="space-y-4">
-        {previousChecks.length === 0 ? (
+        {allChecks.length === 0 ? (
           <div className="card bg-base-200">
             <div className="card-body text-center">
               <p className="opacity-60">
@@ -153,7 +212,7 @@ export default function TruckCheck() {
             </div>
           </div>
         ) : (
-          previousChecks.map((check) => {
+          allChecks.map((check) => {
             const truck = trucks.find((t) => t.truckId === check.truck);
             const checkDate = new Date(check.created_at);
             const isRecent =
@@ -199,6 +258,31 @@ export default function TruckCheck() {
               </div>
             );
           })
+        )}
+
+        {currentLastKey && (
+          <div className="flex justify-center">
+            <button
+              className={`btn ${truckCheckFetcher.state !== "idle" ? "btn-disabled" : "btn-outline"}`}
+              disabled={truckCheckFetcher.state !== "idle"}
+              onClick={() => {
+                if (!currentLastKey || truckCheckFetcher.state !== "idle") {
+                  return;
+                }
+
+                truckCheckFetcher.submit(
+                  {
+                    intent: "scroll",
+                    lastEvaluatedKey: JSON.stringify(currentLastKey),
+                  },
+                  { method: "post" },
+                );
+              }}
+              type="button"
+            >
+              {truckCheckFetcher.state !== "idle" ? "Loading..." : "Load More"}
+            </button>
+          </div>
         )}
       </div>
     </div>

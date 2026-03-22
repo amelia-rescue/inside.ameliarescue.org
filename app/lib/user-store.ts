@@ -88,19 +88,12 @@ export class UserStore {
     return new UserStore();
   }
 
-  public async getUser(user_id: string): Promise<DocumentUser> {
-    const command = new GetCommand({
-      TableName: this.tableName,
-      Key: {
-        user_id,
-      },
-    });
-    const response = await UserStore.client.send(command);
-    if (!response.Item) {
-      throw new UserNotFound();
-    }
-    const user = response.Item as unknown as DocumentUser;
-    if (user.deleted_at) {
+  public async getUser(
+    user_id: string,
+    options?: { includeDeleted?: boolean },
+  ): Promise<DocumentUser> {
+    const user = await this.getUserIncludingDeleted(user_id);
+    if (!options?.includeDeleted && user.deleted_at) {
       throw new UserNotFound();
     }
     return user;
@@ -212,7 +205,9 @@ export class UserStore {
   }
 
   public async softDelete(user_id: string): Promise<void> {
-    const existingUser = await this.getUserIncludingDeleted(user_id);
+    const existingUser = await this.getUser(user_id, {
+      includeDeleted: true,
+    });
 
     // If already deleted, return early
     if (existingUser.deleted_at) {

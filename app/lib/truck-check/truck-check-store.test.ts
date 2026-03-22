@@ -196,8 +196,8 @@ describe("truck check store test", () => {
       checksToCreate.map((check) => store.createTruckCheck(check)),
     );
 
-    const checks = await store.listTruckChecks();
-    expect(checks.length).toBe(3);
+    const { truckChecks } = await store.listTruckChecks();
+    expect(truckChecks.length).toBe(3);
   });
 
   it("should return an empty array when listing with no truck checks", async () => {
