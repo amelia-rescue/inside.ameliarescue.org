@@ -1,13 +1,7 @@
 import { appContext } from "~/context";
 import type { Route } from "./+types/truck-check";
 import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
-import {
-  redirect,
-  useActionData,
-  useFetcher,
-  useLoaderData,
-  Link,
-} from "react-router";
+import { redirect, useFetcher, useLoaderData, Link } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { IoWarning } from "react-icons/io5";
 import {
@@ -92,12 +86,10 @@ export async function loader({ context }: Route.LoaderArgs) {
 }
 
 export default function TruckCheck() {
-  const { user, truckChecks, trucks, lastEvaluatedKey } =
+  const { truckChecks, trucks, lastEvaluatedKey } =
     useLoaderData<typeof loader>();
-  const stuff = useActionData<typeof action>();
 
   const fetcher = useFetcher();
-  const formRef = useRef<HTMLFormElement>(null);
   const modalRef = useRef<HTMLDialogElement>(null);
 
   const toggleModal = () => {
@@ -174,7 +166,7 @@ export default function TruckCheck() {
               ✕
             </button>
           </form>
-          <fetcher.Form method="post" ref={formRef}>
+          <fetcher.Form method="post">
             <h3 className="text-lg font-bold">New Truck Check!</h3>
             <p className="py-4">
               Once you create a new check other members will be able to edit it
@@ -184,6 +176,7 @@ export default function TruckCheck() {
               <IoWarning />
               Truck checks are automatically locked after 24 hours.
             </div>
+            <input type="hidden" name="intent" value="create" />
             <select className="select mt-4" required name="truck">
               {trucks.map((truck) => (
                 <option key={truck.truckId} value={truck.truckId}>
@@ -192,10 +185,7 @@ export default function TruckCheck() {
               ))}
             </select>
             <div className="modal-action">
-              <button
-                onClick={() => fetcher.submit(formRef.current)}
-                className="btn btn-primary"
-              >
+              <button type="submit" className="btn btn-primary">
                 Start New Check
               </button>
             </div>
