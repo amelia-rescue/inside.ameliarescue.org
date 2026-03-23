@@ -461,6 +461,124 @@ export default function TrainingStatus() {
 
           <div className="divider my-0" />
 
+          <div className="flex flex-col gap-3 pt-2 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Member-level Detail</h2>
+              <p className="text-sm opacity-70">
+                Search and review member training status before diving into the
+                dashboard summary.
+              </p>
+            </div>
+            <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:items-center">
+              <div className="form-control w-full lg:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search members..."
+                  className="input input-bordered w-full lg:w-80"
+                  value={globalFilter ?? ""}
+                  onChange={(e) => setGlobalFilter(e.target.value)}
+                />
+              </div>
+              <a
+                href="/api/training-status/export"
+                className="btn btn-secondary w-full sm:w-auto"
+              >
+                Export to CSV
+              </a>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="badge badge-success badge-sm">
+                <FaCheckCircle />
+              </span>
+              <span>Active</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="badge badge-warning badge-sm">
+                <FaExclamationTriangle />
+              </span>
+              <span>Expiring Soon</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="badge badge-error badge-sm">
+                <FaTimesCircle />
+              </span>
+              <span>Expired</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="badge badge-error badge-sm">
+                <FaMinusCircle />
+              </span>
+              <span>Missing</span>
+            </div>
+          </div>
+
+          <div className="rounded-box border-base-300/60 w-full overflow-x-auto border">
+            <table className="table-sm table w-full min-w-max">
+              <thead>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className="text-center whitespace-nowrap"
+                      >
+                        {header.isPlaceholder ? null : (
+                          <div
+                            className={
+                              header.column.getCanSort()
+                                ? "flex cursor-pointer items-center justify-center gap-1 select-none"
+                                : "flex items-center justify-center"
+                            }
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                            {header.column.getCanSort() && (
+                              <span className="text-xs opacity-50">
+                                {{
+                                  asc: "↑",
+                                  desc: "↓",
+                                }[header.column.getIsSorted() as string] ?? "↕"}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody>
+                {table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="hover">
+                    {row.getVisibleCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className="text-center whitespace-nowrap"
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {table.getRowModel().rows.length === 0 && (
+            <div className="text-base-content/50 py-8 text-center">
+              No members found matching your search.
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="stats bg-base-200 shadow-sm md:col-span-2 xl:col-span-1">
               <div className="stat">
@@ -662,124 +780,6 @@ export default function TrainingStatus() {
               </div>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="badge badge-success badge-sm">
-                <FaCheckCircle />
-              </span>
-              <span>Active</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-warning badge-sm">
-                <FaExclamationTriangle />
-              </span>
-              <span>Expiring Soon</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-error badge-sm">
-                <FaTimesCircle />
-              </span>
-              <span>Expired</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-error badge-sm">
-                <FaMinusCircle />
-              </span>
-              <span>Missing</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 pt-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Member-level Detail</h2>
-              <p className="text-sm opacity-70">
-                Use the table below for drill-down after reviewing the dashboard
-                summary.
-              </p>
-            </div>
-            <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:items-center">
-              <div className="form-control w-full lg:w-auto">
-                <input
-                  type="text"
-                  placeholder="Search members..."
-                  className="input input-bordered w-full lg:w-80"
-                  value={globalFilter ?? ""}
-                  onChange={(e) => setGlobalFilter(e.target.value)}
-                />
-              </div>
-              <a
-                href="/api/training-status/export"
-                className="btn btn-secondary w-full sm:w-auto"
-              >
-                Export to CSV
-              </a>
-            </div>
-          </div>
-
-          <div className="rounded-box border-base-300/60 w-full overflow-x-auto border">
-            <table className="table-sm table w-full min-w-max">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        className="text-center whitespace-nowrap"
-                      >
-                        {header.isPlaceholder ? null : (
-                          <div
-                            className={
-                              header.column.getCanSort()
-                                ? "flex cursor-pointer items-center justify-center gap-1 select-none"
-                                : "flex items-center justify-center"
-                            }
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                            {header.column.getCanSort() && (
-                              <span className="text-xs opacity-50">
-                                {{
-                                  asc: "↑",
-                                  desc: "↓",
-                                }[header.column.getIsSorted() as string] ?? "↕"}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="hover">
-                    {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className="text-center whitespace-nowrap"
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {table.getRowModel().rows.length === 0 && (
-            <div className="text-base-content/50 py-8 text-center">
-              No members found matching your search.
-            </div>
-          )}
         </div>
       </div>
     </div>
