@@ -9,6 +9,99 @@ import {
   type TruckCheckSchema,
 } from "~/lib/truck-check/truck-check-schema-store";
 
+type TruckCheckListItem = Awaited<
+  ReturnType<TruckCheckStore["listTruckChecks"]>
+>["truckChecks"][number];
+type Truck = Awaited<ReturnType<TruckCheckSchemaStore["listTrucks"]>>[number];
+
+type TruckCheckWithCompletion = TruckCheckListItem & {
+  requiredCompleted: number;
+  requiredTotal: number;
+};
+
+function getFieldId(sectionId: string, fieldLabel: string): string {
+  return `${sectionId}-${fieldLabel.replace(/\s+/g, "-").toLowerCase()}`;
+}
+
+function isFieldFilled(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return value.trim().length > 0;
+  return true;
+}
+
+async function addCompletionProgress({
+  truckChecks,
+  trucks,
+  truckCheckSchemaStore,
+}: {
+  truckChecks: TruckCheckListItem[];
+  trucks: Truck[];
+  truckCheckSchemaStore: TruckCheckSchemaStore;
+}): Promise<TruckCheckWithCompletion[]> {
+  const schemaCache = new Map<string, TruckCheckSchema>();
+
+  return Promise.all(
+    truckChecks.map(async (check) => {
+      const truck = trucks.find((t) => t.truckId === check.truck);
+
+      let schemaCacheKey: string | null = null;
+      let schemaLookup: (() => Promise<TruckCheckSchema>) | null = null;
+
+      if (check.schema_id && check.schema_created_at) {
+        schemaCacheKey = `${check.schema_id}:${check.schema_created_at}`;
+        schemaLookup = () =>
+          truckCheckSchemaStore.getSchemaVersion(
+            check.schema_id as string,
+            check.schema_created_at as string,
+          );
+      } else if (truck) {
+        schemaCacheKey = `${truck.schemaId}:latest`;
+        schemaLookup = () => truckCheckSchemaStore.getSchema(truck.schemaId);
+      }
+
+      if (!schemaCacheKey || !schemaLookup) {
+        return {
+          ...check,
+          requiredCompleted: 0,
+          requiredTotal: 0,
+        };
+      }
+
+      let schema = schemaCache.get(schemaCacheKey);
+
+      if (!schema) {
+        try {
+          schema = await schemaLookup();
+          schemaCache.set(schemaCacheKey, schema);
+        } catch {
+          return {
+            ...check,
+            requiredCompleted: 0,
+            requiredTotal: 0,
+          };
+        }
+      }
+
+      const requiredFieldIds = schema.sections.flatMap((section) =>
+        section.fields
+          .filter((field) => field.required)
+          .map((field) => getFieldId(section.id, field.label)),
+      );
+
+      const requiredCompleted = requiredFieldIds.filter((fieldId) =>
+        isFieldFilled(check.data[fieldId]),
+      ).length;
+
+      return {
+        ...check,
+        requiredCompleted,
+        requiredTotal: requiredFieldIds.length,
+      };
+    }),
+  );
+}
+
 export async function action({ context, request }: Route.ActionArgs) {
   const ctx = context.get(appContext);
   if (!ctx) {
@@ -50,9 +143,17 @@ export async function action({ context, request }: Route.ActionArgs) {
       ? (JSON.parse(lastEvaluatedKeyJson as string) as Record<string, unknown>)
       : undefined;
     const truckCheckStore = TruckCheckStore.make();
+    const truckCheckSchemaStore = TruckCheckSchemaStore.make();
     const result = await truckCheckStore.listTruckChecks(lastEvaluatedKey);
-    return {
+    const trucks = await truckCheckSchemaStore.listTrucks();
+    const truckChecksWithCompletion = await addCompletionProgress({
       truckChecks: result.truckChecks,
+      trucks,
+      truckCheckSchemaStore,
+    });
+
+    return {
+      truckChecks: truckChecksWithCompletion,
       lastEvaluatedKey: result.lastEvaluatedKey,
     };
   }
@@ -77,9 +178,15 @@ export async function loader({ context }: Route.LoaderArgs) {
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 
+  const truckChecksWithCompletion = await addCompletionProgress({
+    truckChecks: sortedChecks,
+    trucks,
+    truckCheckSchemaStore,
+  });
+
   return {
     user: ctx.user,
-    truckChecks: sortedChecks,
+    truckChecks: truckChecksWithCompletion,
     trucks,
     lastEvaluatedKey,
   };
@@ -224,6 +331,16 @@ export default function TruckCheck() {
                         {check.locked && (
                           <span className="badge badge-error">Locked</span>
                         )}
+                        <span
+                          className={`badge badge-sm ${
+                            check.requiredTotal > 0 &&
+                            check.requiredCompleted === check.requiredTotal
+                              ? "badge-success"
+                              : "badge-outline"
+                          }`}
+                        >
+                          {check.requiredCompleted}/{check.requiredTotal}
+                        </span>
                         <span className="text-sm opacity-60">
                           {check.contributors.length} contributor
                           {check.contributors.length !== 1 ? "s" : ""}
