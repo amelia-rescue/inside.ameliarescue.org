@@ -1,7 +1,3 @@
-import type {
-  APIGatewayProxyWebsocketEventV2,
-  APIGatewayProxyWebsocketHandlerV2,
-} from "aws-lambda";
 import {
   ApiGatewayManagementApiClient,
   PostToConnectionCommand,
@@ -16,17 +12,76 @@ import {
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { log } from "~/lib/logger";
+import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
 import type { ApiGatewayWebSocketEvent } from "types/apigateway";
 import { getUserInfo } from "~/lib/auth.server";
+import { UserStore } from "~/lib/user-store";
 
 const dynamoClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
+type HandlerResponse = { statusCode: number; body: string };
+type ConnectedUser = { userId: string; userName: string };
+
+type HandleConnectParams = {
+  event: ApiGatewayWebSocketEvent;
+  connectionId: string;
+  tableName: string;
+};
+
+type HandleDisconnectParams = {
+  connectionId: string;
+  tableName: string;
+  domainName: string;
+  stage: string;
+};
+
+type GetConnectedUsersForTruckCheckParams = {
+  connectionsTableName: string;
+  truckCheckId: string;
+};
+
+type BroadcastToTruckCheckParams = {
+  apiGatewayClient: ApiGatewayManagementApiClient;
+  connectionsTableName: string;
+  truckCheckId: string;
+  message: Record<string, unknown>;
+  excludeConnectionId?: string;
+};
+
+type SendToConnectionParams = {
+  apiGatewayClient: ApiGatewayManagementApiClient;
+  connectionId: string;
+  message: Record<string, unknown>;
+};
+
+type HandleMessageParams = {
+  event: ApiGatewayWebSocketEvent & { body?: string };
+  connectionId: string;
+  domainName: string;
+  stage: string;
+  connectionsTableName: string;
+};
+
+type HandleJoinTruckCheckParams = {
+  apiGatewayClient: ApiGatewayManagementApiClient;
+  connectionId: string;
+  connectionsTableName: string;
+  truckCheckId: string;
+};
+
+type HandleUpdateFieldParams = {
+  apiGatewayClient: ApiGatewayManagementApiClient;
+  connectionId: string;
+  connectionsTableName: string;
+  truckCheckId: string;
+  fieldId: string;
+  value: unknown;
+};
+
 export const handler = async (event: ApiGatewayWebSocketEvent) => {
   const { connectionId, eventType, domainName, stage } = event.requestContext;
   const connectionsTableName = process.env.WEBSOCKET_CONNECTIONS_TABLE_NAME;
-  const truckChecksTableName = process.env.TRUCK_CHECKS_TABLE_NAME;
-  const usersTableName = process.env.USERS_TABLE_NAME;
 
   log.info("event data", { event });
 
@@ -38,27 +93,28 @@ export const handler = async (event: ApiGatewayWebSocketEvent) => {
   try {
     switch (eventType) {
       case "CONNECT":
-        return await handleConnect(event, connectionId, connectionsTableName);
+        return await handleConnect({
+          event,
+          connectionId,
+          tableName: connectionsTableName,
+        });
 
       case "DISCONNECT":
-        return await handleDisconnect(
+        return await handleDisconnect({
           connectionId,
-          connectionsTableName,
-          truckChecksTableName,
+          tableName: connectionsTableName,
           domainName,
           stage,
-        );
+        });
 
       case "MESSAGE":
-        return await handleMessage(
+        return await handleMessage({
           event,
           connectionId,
           domainName,
           stage,
           connectionsTableName,
-          truckChecksTableName,
-          usersTableName,
-        );
+        });
 
       default:
         console.warn(`Unknown event type: ${eventType}`);
@@ -70,11 +126,11 @@ export const handler = async (event: ApiGatewayWebSocketEvent) => {
   }
 };
 
-async function handleConnect(
-  event: ApiGatewayWebSocketEvent,
-  connectionId: string,
-  tableName: string,
-): Promise<{ statusCode: number; body: string }> {
+async function handleConnect({
+  event,
+  connectionId,
+  tableName,
+}: HandleConnectParams): Promise<HandlerResponse> {
   try {
     const ttl = Math.floor(Date.now() / 1000) + 7200;
 
@@ -115,13 +171,12 @@ async function handleConnect(
   }
 }
 
-async function handleDisconnect(
-  connectionId: string,
-  tableName: string,
-  truckChecksTableName: string | undefined,
-  domainName: string,
-  stage: string,
-): Promise<{ statusCode: number; body: string }> {
+async function handleDisconnect({
+  connectionId,
+  tableName,
+  domainName,
+  stage,
+}: HandleDisconnectParams): Promise<HandlerResponse> {
   try {
     const connectionResult = await docClient.send(
       new GetCommand({
@@ -147,23 +202,22 @@ async function handleDisconnect(
         endpoint: `https://${domainName}/${stage}`,
       });
 
-      const connectedUsers = await getConnectedUsersForTruckCheck(
-        tableName,
+      const connectedUsers = await getConnectedUsersForTruckCheck({
+        connectionsTableName: tableName,
         truckCheckId,
-      );
+      });
 
-      await broadcastToTruckCheck(
+      await broadcastToTruckCheck({
         apiGatewayClient,
-        tableName,
+        connectionsTableName: tableName,
         truckCheckId,
-        {
+        message: {
           type: "user-left",
           userId,
           userName: userName || "Unknown",
           connectedUsers,
         },
-        undefined,
-      );
+      });
     }
 
     console.log(`Connection closed: ${connectionId}`);
@@ -174,10 +228,10 @@ async function handleDisconnect(
   }
 }
 
-async function getConnectedUsersForTruckCheck(
-  connectionsTableName: string,
-  truckCheckId: string,
-): Promise<{ userId: string; userName: string }[]> {
+async function getConnectedUsersForTruckCheck({
+  connectionsTableName,
+  truckCheckId,
+}: GetConnectedUsersForTruckCheckParams): Promise<ConnectedUser[]> {
   const result = await docClient.send(
     new ScanCommand({
       TableName: connectionsTableName,
@@ -202,13 +256,13 @@ async function getConnectedUsersForTruckCheck(
   }));
 }
 
-async function broadcastToTruckCheck(
-  apiGatewayClient: ApiGatewayManagementApiClient,
-  connectionsTableName: string,
-  truckCheckId: string,
-  message: Record<string, any>,
-  excludeConnectionId?: string,
-): Promise<void> {
+async function broadcastToTruckCheck({
+  apiGatewayClient,
+  connectionsTableName,
+  truckCheckId,
+  message,
+  excludeConnectionId,
+}: BroadcastToTruckCheckParams): Promise<void> {
   const result = await docClient.send(
     new ScanCommand({
       TableName: connectionsTableName,
@@ -249,11 +303,11 @@ async function broadcastToTruckCheck(
   await Promise.all(broadcastPromises);
 }
 
-async function sendToConnection(
-  apiGatewayClient: ApiGatewayManagementApiClient,
-  connectionId: string,
-  message: Record<string, any>,
-): Promise<void> {
+async function sendToConnection({
+  apiGatewayClient,
+  connectionId,
+  message,
+}: SendToConnectionParams): Promise<void> {
   await apiGatewayClient.send(
     new PostToConnectionCommand({
       ConnectionId: connectionId,
@@ -262,15 +316,13 @@ async function sendToConnection(
   );
 }
 
-async function handleMessage(
-  event: any,
-  connectionId: string,
-  domainName: string,
-  stage: string,
-  connectionsTableName: string,
-  truckChecksTableName: string | undefined,
-  usersTableName: string | undefined,
-): Promise<{ statusCode: number; body: string }> {
+async function handleMessage({
+  event,
+  connectionId,
+  domainName,
+  stage,
+  connectionsTableName,
+}: HandleMessageParams): Promise<HandlerResponse> {
   const apiGatewayClient = new ApiGatewayManagementApiClient({
     endpoint: `https://${domainName}/${stage}`,
   });
@@ -280,24 +332,21 @@ async function handleMessage(
     const action = body.action;
 
     if (action === "join-truck-check") {
-      return await handleJoinTruckCheck(
+      return await handleJoinTruckCheck({
         apiGatewayClient,
         connectionId,
         connectionsTableName,
-        truckChecksTableName,
-        usersTableName,
-        body.truckCheckId,
-      );
+        truckCheckId: body.truckCheckId,
+      });
     } else if (action === "update-field") {
-      return await handleUpdateField(
+      return await handleUpdateField({
         apiGatewayClient,
         connectionId,
         connectionsTableName,
-        truckChecksTableName,
-        body.truckCheckId,
-        body.fieldId,
-        body.value,
-      );
+        truckCheckId: body.truckCheckId,
+        fieldId: body.fieldId,
+        value: body.value,
+      });
     }
 
     return { statusCode: 400, body: "Unknown action" };
@@ -307,15 +356,13 @@ async function handleMessage(
   }
 }
 
-async function handleJoinTruckCheck(
-  apiGatewayClient: ApiGatewayManagementApiClient,
-  connectionId: string,
-  connectionsTableName: string,
-  truckChecksTableName: string | undefined,
-  usersTableName: string | undefined,
-  truckCheckId: string,
-): Promise<{ statusCode: number; body: string }> {
-  if (!truckChecksTableName || !truckCheckId) {
+async function handleJoinTruckCheck({
+  apiGatewayClient,
+  connectionId,
+  connectionsTableName,
+  truckCheckId,
+}: HandleJoinTruckCheckParams): Promise<HandlerResponse> {
+  if (!truckCheckId) {
     return { statusCode: 400, body: "Missing truckCheckId or table config" };
   }
 
@@ -332,18 +379,14 @@ async function handleJoinTruckCheck(
   }
 
   const userId = connection.user_id;
+  const userStore = UserStore.make();
 
   let userName = "Unknown";
-  if (usersTableName && userId) {
+  if (userId) {
     try {
-      const userResult = await docClient.send(
-        new GetCommand({
-          TableName: usersTableName,
-          Key: { user_id: userId },
-        }),
-      );
-      if (userResult.Item) {
-        userName = `${userResult.Item.first_name} ${userResult.Item.last_name}`;
+      const user = await userStore.getUser(userId);
+      if (user) {
+        userName = `${user.first_name} ${user.last_name}`;
       }
     } catch (error) {
       console.error("Error fetching user info:", error);
@@ -362,96 +405,77 @@ async function handleJoinTruckCheck(
     }),
   );
 
-  const truckCheckResult = await docClient.send(
-    new GetCommand({
-      TableName: truckChecksTableName,
-      Key: { id: truckCheckId },
-    }),
-  );
+  const truckCheckStore = TruckCheckStore.make();
 
-  const truckCheck = truckCheckResult.Item;
-  if (!truckCheck) {
-    return { statusCode: 404, body: "Truck check not found" };
-  }
-
-  const contributors: string[] = truckCheck.contributors || [];
+  const contributors: string[] = [];
   if (userId && !contributors.includes(userId)) {
     contributors.push(userId);
-    await docClient.send(
-      new UpdateCommand({
-        TableName: truckChecksTableName,
-        Key: { id: truckCheckId },
-        UpdateExpression: "SET contributors = :contributors",
-        ExpressionAttributeValues: {
-          ":contributors": contributors,
-        },
-      }),
-    );
-    truckCheck.contributors = contributors;
+    await truckCheckStore.updateTruckCheck({
+      id: truckCheckId,
+      contributors,
+    });
   }
 
   let contributorNames: { userId: string; userName: string }[] = [];
-  if (usersTableName) {
-    const namePromises = contributors.map(async (cId: string) => {
-      try {
-        const userResult = await docClient.send(
-          new GetCommand({
-            TableName: usersTableName,
-            Key: { user_id: cId },
-          }),
-        );
-        return {
-          userId: cId,
-          userName: userResult.Item
-            ? `${userResult.Item.first_name} ${userResult.Item.last_name}`
-            : "Unknown",
-        };
-      } catch {
-        return { userId: cId, userName: "Unknown" };
-      }
-    });
-    contributorNames = await Promise.all(namePromises);
-  }
+  const namePromises = contributors.map(async (cId: string) => {
+    try {
+      const userResult = await userStore.getUser(userId, {
+        includeDeleted: true,
+      });
+      return {
+        userId: cId,
+        userName: `${userResult.first_name} ${userResult.last_name}`,
+      };
+    } catch {
+      return { userId: cId, userName: "Unknown" };
+    }
+  });
+  contributorNames = await Promise.all(namePromises);
 
-  const connectedUsers = await getConnectedUsersForTruckCheck(
+  const connectedUsers = await getConnectedUsersForTruckCheck({
     connectionsTableName,
     truckCheckId,
-  );
-
-  await sendToConnection(apiGatewayClient, connectionId, {
-    type: "truck-check-joined",
-    truckCheckData: truckCheck.data || {},
-    connectedUsers,
-    contributors: contributorNames,
   });
 
-  await broadcastToTruckCheck(
+  const truckCheck = await truckCheckStore.getTruckCheck(truckCheckId);
+
+  await sendToConnection({
+    apiGatewayClient,
+    connectionId,
+    message: {
+      type: "truck-check-joined",
+      truckCheckData: truckCheck.data || {},
+      connectedUsers,
+      contributors: contributorNames,
+    },
+  });
+
+  await broadcastToTruckCheck({
     apiGatewayClient,
     connectionsTableName,
     truckCheckId,
-    {
+    message: {
       type: "user-joined",
       userId,
       userName,
       connectedUsers,
       contributors: contributorNames,
     },
-    connectionId,
-  );
+    excludeConnectionId: connectionId,
+  });
 
   return { statusCode: 200, body: "Joined truck check" };
 }
 
-async function handleUpdateField(
-  apiGatewayClient: ApiGatewayManagementApiClient,
-  connectionId: string,
-  connectionsTableName: string,
-  truckChecksTableName: string | undefined,
-  truckCheckId: string,
-  fieldId: string,
-  value: any,
-): Promise<{ statusCode: number; body: string }> {
-  if (!truckChecksTableName || !truckCheckId || !fieldId) {
+async function handleUpdateField({
+  apiGatewayClient,
+  connectionId,
+  connectionsTableName,
+  truckCheckId,
+  fieldId,
+  value,
+}: HandleUpdateFieldParams): Promise<HandlerResponse> {
+  if (!truckCheckId || !fieldId) {
     return { statusCode: 400, body: "Missing required fields" };
   }
 
@@ -467,34 +491,27 @@ async function handleUpdateField(
     return { statusCode: 400, body: "Connection not found" };
   }
 
-  await docClient.send(
-    new UpdateCommand({
-      TableName: truckChecksTableName,
-      Key: { id: truckCheckId },
-      UpdateExpression: "SET #data.#fieldId = :value, updated_at = :now",
-      ExpressionAttributeNames: {
-        "#data": "data",
-        "#fieldId": fieldId,
-      },
-      ExpressionAttributeValues: {
-        ":value": value,
-        ":now": new Date().toISOString(),
-      },
-    }),
-  );
+  const truckCheckStore = TruckCheckStore.make();
+  const truckCheck = await truckCheckStore.getTruckCheck(truckCheckId);
+  const updatedTruckCheck = await truckCheckStore.updateTruckCheck({
+    ...truckCheck,
+    data: { ...truckCheck.data, [fieldId]: value },
+  });
 
-  await broadcastToTruckCheck(
+  await broadcastToTruckCheck({
     apiGatewayClient,
     connectionsTableName,
     truckCheckId,
-    {
+    message: {
       type: "field-update",
+      truckCheckData: updatedTruckCheck.data,
       fieldId,
       value,
       updatedBy: connection.user_id,
       updatedByName: connection.userName || "Unknown",
     },
-  );
+    excludeConnectionId: connectionId,
+  });
 
   return { statusCode: 200, body: "Field updated" };
 }

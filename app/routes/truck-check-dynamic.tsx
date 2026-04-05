@@ -232,10 +232,21 @@ export default function TruckCheckDynamic() {
               break;
 
             case "field-update":
-              setFieldValues((prev) => ({
-                ...prev,
-                [data.fieldId]: data.value,
-              }));
+              setFieldValues((prev) => {
+                const mergedValues = {
+                  ...prev,
+                  ...(typeof data.truckCheckData === "object" &&
+                  data.truckCheckData !== null
+                    ? data.truckCheckData
+                    : {}),
+                };
+
+                if (data.fieldId) {
+                  mergedValues[data.fieldId] = data.value;
+                }
+
+                return mergedValues;
+              });
               setLastUpdate({
                 fieldId: data.fieldId,
                 userName: data.updatedByName,

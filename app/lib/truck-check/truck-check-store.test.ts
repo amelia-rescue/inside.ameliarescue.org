@@ -203,8 +203,8 @@ describe("truck check store test", () => {
   it("should return an empty array when listing with no truck checks", async () => {
     const store = TruckCheckStore.make();
 
-    const checks = await store.listTruckChecks();
-    expect(checks).toEqual([]);
+    const { truckChecks } = await store.listTruckChecks();
+    expect(truckChecks).toEqual([]);
   });
 
   it("should preserve created_at when updating a truck check", async () => {
@@ -342,5 +342,30 @@ describe("truck check store test", () => {
 
     expect(truckCheck.data).toEqual({});
     expect(truckCheck.contributors).toEqual([]);
+  });
+
+  it("should merge contributors on update", async () => {
+    const store = TruckCheckStore.make();
+
+    const truckCheck = await store.createTruckCheck({
+      created_by: "user-123",
+      truck: "Ambulance 1",
+      data: { initial_check: "complete" },
+      contributors: ["user-123"],
+      locked: false,
+    });
+
+    expect(truckCheck.contributors).toEqual(["user-123"]);
+
+    const updated = await store.updateTruckCheck({
+      id: truckCheck.id,
+      created_by: "user-123",
+      truck: "Ambulance 1",
+      data: { initial_check: "complete", secondary_check: "complete" },
+      contributors: ["user-456"],
+      locked: false,
+    });
+
+    expect(updated.contributors).toEqual(["user-123", "user-456"]);
   });
 });

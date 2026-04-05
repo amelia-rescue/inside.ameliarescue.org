@@ -99,12 +99,20 @@ export class TruckCheckStore {
   }
 
   public async updateTruckCheck(
-    truckCheck: TruckCheck,
+    truckCheck: Partial<TruckCheck> & { id: string },
   ): Promise<DocumentTruckCheck> {
     const existing = await this.getTruckCheck(truckCheck.id);
 
     const documentTruckCheck: DocumentTruckCheck = {
+      ...existing,
       ...truckCheck,
+      // merge the contributors on updates
+      contributors: [
+        ...new Set([
+          ...existing.contributors,
+          ...(truckCheck.contributors ?? []),
+        ]),
+      ],
       created_at: existing.created_at,
       updated_at: new Date().toISOString(),
     };
