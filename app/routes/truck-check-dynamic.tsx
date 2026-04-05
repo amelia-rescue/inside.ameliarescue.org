@@ -100,6 +100,14 @@ interface ConnectedUser {
 
 type TriStateCheckboxValue = true | "not-present" | null;
 
+function getPhotoUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (photoUrl): photoUrl is string =>
+      typeof photoUrl === "string" && photoUrl.trim().length > 0,
+  );
+}
+
 function getFieldId(sectionId: string, fieldLabel: string): string {
   return `${sectionId}-${fieldLabel.replace(/\s+/g, "-").toLowerCase()}`;
 }
@@ -160,6 +168,9 @@ export default function TruckCheckDynamic() {
     fieldId: string;
     userName: string;
   } | null>(null);
+  const [photoUploadStatus, setPhotoUploadStatus] = useState<
+    Record<string, { isUploading: boolean; error?: string }>
+  >({});
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -190,6 +201,118 @@ export default function TruckCheckDynamic() {
       });
     },
     [sendMessage, truckCheck.id],
+  );
+
+  const handlePhotoUpload = useCallback(
+    async (fieldId: string, files: FileList | null, maxPhotos?: number) => {
+      if (!files || files.length === 0 || isLocked) {
+        return;
+      }
+
+      const currentUrls = getPhotoUrls(fieldValues[fieldId]);
+      const selectedFiles = Array.from(files);
+      const maxAllowed = typeof maxPhotos === "number" ? maxPhotos : Infinity;
+
+      if (currentUrls.length >= maxAllowed) {
+        setPhotoUploadStatus((prev) => ({
+          ...prev,
+          [fieldId]: {
+            isUploading: false,
+            error: `Maximum of ${maxAllowed} photos reached`,
+          },
+        }));
+        return;
+      }
+
+      const availableSlots = Math.max(maxAllowed - currentUrls.length, 0);
+      const filesToUpload = selectedFiles.slice(0, availableSlots);
+
+      if (filesToUpload.length === 0) {
+        setPhotoUploadStatus((prev) => ({
+          ...prev,
+          [fieldId]: {
+            isUploading: false,
+            error: "No additional photos can be uploaded",
+          },
+        }));
+        return;
+      }
+
+      setPhotoUploadStatus((prev) => ({
+        ...prev,
+        [fieldId]: { isUploading: true },
+      }));
+
+      try {
+        const uploadedUrls: string[] = [];
+
+        for (const file of filesToUpload) {
+          const uploadUrlFormData = new FormData();
+          uploadUrlFormData.append("truck_check_id", truckCheck.id);
+          uploadUrlFormData.append("field_id", fieldId);
+          uploadUrlFormData.append("file_name", file.name);
+          uploadUrlFormData.append("content_type", file.type);
+
+          const uploadUrlResponse = await fetch(
+            "/api/truck-check-images/get-upload-url",
+            {
+              method: "POST",
+              body: uploadUrlFormData,
+            },
+          );
+
+          if (!uploadUrlResponse.ok) {
+            const payload = (await uploadUrlResponse
+              .json()
+              .catch(() => null)) as { error?: string } | null;
+            throw new Error(payload?.error || "Failed to get upload URL");
+          }
+
+          const { uploadUrl, fileUrl } = (await uploadUrlResponse.json()) as {
+            uploadUrl: string;
+            fileUrl: string;
+          };
+
+          const uploadResponse = await fetch(uploadUrl, {
+            method: "PUT",
+            body: file,
+            headers: {
+              "Content-Type": file.type,
+            },
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Failed to upload ${file.name}`);
+          }
+
+          uploadedUrls.push(fileUrl);
+        }
+
+        const updatedUrls = [...currentUrls, ...uploadedUrls];
+        handleFieldChange(fieldId, updatedUrls);
+
+        setPhotoUploadStatus((prev) => ({
+          ...prev,
+          [fieldId]: {
+            isUploading: false,
+            error:
+              filesToUpload.length !== selectedFiles.length
+                ? `Uploaded ${filesToUpload.length} of ${selectedFiles.length} selected photos due to max limit`
+                : undefined,
+          },
+        }));
+      } catch (error) {
+        setPhotoUploadStatus((prev) => ({
+          ...prev,
+          [fieldId]: {
+            isUploading: false,
+            error:
+              error instanceof Error ? error.message : "Failed to upload photo",
+          },
+        }));
+      }
+    },
+    [fieldValues, handleFieldChange, isLocked, truckCheck.id],
   );
 
   const connectWebSocket = useCallback(() => {
@@ -353,6 +476,7 @@ export default function TruckCheckDynamic() {
 
   const isFieldFilled = (value: any): boolean => {
     if (value === null || value === undefined) return false;
+    if (Array.isArray(value)) return value.length > 0;
     if (typeof value === "boolean") return value;
     if (typeof value === "string") return value.trim().length > 0;
     return true;
@@ -639,6 +763,13 @@ export default function TruckCheckDynamic() {
         );
 
       case "photo":
+        const photoUrls = getPhotoUrls(value);
+        const photoMax =
+          typeof field.maxPhotos === "number" ? field.maxPhotos : null;
+        const photoFieldStatus = photoUploadStatus[fieldId];
+        const isUploadingPhotos = photoFieldStatus?.isUploading === true;
+        const canUploadMorePhotos = !photoMax || photoUrls.length < photoMax;
+
         return (
           <div key={fieldId} className={fieldContainerClass}>
             <label className="label">
@@ -646,19 +777,77 @@ export default function TruckCheckDynamic() {
                 {field.label}
                 {field.required && <span className="text-error ml-1">*</span>}
               </span>
+              {isRemoteUpdate && (
+                <span className="label-text-alt text-info text-xs italic">
+                  Updated by {lastUpdate.userName}
+                </span>
+              )}
             </label>
+            {photoUrls.length > 0 && (
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {photoUrls.map((photoUrl, index) => (
+                  <div key={`${photoUrl}-${index}`} className="relative">
+                    <img
+                      src={photoUrl}
+                      alt={`${field.label} ${index + 1}`}
+                      className="border-base-300 h-24 w-full rounded border object-cover"
+                    />
+                    {!isLocked && (
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-circle btn-error absolute top-1 right-1"
+                        disabled={isUploadingPhotos}
+                        onClick={() =>
+                          handleFieldChange(
+                            fieldId,
+                            photoUrls.filter(
+                              (_, photoIndex) => photoIndex !== index,
+                            ),
+                          )
+                        }
+                        aria-label="Remove photo"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             <input
               id={fieldId}
               type="file"
               accept="image/*"
               multiple
               className="file-input file-input-bordered w-full"
-              disabled={isLocked}
+              disabled={isLocked || isUploadingPhotos || !canUploadMorePhotos}
+              onChange={(e) => {
+                void handlePhotoUpload(
+                  fieldId,
+                  e.target.files,
+                  field.maxPhotos,
+                );
+                e.currentTarget.value = "";
+              }}
             />
+            {isUploadingPhotos && (
+              <label className="label">
+                <span className="label-text-alt text-info">
+                  Uploading photos...
+                </span>
+              </label>
+            )}
+            {photoFieldStatus?.error && (
+              <label className="label">
+                <span className="label-text-alt text-error">
+                  {photoFieldStatus.error}
+                </span>
+              </label>
+            )}
             {field.maxPhotos && (
               <label className="label">
                 <span className="label-text-alt opacity-60">
-                  Max {field.maxPhotos} photos
+                  {photoUrls.length}/{field.maxPhotos} photos
                 </span>
               </label>
             )}

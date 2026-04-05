@@ -25,6 +25,7 @@ function getFieldId(sectionId: string, fieldLabel: string): string {
 
 function isFieldFilled(value: unknown): boolean {
   if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.length > 0;
   if (typeof value === "boolean") return value;
   if (typeof value === "string") return value.trim().length > 0;
   return true;
