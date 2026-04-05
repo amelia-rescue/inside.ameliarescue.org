@@ -492,10 +492,10 @@ async function handleUpdateField({
   }
 
   const truckCheckStore = TruckCheckStore.make();
-  const truckCheck = await truckCheckStore.getTruckCheck(truckCheckId);
-  const updatedTruckCheck = await truckCheckStore.updateTruckCheck({
-    ...truckCheck,
-    data: { ...truckCheck.data, [fieldId]: value },
+  await truckCheckStore.updateTruckCheckField({
+    id: truckCheckId,
+    fieldId,
+    value,
   });
 
   await broadcastToTruckCheck({
@@ -504,7 +504,6 @@ async function handleUpdateField({
     truckCheckId,
     message: {
       type: "field-update",
-      truckCheckData: updatedTruckCheck.data,
       fieldId,
       value,
       updatedBy: connection.user_id,

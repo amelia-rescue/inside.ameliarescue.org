@@ -5,6 +5,7 @@ import {
   PutCommand,
   ScanCommand,
   DeleteCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
 import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
@@ -96,6 +97,50 @@ export class TruckCheckStore {
     });
     await TruckCheckStore.client.send(command);
     return documentTruckCheck;
+  }
+
+  public async updateTruckCheckField({
+    id,
+    fieldId,
+    value,
+  }: {
+    id: string;
+    fieldId: string;
+    value: unknown;
+  }): Promise<DocumentTruckCheck> {
+    try {
+      const response = await TruckCheckStore.client.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { id },
+          ConditionExpression: "attribute_exists(id)",
+          UpdateExpression:
+            "SET #data.#fieldId = :value, updated_at = :updatedAt",
+          ExpressionAttributeNames: {
+            "#data": "data",
+            "#fieldId": fieldId,
+          },
+          ExpressionAttributeValues: {
+            ":value": value,
+            ":updatedAt": new Date().toISOString(),
+          },
+          ReturnValues: "ALL_NEW",
+        }),
+      );
+
+      return response.Attributes as DocumentTruckCheck;
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "name" in error &&
+        error.name === "ConditionalCheckFailedException"
+      ) {
+        throw new TruckCheckNotFound(id);
+      }
+
+      throw error;
+    }
   }
 
   public async updateTruckCheck(
