@@ -814,22 +814,29 @@ export default function TruckCheckDynamic() {
                 ))}
               </div>
             )}
-            <input
-              id={fieldId}
-              type="file"
-              accept="image/*"
-              multiple
-              className="file-input file-input-bordered w-full"
-              disabled={isLocked || isUploadingPhotos || !canUploadMorePhotos}
-              onChange={(e) => {
-                void handlePhotoUpload(
-                  fieldId,
-                  e.target.files,
-                  field.maxPhotos,
-                );
-                e.currentTarget.value = "";
-              }}
-            />
+            <div>
+              <input
+                id={fieldId}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="file-input file-input-bordered w-full"
+                disabled={isLocked || isUploadingPhotos || !canUploadMorePhotos}
+                onChange={(e) => {
+                  void handlePhotoUpload(
+                    fieldId,
+                    e.target.files,
+                    field.maxPhotos,
+                  );
+                  e.currentTarget.value = "";
+                }}
+              />
+            </div>
+            <label className="label">
+              <span className="label-text-alt opacity-60">
+                Take a photo with your camera.
+              </span>
+            </label>
             {isUploadingPhotos && (
               <label className="label">
                 <span className="label-text-alt text-info">
