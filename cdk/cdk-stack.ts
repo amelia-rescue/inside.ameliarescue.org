@@ -16,6 +16,8 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
 import * as ses from "aws-cdk-lib/aws-ses";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import * as events from "aws-cdk-lib/aws-events";
 import * as eventsTargets from "aws-cdk-lib/aws-events-targets";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
@@ -45,12 +47,45 @@ export class CdkStack extends cdk.Stack {
       authCertificate,
     } = props;
 
+    const sesStatusTopic = new sns.Topic(this, "SesStatusTopic", {
+      topicName: "inside-amelia-rescue-ses-status-events",
+      displayName: "inside.ameliarescue.org SES status events",
+    });
+
+    const sesConfigurationSet = new ses.ConfigurationSet(
+      this,
+      "SesStatusConfigurationSet",
+      {
+        configurationSetName: "inside-amelia-rescue-ses-status-events",
+        sendingEnabled: true,
+      },
+    );
+
+    sesConfigurationSet.addEventDestination("SesStatusSnsDestination", {
+      destination: ses.EventDestination.snsTopic(sesStatusTopic),
+      events: [
+        ses.EmailSendingEvent.SEND,
+        ses.EmailSendingEvent.REJECT,
+        ses.EmailSendingEvent.BOUNCE,
+        ses.EmailSendingEvent.COMPLAINT,
+        ses.EmailSendingEvent.DELIVERY,
+        ses.EmailSendingEvent.RENDERING_FAILURE,
+        ses.EmailSendingEvent.DELIVERY_DELAY,
+      ],
+    });
+
     // Create SES email identity for sending emails from custom domain
     // Go into the console and click "publish DNS records" in the SES console -> identities section after deployment
     // However, it wouldn't be terribly difficult to set this up in code but AI is not doing it correctly and may require
     // some string manipulation that I don't care to write at the moment.
     const sesIdentity = new ses.CfnEmailIdentity(this, "SesEmailIdentity", {
+      configurationSetAttributes: {
+        configurationSetName: sesConfigurationSet.configurationSetName,
+      },
       emailIdentity: appDomainName,
+      feedbackAttributes: {
+        emailForwardingEnabled: false,
+      },
     });
 
     // Create session secret in Secrets Manager
@@ -511,6 +546,42 @@ export class CdkStack extends cdk.Stack {
     // Add Lambda as target for the EventBridge rule
     certificationReminderCronRule.addTarget(
       new eventsTargets.LambdaFunction(certificationReminderFunction),
+    );
+
+    const sesStatusLogGroup = new logs.LogGroup(this, "ses-status-logs", {
+      logGroupName: "/aws/lambda/inside-amelia-rescue-ses-status-handler",
+      retention: logs.RetentionDays.SEVEN_YEARS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const sesStatusFunction = new nodejs.NodejsFunction(
+      this,
+      "SesStatusFunction",
+      {
+        functionName: "inside-amelia-rescue-ses-status-handler",
+        runtime: lambda.Runtime.NODEJS_24_X,
+        handler: "handler",
+        entry: path.join(__dirname, "../server/ses-status-handler.ts"),
+        memorySize: 512,
+        timeout: cdk.Duration.seconds(30),
+        architecture: cdk.aws_lambda.Architecture.ARM_64,
+        logGroup: sesStatusLogGroup,
+        bundling: {
+          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          minify: true,
+          sourceMap: true,
+          target: "es2022",
+          format: nodejs.OutputFormat.CJS,
+        },
+        environment: {
+          NODE_OPTIONS: "--enable-source-maps",
+          NODE_ENV: "production",
+        },
+      },
+    );
+
+    sesStatusTopic.addSubscription(
+      new subscriptions.LambdaSubscription(sesStatusFunction),
     );
 
     // Create CloudWatch log group for certification snapshot Lambda function

@@ -157,8 +157,11 @@ https://inside.ameliarescue.org
     });
 
     try {
-      await this.client.send(command);
-      log.info("Email sent successfully", { to_email: toEmail });
+      const response = await this.client.send(command);
+      log.info("Email sent successfully", {
+        to_email: toEmail,
+        ses_message_id: response.MessageId,
+      });
     } catch (error) {
       log.error("Failed to send email", { to_email: toEmail, error });
       throw error;
