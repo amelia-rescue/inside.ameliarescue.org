@@ -183,6 +183,14 @@ export default function User() {
                   <dd className="font-medium">{user.phone || "—"}</dd>
                   <dt className="opacity-70">Email</dt>
                   <dd className="font-medium">{user.email}</dd>
+                  {user.last_login_at && (
+                    <>
+                      <dt className="opacity-70">Last Login</dt>
+                      <dd className="font-medium">
+                        {new Date(user.last_login_at).toLocaleString()}
+                      </dd>
+                    </>
+                  )}
                 </dl>
               </div>
             </div>

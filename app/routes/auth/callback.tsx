@@ -1,7 +1,9 @@
 import dayjs from "dayjs";
 import { redirect, type LoaderFunctionArgs } from "react-router";
 import { exchangeCodeForTokens, getUserInfo } from "~/lib/auth.server";
+import { log } from "~/lib/logger";
 import { createUserSession, getSessionData } from "~/lib/session.server";
+import { UserStore } from "~/lib/user-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -41,11 +43,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     // Get user info
     const userInfo = await getUserInfo(tokens.access_token);
+    const user_id = userInfo.sub as string;
+
+    // Record last login time (non-fatal if it fails)
+    try {
+      await UserStore.make().updateUser({
+        user_id,
+        last_login_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      log.error("Failed to update last_login_at", { err, user_id });
+    }
 
     // Create user session
     return createUserSession(
       {
-        user_id: userInfo.sub as string,
+        user_id,
         session_id: crypto.randomUUID(),
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,

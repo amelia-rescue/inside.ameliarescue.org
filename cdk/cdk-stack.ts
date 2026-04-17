@@ -468,6 +468,7 @@ export class CdkStack extends cdk.Stack {
     certificationTypesTable.grantReadWriteData(lambdaFunction);
     userCertificationsTable.grantReadWriteData(lambdaFunction);
     rolesTable.grantReadWriteData(lambdaFunction);
+    tracksTable.grantReadWriteData(lambdaFunction);
     certificationRemindersTable.grantReadWriteData(lambdaFunction);
     certificationSnapshotsTable.grantReadData(lambdaFunction);
     emailEventsTable.grantReadData(lambdaFunction);

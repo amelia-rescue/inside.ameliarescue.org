@@ -158,6 +158,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                 <tr>
                   <th>Name</th>
                   <th>Website Role</th>
+                  <th>Last Login</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
@@ -173,6 +174,13 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <td>
                       <span className="badge badge-neutral">
                         {user.website_role}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-sm">
+                        {user.last_login_at
+                          ? new Date(user.last_login_at).toLocaleString()
+                          : "Never"}
                       </span>
                     </td>
                     <td className="text-right">

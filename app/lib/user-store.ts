@@ -31,6 +31,7 @@ export const userSchema = type({
   membership_roles: membershipRoleItem.array(),
   "phone?": "string",
   "profile_picture_url?": "string",
+  "last_login_at?": "string",
 });
 userSchema.onUndeclaredKey("delete");
 
