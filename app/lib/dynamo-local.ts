@@ -56,6 +56,17 @@ export async function setupDynamo() {
       partitionKey: "snapshot_date",
     },
     {
+      tableName: "aes_email_events",
+      partitionKey: "message_id",
+      gsi: [
+        {
+          indexName: "RecentEventsIndex",
+          partitionKey: "list_partition",
+          sortKey: "list_sort",
+        },
+      ],
+    },
+    {
       tableName: "aes_truck_checks",
       partitionKey: "id",
     },

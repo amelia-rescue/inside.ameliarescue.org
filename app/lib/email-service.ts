@@ -1,13 +1,16 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { EmailEventStore } from "./email-event-store";
 import type { User } from "./user-store";
 import { log } from "./logger";
 
 export class EmailService {
   private readonly client: SESClient;
+  private readonly emailEventStore: EmailEventStore;
   private readonly fromEmail: string;
 
   constructor(fromEmail: string) {
     this.client = new SESClient({});
+    this.emailEventStore = EmailEventStore.make();
     this.fromEmail = fromEmail;
   }
 
@@ -158,6 +161,17 @@ https://inside.ameliarescue.org
 
     try {
       const response = await this.client.send(command);
+      if (response.MessageId) {
+        await this.emailEventStore.createSentEmailEvent({
+          messageId: response.MessageId,
+          toEmails: [toEmail],
+          subject,
+          sourceEmail: this.fromEmail,
+          sentAt: new Date().toISOString(),
+          origin: "app",
+          status: "SEND",
+        });
+      }
       log.info("Email sent successfully", {
         to_email: toEmail,
         ses_message_id: response.MessageId,

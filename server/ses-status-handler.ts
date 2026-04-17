@@ -1,4 +1,5 @@
 import type { SNSHandler } from "aws-lambda";
+import { EmailEventStore } from "../app/lib/email-event-store.js";
 import { log } from "../app/lib/logger.js";
 
 type SesNotificationPayload = {
@@ -137,6 +138,8 @@ function getLogLevel(eventType?: string): "info" | "warn" | "error" {
 }
 
 export const handler: SNSHandler = async (event) => {
+  const emailEventStore = EmailEventStore.make();
+
   for (const record of event.Records) {
     try {
       const payload = parseSesNotification(record.Sns.Message);
@@ -147,6 +150,37 @@ export const handler: SNSHandler = async (event) => {
         ...buildEventDetails(payload),
       };
       const logLevel = getLogLevel(payload.eventType);
+
+      const messageId = payload.mail?.messageId;
+      const eventType = payload.eventType ?? "UNKNOWN";
+      const eventAt =
+        payload.delivery?.timestamp ??
+        payload.bounce?.timestamp ??
+        payload.complaint?.timestamp ??
+        payload.deliveryDelay?.timestamp ??
+        payload.mail?.timestamp ??
+        record.Sns.Timestamp;
+
+      if (messageId) {
+        await emailEventStore.upsertStatusFromSesCallback({
+          messageId,
+          eventType,
+          eventAt,
+          snsMessageId: record.Sns.MessageId,
+          toEmails: getRecipients(payload),
+          subject: payload.mail?.commonHeaders?.subject,
+          sourceEmail: payload.mail?.source,
+          tags: payload.mail?.tags,
+          origin: payload.mail?.source?.includes("cognito")
+            ? "cognito"
+            : "ses_callback",
+          details,
+          bounceType: payload.bounce?.bounceType,
+          bounceSubType: payload.bounce?.bounceSubType,
+          complaintFeedbackType: payload.complaint?.complaintFeedbackType,
+          deliveryDelayType: payload.deliveryDelay?.delayType,
+        });
+      }
 
       if (logLevel === "warn") {
         log.warn("SES status event received", details);

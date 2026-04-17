@@ -136,6 +136,9 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
           <Link to="/admin/tracks" className="btn btn-secondary">
             Manage Tracks
           </Link>
+          <Link to="/admin/email-events" className="btn btn-secondary">
+            View Email Events
+          </Link>
           <Link to="/admin/truck-checks" className="btn btn-secondary">
             Manage Truck Checks
           </Link>

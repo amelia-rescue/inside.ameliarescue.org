@@ -324,6 +324,28 @@ export class CdkStack extends cdk.Stack {
       },
     );
 
+    const emailEventsTable = new dynamodb.Table(this, "EmailEventsTable", {
+      tableName: "aes_email_events",
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: {
+        name: "message_id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    emailEventsTable.addGlobalSecondaryIndex({
+      indexName: "RecentEventsIndex",
+      partitionKey: {
+        name: "list_partition",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "list_sort",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
     const websocketConnectionsTable = new dynamodb.Table(
       this,
       "WebSocketConnectionsTable",
@@ -445,14 +467,15 @@ export class CdkStack extends cdk.Stack {
     certificationTypesTable.grantReadWriteData(lambdaFunction);
     userCertificationsTable.grantReadWriteData(lambdaFunction);
     rolesTable.grantReadWriteData(lambdaFunction);
-    tracksTable.grantReadWriteData(lambdaFunction);
     certificationRemindersTable.grantReadWriteData(lambdaFunction);
     certificationSnapshotsTable.grantReadData(lambdaFunction);
+    emailEventsTable.grantReadData(lambdaFunction);
     truckChecksTable.grantReadWriteData(lambdaFunction);
     truckCheckSchemasTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);
 
     // Grant Lambda permission to read session secret
+    sessionSecret.grantRead(lambdaFunction);
     sessionSecret.grantRead(lambdaFunction);
 
     // Grant Lambda permissions to manage Cognito users
@@ -506,6 +529,7 @@ export class CdkStack extends cdk.Stack {
           TRACKS_TABLE_NAME: tracksTable.tableName,
           CERTIFICATION_REMINDERS_TABLE_NAME:
             certificationRemindersTable.tableName,
+          EMAIL_EVENTS_TABLE_NAME: emailEventsTable.tableName,
           FROM_EMAIL: `noreply@${appDomainName}`,
           TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
         },
@@ -521,6 +545,7 @@ export class CdkStack extends cdk.Stack {
     certificationRemindersTable.grantReadWriteData(
       certificationReminderFunction,
     );
+    emailEventsTable.grantReadWriteData(certificationReminderFunction);
     truckChecksTable.grantReadWriteData(certificationReminderFunction);
 
     // Grant SES send email permissions
@@ -576,9 +601,12 @@ export class CdkStack extends cdk.Stack {
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
           NODE_ENV: "production",
+          EMAIL_EVENTS_TABLE_NAME: emailEventsTable.tableName,
         },
       },
     );
+
+    emailEventsTable.grantReadWriteData(sesStatusFunction);
 
     sesStatusTopic.addSubscription(
       new subscriptions.LambdaSubscription(sesStatusFunction),
