@@ -179,7 +179,7 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                     <td>
                       <span className="text-sm">
                         {user.last_login_at
-                          ? new Date(user.last_login_at).toLocaleString()
+                          ? `${user.last_login_at.slice(0, 10)} ${user.last_login_at.slice(11, 16)} UTC`
                           : "Never"}
                       </span>
                     </td>
