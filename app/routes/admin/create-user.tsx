@@ -207,6 +207,9 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
           <li>
             <Link to="/admin">Admin</Link>
           </li>
+          <li>
+            <Link to="/admin/users">Users</Link>
+          </li>
           <li>Create User</li>
         </ul>
       </div>
@@ -384,7 +387,7 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
             </div>
 
             <div className="card-actions justify-end pt-4">
-              <Link to="/admin" className="btn btn-ghost">
+              <Link to="/admin/users" className="btn btn-ghost">
                 Cancel
               </Link>
               <button type="submit" className="btn btn-success">

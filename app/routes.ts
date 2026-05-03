@@ -9,6 +9,7 @@ export default [
   index("./routes/_index.tsx"),
   route("admin", "./routes/admin.tsx"),
   ...prefix("admin", [
+    route("users", "./routes/admin/users.tsx"),
     route("create-user", "./routes/admin/create-user.tsx"),
     route("certification-type", "./routes/admin/certification-type.tsx"),
     route("email-events", "./routes/admin/email-events.tsx"),
