@@ -1033,6 +1033,38 @@ export class CdkStack extends cdk.Stack {
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
           cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         },
+        "/sw.js": {
+          origin: staticBucketOrigin,
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        },
+        "/manifest.webmanifest": {
+          origin: staticBucketOrigin,
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        },
+        "/icon-192.svg": {
+          origin: staticBucketOrigin,
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
+        "/icon-512.svg": {
+          origin: staticBucketOrigin,
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
         "/robots.txt": {
           origin: staticBucketOrigin,
           viewerProtocolPolicy:
@@ -1098,7 +1130,15 @@ export class CdkStack extends cdk.Stack {
       sources: [s3deploy.Source.asset(path.join(__dirname, "../build/client"))],
       destinationBucket: staticBucket,
       distribution,
-      distributionPaths: ["/assets/*", "/favicon.ico", "/robots.txt"],
+      distributionPaths: [
+        "/assets/*",
+        "/favicon.ico",
+        "/robots.txt",
+        "/sw.js",
+        "/manifest.webmanifest",
+        "/icon-192.svg",
+        "/icon-512.svg",
+      ],
     });
 
     // Note: APP_URL is determined at runtime from request headers
