@@ -11,6 +11,7 @@ import {
   FiExternalLink,
   FiChevronRight,
 } from "react-icons/fi";
+import { useEffect, useState } from "react";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -32,6 +33,34 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export default function Index({ loaderData }: Route.ComponentProps) {
   const { user } = loaderData;
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+
+    const updateStandaloneState = () => {
+      const iosStandalone =
+        typeof window.navigator !== "undefined" &&
+        "standalone" in window.navigator &&
+        Boolean(
+          (window.navigator as Navigator & { standalone?: boolean }).standalone,
+        );
+
+      setIsStandalone(mediaQuery.matches || iosStandalone);
+    };
+
+    updateStandaloneState();
+    mediaQuery.addEventListener("change", updateStandaloneState);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateStandaloneState);
+    };
+  }, []);
+
   return (
     <>
       {/* Quick Actions Grid */}
@@ -187,6 +216,56 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           )}
         </div>
       </div>
+
+      {!isStandalone && (
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body gap-6">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="card-title text-2xl">Add to your home screen</h2>
+                <p className="text-base-content/70 max-w-2xl text-sm md:text-base">
+                  Get one-tap access on your phone without installing a native
+                  app.
+                </p>
+              </div>
+              <div className="badge badge-success badge-outline">
+                Works best on Safari and Chrome
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="bg-base-200 rounded-box p-5">
+                <h3 className="mb-3 text-lg font-semibold">iPhone and iPad</h3>
+                <ol className="list-decimal space-y-2 pl-5 text-sm md:text-base">
+                  <li>Open Inside Amelia Rescue in Safari.</li>
+                  <li>Tap the Share button.</li>
+                  <li>
+                    Choose{" "}
+                    <span className="font-semibold">Add to Home Screen</span>.
+                  </li>
+                  <li>
+                    Tap <span className="font-semibold">Add</span> to finish.
+                  </li>
+                </ol>
+              </div>
+
+              <div className="bg-base-200 rounded-box p-5">
+                <h3 className="mb-3 text-lg font-semibold">Android</h3>
+                <ol className="list-decimal space-y-2 pl-5 text-sm md:text-base">
+                  <li>Open Inside Amelia Rescue in Chrome.</li>
+                  <li>Tap the browser menu.</li>
+                  <li>
+                    Choose{" "}
+                    <span className="font-semibold">Add to Home screen</span> or{" "}
+                    <span className="font-semibold">Install app</span>.
+                  </li>
+                  <li>Confirm the install prompt.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

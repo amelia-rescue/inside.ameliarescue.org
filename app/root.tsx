@@ -37,6 +37,13 @@ export const links: Route.LinksFunction = () => [
     rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
   },
+  { rel: "manifest", href: "/manifest.webmanifest" },
+  { rel: "icon", href: "/favicon.ico", sizes: "any" },
+  {
+    rel: "apple-touch-icon",
+    href: "/icon-192.svg",
+    type: "image/svg+xml",
+  },
 ];
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -64,10 +71,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const theme = loaderData?.theme || "forest";
   const isWideContentRoute = location.pathname === "/training-status";
+  const themeColor =
+    theme === "light"
+      ? "#f5f5f5"
+      : theme === "retro"
+        ? "#ece3ca"
+        : theme === "dark"
+          ? "#1d232a"
+          : "#1f2937";
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (import.meta.env.DEV || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    void navigator.serviceWorker.register("/sw.js");
+  }, []);
 
   const handleThemeChange = (newTheme: string) => {
     const formData = new FormData();
@@ -80,6 +103,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content={themeColor} />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+          name="apple-mobile-web-app-title"
+          content="Inside Amelia Rescue"
+        />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <Meta />
         <Links />
       </head>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Inside Amelia Rescue icon</title>
+  <desc id="desc">A rounded square icon with the letters IA on a dark background.</desc>
+  <rect width="512" height="512" rx="112" fill="#1f2937" />
+  <rect x="37" y="37" width="438" height="438" rx="90" fill="#22c55e" opacity="0.16" />
+  <path d="M149 144h58v224h-58zm156 0h58c44.183 0 80 35.817 80 80v144h-58V224c0-11.046-8.954-20-20-20h-60v164h-58V144z" fill="#f9fafb" />
+</svg>
