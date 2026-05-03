@@ -117,6 +117,16 @@ export default function ManageRoles({ loaderData }: Route.ComponentProps) {
             </span>
           </div>
 
+          <p className="text-base-content/80 mb-4 text-sm">
+            Roles define what a member does within the organization (e.g.,
+            Provider, Driver, Observer). A single member may be assigned
+            multiple roles such as Driver and Provider. Roles are made up of{" "}
+            <Link to="/admin/tracks" className="link link-primary">
+              tracks
+            </Link>{" "}
+            which drive the required certifications per member.
+          </p>
+
           {fetcher.data && "error" in fetcher.data && (
             <div className="alert alert-error mb-4">
               <span>{fetcher.data.error}</span>

@@ -119,6 +119,18 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
             </span>
           </div>
 
+          <p className="text-base-content/80 mb-4 text-sm">
+            Tracks are a collection of certification types. A{" "}
+            <Link to="/admin/roles" className="link link-primary">
+              role
+            </Link>{" "}
+            such as a paramedic provider may require multiple{" "}
+            <Link to="/admin/certification-type" className="link link-primary">
+              certifications
+            </Link>{" "}
+            such as NREMT-P, CPR, ACLS etc..
+          </p>
+
           {fetcher.data && "error" in fetcher.data && (
             <div className="alert alert-error mb-4">
               <span>{fetcher.data.error}</span>

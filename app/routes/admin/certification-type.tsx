@@ -119,6 +119,19 @@ export default function CreateCertificationType({
             </span>
           </div>
 
+          <p className="text-base-content/80 mb-4 text-sm">
+            This is where you define which certifications are managed on the
+            website. You may define certification types that aren't necessarily
+            requried by the organization but may still be relevant for training
+            purposes. For example, firefighter I may not be required by a
+            strictly EMS agency. You can specify which certifications are
+            required through{" "}
+            <Link className="text-primary" to="/admin/tracks">
+              tracks
+            </Link>
+            .
+          </p>
+
           {fetcher.data && "error" in fetcher.data && (
             <div className="alert alert-error mb-4">
               <span>{fetcher.data.error}</span>
