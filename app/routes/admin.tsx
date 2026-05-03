@@ -1,6 +1,7 @@
 import { Link, redirect } from "react-router";
 import type { Route } from "./+types/admin";
 import { appContext } from "~/context";
+import { UserStore } from "~/lib/user-store";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -20,7 +21,13 @@ export async function loader({ context }: Route.LoaderArgs) {
     throw redirect("/");
   }
 
-  return { user: ctx.user };
+  const userStore = UserStore.make();
+  const allUsers = await userStore.listUsers();
+  const admins = allUsers
+    .filter((u) => u.website_role === "admin")
+    .sort((a, b) => a.last_name.localeCompare(b.last_name));
+
+  return { user: ctx.user, admins };
 }
 
 export default function Admin({ loaderData }: Route.ComponentProps) {
@@ -104,6 +111,39 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             </div>
           </Link>
         ))}
+      </div>
+
+      <div className="card bg-base-100 mt-8 shadow-xl">
+        <div className="card-body">
+          <h2 className="card-title">Current Administrators</h2>
+          {loaderData.admins.length === 0 ? (
+            <p className="text-base-content/70 text-sm">
+              No administrators found.
+            </p>
+          ) : (
+            <ul className="divide-base-200 divide-y">
+              {loaderData.admins.map((admin) => (
+                <li key={admin.user_id} className="py-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <span className="font-medium">
+                        {admin.first_name} {admin.last_name}
+                      </span>
+                      <span className="text-base-content/60 ml-2 text-sm">
+                        {admin.email}
+                      </span>
+                    </div>
+                    {admin.last_login_at && (
+                      <span className="text-base-content/50 shrink-0 text-xs">
+                        Last login: {admin.last_login_at.slice(0, 10)}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
