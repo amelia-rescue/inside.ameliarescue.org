@@ -233,7 +233,7 @@ function buildTrendPointFromSnapshot(
 
   return {
     month: monthDate.format("YYYY-MM"),
-    label: monthDate.format("MMM YY"),
+    label: monthDate.format("MMM"),
     compliancePercentage: Number(
       (snapshot.overall_compliance_rate * 100).toFixed(1),
     ),
@@ -256,7 +256,7 @@ function buildTrendPointFromCurrentData(
 
   return {
     month: monthDate.format("YYYY-MM"),
-    label: monthDate.format("MMM YY"),
+    label: monthDate.format("MMM"),
     compliancePercentage: currentData.complianceStats.compliancePercentage,
     membersTracked: currentData.trainingData.length,
     missingCount: liveCounts.missing,

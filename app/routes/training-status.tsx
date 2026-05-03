@@ -44,22 +44,6 @@ type TrainingStatusRow = {
   certifications: Record<string, CertStatus>;
 };
 
-type TrainingStatusDashboardCallout = {
-  title: string;
-  value: string;
-  description: string;
-  tone: "success" | "warning" | "error" | "info";
-};
-
-type TrainingStatusRiskLeaderboardItem = {
-  certificationType: string;
-  totalRiskCount: number;
-  missingCount: number;
-  expiredCount: number;
-  expiringSoonCount: number;
-  averageDaysToExpiration: number | null;
-};
-
 type TrainingStatusTrendPoint = {
   month: string;
   label: string;
@@ -98,8 +82,6 @@ export async function loader({ context }: Route.LoaderArgs) {
     complianceStats,
     dashboardSummary,
     monthlyTrend,
-    riskLeaderboard,
-    dashboardCallouts,
   } = await loadTrainingStatusDashboardData();
 
   return {
@@ -109,8 +91,6 @@ export async function loader({ context }: Route.LoaderArgs) {
     complianceStats,
     dashboardSummary,
     monthlyTrend,
-    riskLeaderboard,
-    dashboardCallouts,
   };
 }
 
@@ -139,27 +119,6 @@ function formatSignedDelta(value: number | null) {
   }
 
   return `${value > 0 ? "+" : ""}${value.toFixed(1)} pts`;
-}
-
-function CalloutCard({ callout }: { callout: TrainingStatusDashboardCallout }) {
-  const className =
-    callout.tone === "success"
-      ? "alert-success"
-      : callout.tone === "warning"
-        ? "alert-warning"
-        : callout.tone === "error"
-          ? "alert-error"
-          : "alert-info";
-
-  return (
-    <div className={`alert ${className} h-full items-start`}>
-      <div>
-        <div className="font-semibold">{callout.title}</div>
-        <div className="text-lg font-bold">{callout.value}</div>
-        <div className="text-sm opacity-80">{callout.description}</div>
-      </div>
-    </div>
-  );
 }
 
 function ComplianceTrendChart({
@@ -284,55 +243,6 @@ function RiskTrendChart({ points }: { points: TrainingStatusTrendPoint[] }) {
   );
 }
 
-function RiskLeaderboard({
-  items,
-}: {
-  items: TrainingStatusRiskLeaderboardItem[];
-}) {
-  if (items.length === 0) {
-    return (
-      <div className="text-base-content/60 py-6 text-sm">
-        No risk leaderboard data is available yet.
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-w-0 overflow-x-auto">
-      <table className="table-sm table w-full">
-        <thead>
-          <tr>
-            <th>Certification</th>
-            <th className="text-right">At Risk</th>
-            <th className="text-right">Missing</th>
-            <th className="text-right">Expired</th>
-            <th className="text-right">Expiring Soon</th>
-            <th className="text-right">Avg Days Left</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.certificationType}>
-              <td className="max-w-0 font-medium break-words whitespace-normal">
-                {item.certificationType}
-              </td>
-              <td className="text-right">{item.totalRiskCount}</td>
-              <td className="text-right">{item.missingCount}</td>
-              <td className="text-right">{item.expiredCount}</td>
-              <td className="text-right">{item.expiringSoonCount}</td>
-              <td className="text-right">
-                {item.averageDaysToExpiration == null
-                  ? "—"
-                  : item.averageDaysToExpiration}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export default function TrainingStatus() {
   const {
     trainingData,
@@ -341,8 +251,6 @@ export default function TrainingStatus() {
     complianceStats,
     dashboardSummary,
     monthlyTrend,
-    riskLeaderboard,
-    dashboardCallouts,
   } = useLoaderData<typeof loader>();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -631,8 +539,7 @@ export default function TrainingStatus() {
                   {dashboardSummary.requiredCertsAtRisk}
                 </div>
                 <div className="stat-desc">
-                  {dashboardSummary.atRiskMembers} members have a missing,
-                  expired, or expiring-soon required cert
+                  {dashboardSummary.atRiskMembers} members are not compliant
                 </div>
               </div>
             </div>
@@ -657,14 +564,6 @@ export default function TrainingStatus() {
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            {dashboardCallouts.map(
-              (callout: TrainingStatusDashboardCallout) => (
-                <CalloutCard key={callout.title} callout={callout} />
-              ),
-            )}
-          </div>
-
           <div className="grid gap-6 xl:grid-cols-2">
             <div className="card bg-base-200 shadow-sm">
               <div className="card-body">
@@ -672,8 +571,7 @@ export default function TrainingStatus() {
                   <div>
                     <h2 className="card-title text-lg">Compliance Trend</h2>
                     <p className="text-sm opacity-70">
-                      Monthly overall compliance, using the latest snapshot
-                      available for each month.
+                      Overall compliance overtime
                     </p>
                   </div>
                   <span className="badge badge-primary badge-outline">
@@ -694,89 +592,22 @@ export default function TrainingStatus() {
                       quick meeting readout.
                     </p>
                   </div>
-                  <div className="flex flex-wrap justify-end gap-2 text-xs">
-                    <span className="badge badge-outline gap-2">
+                  <div className="flex flex-col items-end gap-2 text-xs">
+                    <span className="badge badge-outline gap-2 whitespace-nowrap">
                       <span className="bg-error inline-block h-2 w-2 rounded-full" />{" "}
                       Missing
                     </span>
-                    <span className="badge badge-outline gap-2">
+                    <span className="badge badge-outline gap-2 whitespace-nowrap">
                       <span className="bg-error/80 inline-block h-2 w-2 rounded-full" />{" "}
                       Expired
                     </span>
-                    <span className="badge badge-outline gap-2">
+                    <span className="badge badge-outline gap-2 whitespace-nowrap">
                       <span className="bg-warning inline-block h-2 w-2 rounded-full" />{" "}
                       Expiring Soon
                     </span>
                   </div>
                 </div>
                 <RiskTrendChart points={monthlyTrend} />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid min-w-0 gap-6 xl:grid-cols-3">
-            <div className="card bg-base-200 min-w-0 shadow-sm xl:col-span-2">
-              <div className="card-body min-w-0">
-                <div className="mb-3 flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="card-title text-lg">Top Training Risks</h2>
-                    <p className="text-sm opacity-70">
-                      The most important certification types to discuss in the
-                      monthly meeting.
-                    </p>
-                  </div>
-                  <span className="badge badge-outline">
-                    Top {riskLeaderboard.length}
-                  </span>
-                </div>
-                <RiskLeaderboard items={riskLeaderboard} />
-              </div>
-            </div>
-
-            <div className="card bg-base-200 min-w-0 shadow-sm xl:col-span-1">
-              <div className="card-body min-w-0 gap-4">
-                <h2 className="card-title text-lg">Current Risk Mix</h2>
-                <div className="flex flex-col gap-3 text-sm">
-                  <div>
-                    <div className="mb-1 flex items-center justify-between">
-                      <span>Missing required certs</span>
-                      <span className="font-medium">
-                        {dashboardSummary.requiredStatusCounts.missing}
-                      </span>
-                    </div>
-                    <progress
-                      className="progress progress-error w-full"
-                      value={dashboardSummary.requiredStatusCounts.missing}
-                      max={Math.max(dashboardSummary.requiredCertsAtRisk, 1)}
-                    />
-                  </div>
-                  <div>
-                    <div className="mb-1 flex items-center justify-between">
-                      <span>Expired required certs</span>
-                      <span className="font-medium">
-                        {dashboardSummary.requiredStatusCounts.expired}
-                      </span>
-                    </div>
-                    <progress
-                      className="progress progress-error w-full"
-                      value={dashboardSummary.requiredStatusCounts.expired}
-                      max={Math.max(dashboardSummary.requiredCertsAtRisk, 1)}
-                    />
-                  </div>
-                  <div>
-                    <div className="mb-1 flex items-center justify-between">
-                      <span>Expiring soon required certs</span>
-                      <span className="font-medium">
-                        {dashboardSummary.requiredStatusCounts.expiringSoon}
-                      </span>
-                    </div>
-                    <progress
-                      className="progress progress-warning w-full"
-                      value={dashboardSummary.requiredStatusCounts.expiringSoon}
-                      max={Math.max(dashboardSummary.requiredCertsAtRisk, 1)}
-                    />
-                  </div>
-                </div>
               </div>
             </div>
           </div>
