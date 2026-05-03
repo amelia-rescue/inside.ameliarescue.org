@@ -11,6 +11,15 @@ import type { DynaliteServer } from "dynalite";
 import { setupDynamo, teardownDynamo } from "./dynamo-local";
 import { UserNotFound, UserStore } from "./user-store";
 
+function resetUserStoreStatics() {
+  const userStoreClass = UserStore as unknown as {
+    client?: unknown;
+    cognito?: unknown;
+  };
+  userStoreClass.client = undefined;
+  userStoreClass.cognito = undefined;
+}
+
 describe("user store test", () => {
   let dynamo: DynaliteServer;
   let mockCognitoClient: any;
@@ -29,11 +38,13 @@ describe("user store test", () => {
       send: cognitoSendSpy,
     };
 
+    resetUserStoreStatics();
     dynamo = await setupDynamo();
   });
 
   afterEach(async () => {
     await teardownDynamo(dynamo);
+    resetUserStoreStatics();
   });
 
   it("should be able to create and get a user", async () => {
@@ -142,6 +153,46 @@ describe("user store test", () => {
     });
     const user = await store.getUser(user_id);
     expect(user.first_name).toBe("Updated");
+  });
+
+  it("should set a temporary password for an existing user", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+    const { user_id } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
+      email: "test@example.com",
+      website_role: "admin",
+      membership_roles: [
+        { role_name: "Provider", track_name: "EMT", precepting: false },
+      ],
+    });
+
+    cognitoSendSpy.mockClear();
+
+    const result = await store.setTemporaryPassword(user_id);
+
+    expect(result.user.user_id).toBe(user_id);
+    expect(result.temporaryPassword).toHaveLength(10);
+    expect(cognitoSendSpy).toHaveBeenCalledTimes(1);
+    expect(cognitoSendSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: {
+          Password: result.temporaryPassword,
+          Permanent: false,
+          Username: user_id,
+          UserPoolId: "inside-amelia-rescue-users",
+        },
+      }),
+    );
+  });
+
+  it("should throw UserNotFound when setting a temporary password for a missing user", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+
+    await expect(
+      store.setTemporaryPassword("non-existent-user"),
+    ).rejects.toBeInstanceOf(UserNotFound);
+    expect(cognitoSendSpy).not.toHaveBeenCalled();
   });
 
   it("should throw a UserNotFound error when trying to update a usser that does not exist", async () => {

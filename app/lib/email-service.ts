@@ -20,6 +20,49 @@ export class EmailService {
     return new EmailService(fromEmail);
   }
 
+  async sendTemporaryPasswordEmail(params: {
+    user: User;
+    temporaryPassword: string;
+  }): Promise<void> {
+    const { user, temporaryPassword } = params;
+    const userName = `${user.first_name} ${user.last_name}`;
+    const appUrl = process.env.APP_URL || "https://inside.ameliarescue.org";
+    const subject = "Your temporary password for inside.ameliarescue.org";
+    const htmlBody = `
+      <html>
+        <body>
+          <h2>Temporary Password</h2>
+          <p>Hi ${userName},</p>
+          <p>An administrator reset your inside.ameliarescue.org password.</p>
+          <p><strong>Username:</strong> ${user.email}</p>
+          <p><strong>Temporary password:</strong> ${temporaryPassword}</p>
+          <p>Please sign in at <a href="${appUrl}">${appUrl}</a> and change your password when prompted.</p>
+          <p>Thank you,<br/>https://inside.ameliarescue.org</p>
+        </body>
+      </html>
+    `;
+    const textBody = `
+Hi ${userName},
+
+An administrator reset your inside.ameliarescue.org password.
+
+Username: ${user.email}
+Temporary password: ${temporaryPassword}
+
+Please sign in at ${appUrl} and change your password when prompted.
+
+Thank you,
+https://inside.ameliarescue.org
+    `;
+
+    await this.sendEmail({
+      toEmail: user.email,
+      subject,
+      htmlBody,
+      textBody,
+    });
+  }
+
   async sendCertificationExpiredEmail(params: {
     user: User;
     certificationName: string;

@@ -471,10 +471,17 @@ export class CdkStack extends cdk.Stack {
     tracksTable.grantReadWriteData(lambdaFunction);
     certificationRemindersTable.grantReadWriteData(lambdaFunction);
     certificationSnapshotsTable.grantReadData(lambdaFunction);
-    emailEventsTable.grantReadData(lambdaFunction);
+    emailEventsTable.grantReadWriteData(lambdaFunction);
     truckChecksTable.grantReadWriteData(lambdaFunction);
     truckCheckSchemasTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);
+
+    lambdaFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["ses:SendEmail", "ses:SendRawEmail"],
+        resources: ["*"],
+      }),
+    );
 
     // Grant Lambda permission to read session secret
     sessionSecret.grantRead(lambdaFunction);

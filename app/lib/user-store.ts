@@ -9,6 +9,7 @@ import {
 import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminSetUserPasswordCommand,
   CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { randomBytes } from "crypto";
@@ -163,6 +164,28 @@ export class UserStore {
     });
     await UserStore.client.send(command);
     return documentUser;
+  }
+
+  public async setTemporaryPassword(user_id: string): Promise<{
+    user: DocumentUser;
+    temporaryPassword: string;
+  }> {
+    const user = await this.getUser(user_id);
+    const temporaryPassword = this.generatePassword();
+
+    await UserStore.cognito.send(
+      new AdminSetUserPasswordCommand({
+        UserPoolId: this.cognitoUserPoolId,
+        Username: user.user_id,
+        Password: temporaryPassword,
+        Permanent: false,
+      }),
+    );
+
+    return {
+      user,
+      temporaryPassword,
+    };
   }
 
   /**

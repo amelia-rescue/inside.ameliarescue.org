@@ -1,6 +1,7 @@
 import { data, Link, redirect, useFetcher } from "react-router";
 import type { Route } from "./+types/admin";
 import { appContext } from "~/context";
+import { EmailService } from "~/lib/email-service";
 import { UserStore } from "~/lib/user-store";
 import { showToast } from "~/components/toaster";
 import { useEffect, useRef, useState } from "react";
@@ -25,7 +26,19 @@ export async function loader({ context }: Route.LoaderArgs) {
   }
 
   const userStore = UserStore.make();
-  const users = await userStore.listUsers();
+  const users = (await userStore.listUsers()).sort((a, b) => {
+    const firstNameComparison = a.first_name.localeCompare(b.first_name);
+    if (firstNameComparison !== 0) {
+      return firstNameComparison;
+    }
+
+    const lastNameComparison = a.last_name.localeCompare(b.last_name);
+    if (lastNameComparison !== 0) {
+      return lastNameComparison;
+    }
+
+    return a.email.localeCompare(b.email);
+  });
   return { users };
 }
 
@@ -45,7 +58,36 @@ export async function action({ request, context }: Route.ActionArgs) {
     const userStore = UserStore.make();
     try {
       await userStore.softDelete(userId);
-      return data({ success: true });
+      return data({ success: true, intent: "delete" });
+    } catch (error) {
+      if (error instanceof Error) {
+        return data({ success: false, error: error.message }, { status: 500 });
+      }
+
+      return data(
+        { success: false, error: "Failed to delete user" },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (intent === "set-temporary-password" && typeof userId === "string") {
+    const userStore = UserStore.make();
+    const emailService = EmailService.make();
+
+    try {
+      const { user, temporaryPassword } =
+        await userStore.setTemporaryPassword(userId);
+      await emailService.sendTemporaryPasswordEmail({
+        user,
+        temporaryPassword,
+      });
+
+      return data({
+        success: true,
+        intent: "set-temporary-password",
+        userEmail: user.email,
+      });
     } catch (error) {
       if (error instanceof Error) {
         return data({ success: false, error: error.message }, { status: 500 });
@@ -67,6 +109,12 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
   const hasShownToast = useRef(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleteUserName, setDeleteUserName] = useState<string>("");
+  const [tempPasswordUserId, setTempPasswordUserId] = useState<string | null>(
+    null,
+  );
+  const [tempPasswordUserName, setTempPasswordUserName] = useState<string>("");
+  const [tempPasswordUserEmail, setTempPasswordUserEmail] =
+    useState<string>("");
 
   const openDeleteModal = (userId: string, userName: string) => {
     setDeleteUserId(userId);
@@ -78,6 +126,28 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     setDeleteUserId(null);
     setDeleteUserName("");
     (document.getElementById("delete_modal") as HTMLDialogElement)?.close();
+  };
+
+  const openTempPasswordModal = (
+    userId: string,
+    userName: string,
+    userEmail: string,
+  ) => {
+    setTempPasswordUserId(userId);
+    setTempPasswordUserName(userName);
+    setTempPasswordUserEmail(userEmail);
+    (
+      document.getElementById("temp_password_modal") as HTMLDialogElement
+    )?.showModal();
+  };
+
+  const closeTempPasswordModal = () => {
+    setTempPasswordUserId(null);
+    setTempPasswordUserName("");
+    setTempPasswordUserEmail("");
+    (
+      document.getElementById("temp_password_modal") as HTMLDialogElement
+    )?.close();
   };
 
   useEffect(() => {
@@ -93,10 +163,31 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
     }
 
     if ("success" in fetcher.data && fetcher.data.success === true) {
+      const actionIntent =
+        "intent" in fetcher.data ? fetcher.data.intent : undefined;
+      const userEmail =
+        "userEmail" in fetcher.data ? fetcher.data.userEmail : undefined;
+
       hasShownToast.current = true;
-      closeDeleteModal();
+      if (actionIntent === "delete") {
+        closeDeleteModal();
+        showToast({
+          message: "User deleted successfully!",
+          type: "alert-success",
+        });
+        return;
+      }
+
+      if (actionIntent === "set-temporary-password") {
+        closeTempPasswordModal();
+      }
+
       showToast({
-        message: "User deleted successfully!",
+        message:
+          actionIntent === "set-temporary-password" &&
+          typeof userEmail === "string"
+            ? `Temporary password email sent to ${userEmail}.`
+            : "Action completed successfully!",
         type: "alert-success",
       });
       return;
@@ -159,17 +250,24 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                   <th>Name</th>
                   <th>Website Role</th>
                   <th>Last Login</th>
-                  <th className="text-right">Actions</th>
+                  <th className="w-56 min-w-56 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
                   <tr key={user.user_id}>
                     <td>
-                      <div className="font-medium">
-                        {user.first_name} {user.last_name}
-                      </div>
-                      <div className="text-sm opacity-60">{user.email}</div>
+                      <Link
+                        to={`/user/${user.user_id}`}
+                        className="group hover:bg-base-200 block rounded-lg px-1 py-1 transition-colors"
+                      >
+                        <div className="text-base-content decoration-base-content/50 font-medium underline underline-offset-2">
+                          {user.first_name} {user.last_name}
+                        </div>
+                        <div className="text-base-content/70 decoration-base-content/30 group-hover:text-base-content text-sm underline underline-offset-2">
+                          {user.email}
+                        </div>
+                      </Link>
                     </td>
                     <td>
                       <span className="badge badge-neutral">
@@ -183,8 +281,22 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
                           : "Never"}
                       </span>
                     </td>
-                    <td className="text-right">
-                      <div className="flex justify-end gap-2">
+                    <td className="w-56 min-w-56 text-right align-top">
+                      <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          disabled={fetcher.state !== "idle"}
+                          onClick={() =>
+                            openTempPasswordModal(
+                              user.user_id,
+                              `${user.first_name} ${user.last_name}`,
+                              user.email,
+                            )
+                          }
+                        >
+                          Set Temporary Password
+                        </button>
                         <Link
                           to={`/admin/update-user/${user.user_id}`}
                           className="btn btn-sm btn-ghost"
@@ -238,6 +350,49 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         </div>
         <form method="dialog" className="modal-backdrop">
           <button onClick={closeDeleteModal}>close</button>
+        </form>
+      </dialog>
+
+      <dialog id="temp_password_modal" className="modal">
+        <div className="modal-box">
+          <h3 className="text-lg font-bold">
+            Confirm Temporary Password Reset
+          </h3>
+          <p className="py-4">
+            Are you sure you want to set a temporary password for{" "}
+            <strong>{tempPasswordUserName}</strong>?
+          </p>
+          <p className="pb-4 text-sm opacity-70">
+            A new temporary password will be emailed to {tempPasswordUserEmail},
+            and the user will be required to change it on next sign-in.
+          </p>
+          <div className="modal-action">
+            <button onClick={closeTempPasswordModal} className="btn btn-ghost">
+              Cancel
+            </button>
+            <fetcher.Form method="post">
+              <input
+                type="hidden"
+                name="intent"
+                value="set-temporary-password"
+              />
+              <input
+                type="hidden"
+                name="userId"
+                value={tempPasswordUserId || ""}
+              />
+              <button
+                type="submit"
+                className="btn btn-outline"
+                disabled={fetcher.state !== "idle"}
+              >
+                Set Temporary Password
+              </button>
+            </fetcher.Form>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button onClick={closeTempPasswordModal}>close</button>
         </form>
       </dialog>
     </>
