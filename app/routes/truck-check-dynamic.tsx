@@ -7,6 +7,7 @@ import {
   TruckCheckStore,
 } from "~/lib/truck-check/truck-check-store";
 import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
+import { showToast } from "~/components/toaster";
 import {
   HiOutlineUsers,
   HiOutlineExclamationTriangle,
@@ -149,6 +150,7 @@ export default function TruckCheckDynamic() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     isLocked ? "disconnected" : "connecting",
   );
+  const canEdit = !isLocked && connectionStatus === "connected";
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
   const [contributors, setContributors] = useState<ConnectedUser[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, any>>(
@@ -175,6 +177,7 @@ export default function TruckCheckDynamic() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasShownDisconnectedToastRef = useRef(false);
 
   const wsUrl =
     import.meta.env?.VITE_WEBSOCKET_URL ||
@@ -192,6 +195,15 @@ export default function TruckCheckDynamic() {
 
   const handleFieldChange = useCallback(
     (fieldId: string, value: any) => {
+      if (!canEdit) {
+        showToast({
+          message:
+            "Truck check changes are disabled until your connection is restored.",
+          type: "alert-warning",
+        });
+        return;
+      }
+
       setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
       sendMessage({
         action: "update-field",
@@ -200,12 +212,12 @@ export default function TruckCheckDynamic() {
         value,
       });
     },
-    [sendMessage, truckCheck.id],
+    [canEdit, sendMessage, truckCheck.id],
   );
 
   const handlePhotoUpload = useCallback(
     async (fieldId: string, files: FileList | null, maxPhotos?: number) => {
-      if (!files || files.length === 0 || isLocked) {
+      if (!files || files.length === 0 || !canEdit) {
         return;
       }
 
@@ -312,7 +324,7 @@ export default function TruckCheckDynamic() {
         }));
       }
     },
-    [fieldValues, handleFieldChange, isLocked, truckCheck.id],
+    [canEdit, fieldValues, handleFieldChange, truckCheck.id],
   );
 
   const connectWebSocket = useCallback(() => {
@@ -422,6 +434,36 @@ export default function TruckCheckDynamic() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (isLocked) return;
+
+    if (connectionStatus === "connected") {
+      if (hasShownDisconnectedToastRef.current) {
+        showToast({
+          message: "Connection restored. Truck check editing is enabled again.",
+          type: "alert-success",
+          duration: 5000,
+        });
+      }
+
+      hasShownDisconnectedToastRef.current = false;
+      return;
+    }
+
+    if (
+      (connectionStatus === "disconnected" || connectionStatus === "error") &&
+      !hasShownDisconnectedToastRef.current
+    ) {
+      hasShownDisconnectedToastRef.current = true;
+      showToast({
+        message:
+          "Connection lost. Truck check editing is disabled until you reconnect.",
+        type: "alert-warning",
+        duration: 15000,
+      });
+    }
+  }, [connectionStatus, isLocked]);
 
   useEffect(() => {
     if (!pendingJumpTarget) return;
@@ -576,7 +618,7 @@ export default function TruckCheckDynamic() {
     const fieldId = getFieldId(sectionId, field.label);
     const value = fieldValues[fieldId];
     const isRemoteUpdate = lastUpdate?.fieldId === fieldId;
-    const isLocked = truckCheck.locked;
+    const fieldDisabled = !canEdit;
     const fieldContainerClass = `form-control rounded-lg border border-base-300 p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`;
 
     switch (field.type) {
@@ -600,7 +642,7 @@ export default function TruckCheckDynamic() {
             : checkboxValue === "not-present"
               ? "border-error bg-error text-error-content"
               : "border-base-content/30 bg-base-100 text-base-content/50"
-        } ${isLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`;
+        } ${fieldDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`;
 
         return (
           <div key={fieldId} className={fieldContainerClass}>
@@ -616,7 +658,7 @@ export default function TruckCheckDynamic() {
                 }
                 aria-label={`${field.label}: ${checkboxStateLabel}`}
                 className={checkboxButtonClass}
-                disabled={isLocked}
+                disabled={fieldDisabled}
                 onClick={() =>
                   handleFieldChange(
                     fieldId,
@@ -664,7 +706,7 @@ export default function TruckCheckDynamic() {
               maxLength={field.maxLength}
               className="input input-bordered w-full"
               value={value || ""}
-              disabled={isLocked}
+              disabled={fieldDisabled}
               onChange={(e) => handleFieldChange(fieldId, e.target.value)}
             />
             {field.helpText && (
@@ -699,7 +741,7 @@ export default function TruckCheckDynamic() {
                 max={field.max}
                 className="input input-bordered w-full flex-1"
                 value={value ?? ""}
-                disabled={isLocked}
+                disabled={fieldDisabled}
                 onChange={(e) =>
                   handleFieldChange(
                     fieldId,
@@ -741,7 +783,7 @@ export default function TruckCheckDynamic() {
               id={fieldId}
               className="select select-bordered w-full"
               value={value || ""}
-              disabled={isLocked}
+              disabled={fieldDisabled}
               onChange={(e) => handleFieldChange(fieldId, e.target.value)}
             >
               <option value="">Select...</option>
@@ -791,7 +833,7 @@ export default function TruckCheckDynamic() {
                       alt={`${field.label} ${index + 1}`}
                       className="border-base-300 h-24 w-full rounded border object-cover"
                     />
-                    {!isLocked && (
+                    {!fieldDisabled && (
                       <button
                         type="button"
                         className="btn btn-xs btn-circle btn-error absolute top-1 right-1"
@@ -820,7 +862,9 @@ export default function TruckCheckDynamic() {
                 accept="image/*"
                 capture="environment"
                 className="file-input file-input-bordered w-full"
-                disabled={isLocked || isUploadingPhotos || !canUploadMorePhotos}
+                disabled={
+                  fieldDisabled || isUploadingPhotos || !canUploadMorePhotos
+                }
                 onChange={(e) => {
                   void handlePhotoUpload(
                     fieldId,
