@@ -178,6 +178,7 @@ export default function TruckCheckDynamic() {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownDisconnectedToastRef = useRef(false);
+  const hasEverConnectedRef = useRef(false);
 
   const wsUrl =
     import.meta.env?.VITE_WEBSOCKET_URL ||
@@ -338,6 +339,7 @@ export default function TruckCheckDynamic() {
       ws.onopen = () => {
         console.log("WebSocket connected");
         setConnectionStatus("connected");
+        hasEverConnectedRef.current = true;
         ws.send(
           JSON.stringify({
             action: "join-truck-check",
@@ -453,7 +455,8 @@ export default function TruckCheckDynamic() {
 
     if (
       (connectionStatus === "disconnected" || connectionStatus === "error") &&
-      !hasShownDisconnectedToastRef.current
+      !hasShownDisconnectedToastRef.current &&
+      hasEverConnectedRef.current
     ) {
       hasShownDisconnectedToastRef.current = true;
       showToast({
