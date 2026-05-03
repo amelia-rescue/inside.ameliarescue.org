@@ -159,7 +159,7 @@ export default function TruckCheckDynamic() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     () =>
       Object.fromEntries(
-        schema.sections.map((section: any) => [section.id, true]),
+        schema.sections.map((section: any) => [section.id, false]),
       ),
   );
   const [pendingJumpTarget, setPendingJumpTarget] = useState<{
@@ -583,8 +583,13 @@ export default function TruckCheckDynamic() {
 
   const jumpToField = useCallback(
     (fieldId: string, sectionId: string) => {
-      setPendingJumpTarget({ fieldId, sectionId });
+      // Open the section first
       setOpenSections((prev) => ({ ...prev, [sectionId]: true }));
+
+      // Set the jump target on the next tick after the section has time to open
+      setTimeout(() => {
+        setPendingJumpTarget({ fieldId, sectionId });
+      }, 0);
     },
     [setOpenSections],
   );
