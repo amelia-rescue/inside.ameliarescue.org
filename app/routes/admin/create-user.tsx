@@ -4,10 +4,9 @@ import { appContext } from "~/context";
 import { userSchema, UserStore } from "~/lib/user-store";
 import { type } from "arktype";
 import { IoInformationCircle } from "react-icons/io5";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { RoleStore } from "~/lib/role-store";
 import { TrackStore } from "~/lib/track-store";
-import { showToast } from "~/components/toaster";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -116,13 +115,12 @@ export async function action({ request }: Route.ActionArgs) {
     throw error;
   }
 
-  return { success: true };
+  return redirect("/admin/users?toast=user-created");
 }
 
 export default function CreateUser({ loaderData }: Route.ComponentProps) {
-  const { user, roles, tracks } = loaderData;
+  const { roles, tracks } = loaderData;
   const fetcher = useFetcher<typeof action>();
-  const hasShownToast = useRef(false);
   const [assignments, setAssignments] = useState([
     { id: Date.now(), role_name: "", track_name: "", precepting: false },
   ]);
@@ -166,36 +164,6 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
 
     setAssignments(updatedAssignments);
   };
-
-  useEffect(() => {
-    const isIdle = fetcher.state === "idle";
-
-    if (!isIdle) {
-      hasShownToast.current = false;
-      return;
-    }
-
-    if (!fetcher.data || hasShownToast.current) {
-      return;
-    }
-
-    if ("success" in fetcher.data && fetcher.data.success === true) {
-      hasShownToast.current = true;
-      showToast({
-        message: "User created successfully!",
-        type: "alert-success",
-      });
-      return;
-    }
-
-    if ("error" in fetcher.data && typeof fetcher.data.error === "string") {
-      hasShownToast.current = true;
-      showToast({
-        message: fetcher.data.error,
-        type: "alert-error",
-      });
-    }
-  }, [fetcher.state, fetcher.data]);
 
   return (
     <div className="mx-auto w-full max-w-2xl">

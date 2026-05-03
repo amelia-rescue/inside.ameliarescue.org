@@ -1,4 +1,11 @@
-import { data, Link, redirect, useFetcher } from "react-router";
+import {
+  data,
+  Link,
+  redirect,
+  useFetcher,
+  useNavigate,
+  useSearchParams,
+} from "react-router";
 import type { Route } from "./+types/users";
 import { appContext } from "~/context";
 import { EmailService } from "~/lib/email-service";
@@ -105,7 +112,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function AdminUsers({ loaderData }: Route.ComponentProps) {
   const { users } = loaderData;
   const fetcher = useFetcher<typeof action>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const hasShownToast = useRef(false);
+  const hasShownRedirectToast = useRef(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleteUserName, setDeleteUserName] = useState<string>("");
   const [tempPasswordUserId, setTempPasswordUserId] = useState<string | null>(
@@ -148,6 +158,34 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
       document.getElementById("temp_password_modal") as HTMLDialogElement
     )?.close();
   };
+
+  useEffect(() => {
+    if (hasShownRedirectToast.current) {
+      return;
+    }
+
+    if (searchParams.get("toast") !== "user-created") {
+      return;
+    }
+
+    hasShownRedirectToast.current = true;
+    showToast({
+      message: "User created successfully!",
+      type: "alert-success",
+      duration: 60_000,
+    });
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete("toast");
+    const nextSearch = nextSearchParams.toString();
+    navigate(
+      {
+        pathname: "/admin/users",
+        search: nextSearch ? `?${nextSearch}` : "",
+      },
+      { replace: true },
+    );
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     const isIdle = fetcher.state === "idle";
