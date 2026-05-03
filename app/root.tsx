@@ -6,13 +6,14 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useNavigation,
   useRouteError,
   useRouteLoaderData,
   useFetcher,
   useLocation,
   data,
 } from "react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -62,6 +63,47 @@ export async function action({ request }: Route.ActionArgs) {
   const headers = await setPreferences({ theme });
 
   return data({ success: true }, { headers });
+}
+
+function NavigationLoadingIndicator() {
+  const navigation = useNavigation();
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      setIsVisible(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsVisible(true);
+    }, 150);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [navigation.state]);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <div
+      aria-live="polite"
+      aria-busy="true"
+      className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4"
+      role="status"
+    >
+      <div className="bg-base-100/90 text-base-content border-primary flex items-center gap-3 rounded-full border px-4 py-2 shadow-lg backdrop-blur-sm">
+        <span
+          className="loading loading-spinner loading-sm"
+          aria-hidden="true"
+        />
+        <span className="text-sm font-medium">Loading page…</span>
+      </div>
+    </div>
+  );
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -115,6 +157,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
+        <NavigationLoadingIndicator />
         <div className="bg-base-200 flex min-h-screen flex-col">
           <div className="navbar bg-base-100 shadow">
             <div className="mx-auto w-full max-w-5xl px-4">
