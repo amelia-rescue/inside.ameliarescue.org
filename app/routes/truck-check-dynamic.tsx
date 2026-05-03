@@ -354,6 +354,10 @@ export default function TruckCheckDynamic() {
               setConnectedUsers(data.connectedUsers || []);
               break;
 
+            case "contributors-updated":
+              setContributors(data.contributors || []);
+              break;
+
             case "field-update":
               setFieldValues((prev) => {
                 if (data.fieldId) {

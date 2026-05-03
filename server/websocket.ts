@@ -406,38 +406,30 @@ async function handleJoinTruckCheck({
   );
 
   const truckCheckStore = TruckCheckStore.make();
-
-  const contributors: string[] = [];
-  if (userId && !contributors.includes(userId)) {
-    contributors.push(userId);
-    await truckCheckStore.updateTruckCheck({
-      id: truckCheckId,
-      contributors,
-    });
-  }
+  const truckCheck = await truckCheckStore.getTruckCheck(truckCheckId);
 
   let contributorNames: { userId: string; userName: string }[] = [];
-  const namePromises = contributors.map(async (cId: string) => {
-    try {
-      const userResult = await userStore.getUser(userId, {
-        includeDeleted: true,
-      });
-      return {
-        userId: cId,
-        userName: `${userResult.first_name} ${userResult.last_name}`,
-      };
-    } catch {
-      return { userId: cId, userName: "Unknown" };
-    }
-  });
+  const namePromises = (truckCheck.contributors || []).map(
+    async (cId: string) => {
+      try {
+        const userResult = await userStore.getUser(cId, {
+          includeDeleted: true,
+        });
+        return {
+          userId: cId,
+          userName: `${userResult.first_name} ${userResult.last_name}`,
+        };
+      } catch {
+        return { userId: cId, userName: "Unknown" };
+      }
+    },
+  );
   contributorNames = await Promise.all(namePromises);
 
   const connectedUsers = await getConnectedUsersForTruckCheck({
     connectionsTableName,
     truckCheckId,
   });
-
-  const truckCheck = await truckCheckStore.getTruckCheck(truckCheckId);
 
   await sendToConnection({
     apiGatewayClient,
@@ -491,12 +483,38 @@ async function handleUpdateField({
     return { statusCode: 400, body: "Connection not found" };
   }
 
+  const userId = connection.user_id as string | undefined;
   const truckCheckStore = TruckCheckStore.make();
-  await truckCheckStore.updateTruckCheckField({
+  const updatedField = await truckCheckStore.updateTruckCheckField({
     id: truckCheckId,
     fieldId,
     value,
   });
+
+  let updatedContributorNames:
+    | { userId: string; userName: string }[]
+    | undefined;
+  if (userId && !(updatedField.contributors || []).includes(userId)) {
+    const updatedCheck = await truckCheckStore.updateTruckCheck({
+      id: truckCheckId,
+      contributors: [userId],
+    });
+    const userStore = UserStore.make();
+    const namePromises = updatedCheck.contributors.map(async (cId: string) => {
+      try {
+        const userResult = await userStore.getUser(cId, {
+          includeDeleted: true,
+        });
+        return {
+          userId: cId,
+          userName: `${userResult.first_name} ${userResult.last_name}`,
+        };
+      } catch {
+        return { userId: cId, userName: "Unknown" };
+      }
+    });
+    updatedContributorNames = await Promise.all(namePromises);
+  }
 
   await broadcastToTruckCheck({
     apiGatewayClient,
@@ -511,6 +529,18 @@ async function handleUpdateField({
     },
     excludeConnectionId: connectionId,
   });
+
+  if (updatedContributorNames) {
+    await broadcastToTruckCheck({
+      apiGatewayClient,
+      connectionsTableName,
+      truckCheckId,
+      message: {
+        type: "contributors-updated",
+        contributors: updatedContributorNames,
+      },
+    });
+  }
 
   return { statusCode: 200, body: "Field updated" };
 }
