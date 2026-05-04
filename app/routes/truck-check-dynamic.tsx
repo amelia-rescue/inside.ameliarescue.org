@@ -362,6 +362,13 @@ export default function TruckCheckDynamic() {
             case "user-joined":
               setConnectedUsers(data.connectedUsers || []);
               setContributors(data.contributors || []);
+              if (data.userId !== user.user_id) {
+                showToast({
+                  message: `${data.userName || "Someone"} joined.`,
+                  type: "alert-info",
+                  duration: 5000,
+                });
+              }
               break;
 
             case "user-left":
