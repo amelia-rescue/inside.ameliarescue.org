@@ -42,8 +42,8 @@ export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.ico", sizes: "any" },
   {
     rel: "apple-touch-icon",
-    href: "/icon-192.svg",
-    type: "image/svg+xml",
+    href: "/logo-192.png",
+    type: "image/png",
   },
 ];
 
@@ -162,8 +162,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="navbar bg-base-100 shadow">
             <div className="mx-auto w-full max-w-5xl px-4">
               <div className="flex w-full items-center justify-between">
-                <Link to="/" className="text-xl font-semibold">
-                  Inside Amelia Rescue
+                <Link to="/" aria-label="Inside Amelia Rescue">
+                  <img
+                    src="/logo-192.png"
+                    alt="Inside Amelia Rescue"
+                    className="h-10 w-10 rounded"
+                  />
                 </Link>
                 <div className="flex items-center gap-4">
                   {loaderData?.user && (

@@ -1049,7 +1049,7 @@ export class CdkStack extends cdk.Stack {
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
         },
-        "/icon-192.svg": {
+        "/logo-192.png": {
           origin: staticBucketOrigin,
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -1057,7 +1057,7 @@ export class CdkStack extends cdk.Stack {
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
           cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         },
-        "/icon-512.svg": {
+        "/logo-512.png": {
           origin: staticBucketOrigin,
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -1126,20 +1126,29 @@ export class CdkStack extends cdk.Stack {
     });
 
     // Deploy static assets to S3
-    new s3deploy.BucketDeployment(this, "DeployStaticAssets", {
-      sources: [s3deploy.Source.asset(path.join(__dirname, "../build/client"))],
-      destinationBucket: staticBucket,
-      distribution,
-      distributionPaths: [
-        "/assets/*",
-        "/favicon.ico",
-        "/robots.txt",
-        "/sw.js",
-        "/manifest.webmanifest",
-        "/icon-192.svg",
-        "/icon-512.svg",
-      ],
-    });
+    const staticAssetsDeployment = new s3deploy.BucketDeployment(
+      this,
+      "DeployStaticAssets",
+      {
+        sources: [
+          s3deploy.Source.asset(path.join(__dirname, "../build/client")),
+        ],
+        destinationBucket: staticBucket,
+        prune: false,
+        distribution,
+        distributionPaths: [
+          "/assets/*",
+          "/favicon.ico",
+          "/robots.txt",
+          "/sw.js",
+          "/manifest.webmanifest",
+          "/logo-192.png",
+          "/logo-512.png",
+        ],
+      },
+    );
+
+    lambdaFunction.node.addDependency(staticAssetsDeployment);
 
     // Note: APP_URL is determined at runtime from request headers
     // to avoid circular dependency with CloudFront distribution
