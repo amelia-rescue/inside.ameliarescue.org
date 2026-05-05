@@ -311,7 +311,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                       <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
                         <button
                           type="button"
-                          className="btn btn-sm btn-ghost"
+                          className="btn btn-sm btn-ghost text-warning"
                           disabled={fetcher.state !== "idle"}
                           onClick={() =>
                             openTempPasswordModal(
@@ -409,7 +409,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
               />
               <button
                 type="submit"
-                className="btn btn-outline"
+                className="btn btn-outline text-warning"
                 disabled={fetcher.state !== "idle"}
               >
                 Set Temporary Password
