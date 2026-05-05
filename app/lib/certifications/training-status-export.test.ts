@@ -140,6 +140,8 @@ describe("serializeTrainingStatusExportRowsToCsv", () => {
     expect(csv).toContain("required");
     expect(csv).toContain('"Doe ""Medic"""');
     expect(csv).toContain('"EMT - Operations, Driver - Transport"');
-    expect(csv).toContain(",yes,active,2025-01-01,2027-01-01,2025-01-02T00:00:00.000Z,");
+    expect(csv).toContain(
+      ",yes,active,2025-01-01,2027-01-01,2025-01-02T00:00:00.000Z,",
+    );
   });
 });

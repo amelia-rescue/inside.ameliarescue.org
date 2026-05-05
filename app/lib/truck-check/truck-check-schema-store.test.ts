@@ -137,7 +137,6 @@ describe("truck check schema store test", () => {
       const trucks = await store.listTrucks();
       expect(trucks).toEqual([]);
     });
-
   });
 
   describe("Schema operations", () => {

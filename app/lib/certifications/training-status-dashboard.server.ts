@@ -15,7 +15,10 @@ export async function loadTrainingStatusDashboardData(): Promise<TrainingStatusD
     .startOf("month")
     .format("YYYY-MM-DD");
   const endDate = dayjs(now).format("YYYY-MM-DD");
-  const snapshots = await snapshotStore.getSnapshotsByDateRange(startDate, endDate);
+  const snapshots = await snapshotStore.getSnapshotsByDateRange(
+    startDate,
+    endDate,
+  );
 
   return buildTrainingStatusDashboardData({
     currentData,

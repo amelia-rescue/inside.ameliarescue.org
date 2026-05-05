@@ -59,7 +59,7 @@ Member management system for Amelia Rescue Squad.
                                        └──────────────────────┘
 
 Example Flow:
-  1. User "John Doe" has membership_role: { role_name: "Provider", 
+  1. User "John Doe" has membership_role: { role_name: "Provider",
      track_name: "EMT", precepting: false }
   2. Role "Provider" allows tracks: ["EMT", "ALS", "BLS"]
   3. Track "EMT" requires certifications: ["CPR", "EMT-Basic"]

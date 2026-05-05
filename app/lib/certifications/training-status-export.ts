@@ -110,11 +110,16 @@ function formatMembershipRoles(user: User): string {
     .join("; ");
 }
 
-function buildRequiredCertificationNames(user: User, tracks: Track[]): string[] {
+function buildRequiredCertificationNames(
+  user: User,
+  tracks: Track[],
+): string[] {
   const requiredCertNames = new Set<string>();
 
   for (const assignment of user.membership_roles) {
-    const track = tracks.find((candidate) => candidate.name === assignment.track_name);
+    const track = tracks.find(
+      (candidate) => candidate.name === assignment.track_name,
+    );
     if (!track) {
       continue;
     }
@@ -139,7 +144,9 @@ function buildCurrentCertificationsByType(
 
     if (
       !existingCertification ||
-      certification.uploaded_at.localeCompare(existingCertification.uploaded_at) > 0
+      certification.uploaded_at.localeCompare(
+        existingCertification.uploaded_at,
+      ) > 0
     ) {
       certificationsByType.set(
         certification.certification_type_name,
@@ -162,10 +169,12 @@ export function buildTrainingStatusData({
 
   const trainingData: TrainingStatusRow[] = users.map((user) => {
     const userCertifications = certificationsByUserId[user.user_id] || [];
-    const requiredCertifications = buildRequiredCertificationNames(user, tracks);
-    const currentCertificationsByType = buildCurrentCertificationsByType(
-      userCertifications,
+    const requiredCertifications = buildRequiredCertificationNames(
+      user,
+      tracks,
     );
+    const currentCertificationsByType =
+      buildCurrentCertificationsByType(userCertifications);
     const certifications: Record<string, CertStatus> = {};
 
     requiredCertifications.forEach((certificationTypeName) => {
@@ -183,7 +192,9 @@ export function buildTrainingStatusData({
     ).sort();
 
     exportCertificationTypes.forEach((certificationTypeName) => {
-      const certification = currentCertificationsByType.get(certificationTypeName);
+      const certification = currentCertificationsByType.get(
+        certificationTypeName,
+      );
       const required = requiredCertifications.includes(certificationTypeName);
 
       exportRows.push({
@@ -262,7 +273,9 @@ export async function loadTrainingStatusData(): Promise<TrainingStatusData> {
     }),
   );
 
-  const certificationsByUserId = Object.fromEntries(certificationsByUserEntries);
+  const certificationsByUserId = Object.fromEntries(
+    certificationsByUserEntries,
+  );
 
   return buildTrainingStatusData({
     users,
@@ -305,7 +318,11 @@ export function serializeTrainingStatusExportRowsToCsv(
       .map((column) => {
         const value = row[column];
         const normalizedValue =
-          typeof value === "boolean" ? (value ? "yes" : "no") : String(value ?? "");
+          typeof value === "boolean"
+            ? value
+              ? "yes"
+              : "no"
+            : String(value ?? "");
         return escapeCsvValue(normalizedValue);
       })
       .join(","),

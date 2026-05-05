@@ -46,7 +46,11 @@ export async function action({ request }: Route.ActionArgs) {
     return data({ error: "Missing required fields" }, { status: 400 });
   }
 
-  if (!ALLOWED_IMAGE_TYPES.includes(contentType as (typeof ALLOWED_IMAGE_TYPES)[number])) {
+  if (
+    !ALLOWED_IMAGE_TYPES.includes(
+      contentType as (typeof ALLOWED_IMAGE_TYPES)[number],
+    )
+  ) {
     return data(
       { error: "Invalid file type. Only JPG, PNG, WebP, and GIF are allowed." },
       { status: 400 },
@@ -70,9 +74,6 @@ export async function action({ request }: Route.ActionArgs) {
     });
   } catch (error) {
     console.error("Error generating truck-check image upload URL:", error);
-    return data(
-      { error: "Failed to generate upload URL" },
-      { status: 500 },
-    );
+    return data({ error: "Failed to generate upload URL" }, { status: 500 });
   }
 }

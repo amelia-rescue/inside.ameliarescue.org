@@ -112,6 +112,7 @@ Coverage reports are generated in the `coverage/` directory when running `npm ru
 ## CI/CD Integration
 
 For CI pipelines, use:
+
 ```bash
 npm run test:run
 ```
