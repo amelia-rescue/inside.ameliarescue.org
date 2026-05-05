@@ -78,7 +78,14 @@ export function CertificationUpload({
       });
 
       if (!saveResponse.ok) {
-        throw new Error("Failed to save certification");
+        let errorString: string;
+        try {
+          const body = await saveResponse.json();
+          errorString = body.error || "Failed to save certification";
+        } catch (error) {
+          errorString = "Failed to save certification";
+        }
+        throw new Error(errorString);
       }
 
       setUploadSuccess(true);
