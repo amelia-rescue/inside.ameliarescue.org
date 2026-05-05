@@ -3,6 +3,7 @@ import type { Route } from "./+types/certifications.save";
 import { CertificationStore } from "~/lib/certifications/certification-store";
 import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
 import dayjs from "dayjs";
+import { log } from "~/lib/logger";
 
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
@@ -63,7 +64,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     return data({ success: true, certification });
   } catch (error) {
-    console.error("Error saving certification:", error);
+    log.error("Error saving certification:", { error });
     return data({ error: "Failed to save certification" }, { status: 500 });
   }
 }
