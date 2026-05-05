@@ -27,6 +27,8 @@ export const authMiddleware: Route.MiddlewareFunction = async function (
       ...sessionUser,
     },
     theme: preferences.theme,
+    locale: preferences.locale,
+    timeZone: preferences.timeZone,
   });
 
   const response = await next();

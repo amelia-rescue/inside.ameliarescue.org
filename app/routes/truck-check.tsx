@@ -8,6 +8,7 @@ import {
   TruckCheckSchemaStore,
   type TruckCheckSchema,
 } from "~/lib/truck-check/truck-check-schema-store";
+import { DateDisplay } from "~/components/date-display";
 
 type TruckCheckListItem = Awaited<
   ReturnType<TruckCheckStore["listTruckChecks"]>
@@ -325,8 +326,15 @@ export default function TruckCheck() {
                         {truck?.displayName || check.truck}
                       </h2>
                       <p className="mt-1 text-sm opacity-70">
-                        {checkDate.toLocaleDateString()} at{" "}
-                        {checkDate.toLocaleTimeString()}
+                        <DateDisplay
+                          value={check.created_at}
+                          format="shortDate"
+                        />{" "}
+                        at{" "}
+                        <DateDisplay
+                          value={check.created_at}
+                          format="shortTime"
+                        />
                       </p>
                       <div className="mt-3 flex items-center gap-2">
                         {check.locked && (

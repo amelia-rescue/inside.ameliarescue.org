@@ -10,6 +10,7 @@ import { CertificationStore } from "~/lib/certifications/certification-store";
 import { TrackStore } from "~/lib/track-store";
 import { RoleStore } from "~/lib/role-store";
 import { CertificationReminderStore } from "~/lib/certifications/certification-reminder-store";
+import { DateDisplay } from "~/components/date-display";
 
 async function getCertificationData(user_id: string) {
   const certificationTypeStore = CertificationTypeStore.make();
@@ -187,7 +188,10 @@ export default function User() {
                     <>
                       <dt className="opacity-70">Last Login</dt>
                       <dd className="font-medium">
-                        {new Date(user.last_login_at).toLocaleString()}
+                        <DateDisplay
+                          value={user.last_login_at}
+                          format="shortDateTime"
+                        />
                       </dd>
                     </>
                   )}
@@ -394,14 +398,10 @@ export default function User() {
                                 reminder.reminder_type.slice(1)}
                           </span>
                           <span className="text-xs opacity-50">
-                            {new Date(reminder.sent_at).toLocaleDateString(
-                              undefined,
-                              {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
+                            <DateDisplay
+                              value={reminder.sent_at}
+                              format="mediumDate"
+                            />
                           </span>
                         </div>
                         <p className="text-sm font-medium">
@@ -474,14 +474,10 @@ export default function User() {
                             </div>
                           </td>
                           <td>
-                            {new Date(reminder.sent_at).toLocaleDateString(
-                              undefined,
-                              {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
+                            <DateDisplay
+                              value={reminder.sent_at}
+                              format="mediumDate"
+                            />
                           </td>
                         </tr>
                       ))}

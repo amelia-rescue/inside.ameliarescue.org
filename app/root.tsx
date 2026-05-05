@@ -12,8 +12,9 @@ import {
   useFetcher,
   useLocation,
   data,
+  useRevalidator,
 } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -47,20 +48,35 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ context, request }: Route.LoaderArgs) {
   const appCtx = context.get(appContext);
+  const { getPreferences } = await import("./lib/preferences.server");
+  const preferences = appCtx ? null : await getPreferences(request);
+
   return {
     user: appCtx?.user,
-    theme: appCtx?.theme || "forest",
+    theme: appCtx?.theme || preferences?.theme || "forest",
+    locale: appCtx?.locale || preferences?.locale || "en-US",
+    timeZone: appCtx?.timeZone || preferences?.timeZone || "UTC",
+    currentYear: new Date().getUTCFullYear(),
   };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
-  const theme = formData.get("theme") as string;
+  const theme = formData.get("theme");
+  const locale = formData.get("locale");
+  const timeZone = formData.get("timeZone");
 
-  const { setPreferences } = await import("./lib/preferences.server");
-  const headers = await setPreferences({ theme });
+  const { getPreferences, setPreferences } =
+    await import("./lib/preferences.server");
+  const preferences = await getPreferences(request);
+  const headers = await setPreferences({
+    ...preferences,
+    ...(typeof theme === "string" && theme ? { theme } : {}),
+    ...(typeof locale === "string" && locale ? { locale } : {}),
+    ...(typeof timeZone === "string" && timeZone ? { timeZone } : {}),
+  });
 
   return data({ success: true }, { headers });
 }
@@ -110,8 +126,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const loaderData = useRouteLoaderData<typeof loader>("root");
   const error = useRouteError();
   const fetcher = useFetcher();
+  const preferenceFetcher = useFetcher();
+  const revalidator = useRevalidator();
+  const submittedPreferencesRef = useRef<string | null>(null);
   const location = useLocation();
   const theme = loaderData?.theme || "forest";
+  const locale = loaderData?.locale || "en-US";
+  const timeZone = loaderData?.timeZone || "UTC";
   const isWideContentRoute = location.pathname === "/training-status";
   const themeColor =
     theme === "light"
@@ -125,6 +146,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const browserLocale = navigator.language;
+    const preferenceKey = `${browserLocale}:${browserTimeZone}`;
+
+    if (
+      !browserTimeZone ||
+      preferenceFetcher.state !== "idle" ||
+      submittedPreferencesRef.current === preferenceKey ||
+      (browserTimeZone === timeZone && browserLocale === locale)
+    ) {
+      return;
+    }
+
+    submittedPreferencesRef.current = preferenceKey;
+    const formData = new FormData();
+    formData.append("timeZone", browserTimeZone);
+    formData.append("locale", browserLocale);
+    preferenceFetcher.submit(formData, { method: "post" });
+  }, [locale, preferenceFetcher, preferenceFetcher.state, timeZone]);
+
+  useEffect(() => {
+    if (preferenceFetcher.state === "idle" && preferenceFetcher.data) {
+      revalidator.revalidate();
+    }
+  }, [preferenceFetcher.data, preferenceFetcher.state, revalidator]);
 
   useEffect(() => {
     if (import.meta.env.DEV || !("serviceWorker" in navigator)) {
@@ -141,7 +189,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <html lang="en" data-theme={theme}>
+    <html lang={locale} data-theme={theme}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -248,7 +296,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <footer className="footer footer-center bg-base-300 text-base-content p-4">
             <aside>
               <p>
-                {new Date().getFullYear()} Amelia Emergency Squad. All rights
+                {loaderData?.currentYear} Amelia Emergency Squad. All rights
                 reserved.
               </p>
             </aside>

@@ -7,6 +7,7 @@ import {
   deleteWebAuthnCredential,
 } from "~/lib/auth.server";
 import { requireUser } from "~/lib/session.server";
+import { DateDisplay } from "~/components/date-display";
 
 export async function loader({ context, request }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
@@ -134,9 +135,10 @@ export default function Security({ loaderData }: Route.ComponentProps) {
                               : "Cross-platform authenticator"}
                             {" · "}
                             Added{" "}
-                            {new Date(
-                              passkey.CreatedAt * 1000,
-                            ).toLocaleDateString()}
+                            <DateDisplay
+                              value={passkey.CreatedAt * 1000}
+                              format="shortDate"
+                            />
                           </p>
                         </div>
                       </div>

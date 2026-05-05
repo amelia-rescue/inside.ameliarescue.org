@@ -18,6 +18,7 @@ import {
   HiOutlineChevronLeft,
 } from "react-icons/hi2";
 import { UserStore, type User } from "~/lib/user-store";
+import { DateDisplay } from "~/components/date-display";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Truck Check - Inside Amelia Rescue" }];
@@ -961,12 +962,10 @@ export default function TruckCheckDynamic() {
                 {truckCheck.schema_created_at}
               </p>
               <p>
-                {new Date(truckCheck.created_at).toLocaleDateString(undefined, {
-                  weekday: "short",
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
+                <DateDisplay
+                  value={truckCheck.created_at}
+                  format="weekdayDate"
+                />
               </p>
             </div>
           </div>

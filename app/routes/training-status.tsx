@@ -34,6 +34,10 @@ import {
   FaCalendarAlt,
   FaUsers,
 } from "react-icons/fa";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+
+dayjs.extend(utc);
 
 type CertStatus = "active" | "expiring_soon" | "expired" | "missing";
 
@@ -101,16 +105,12 @@ function formatSnapshotDate(date: string | null) {
     return "No snapshots yet";
   }
 
-  const formatted = new Date(date);
-  if (Number.isNaN(formatted.getTime())) {
+  const formatted = dayjs.utc(date);
+  if (!formatted.isValid()) {
     return date;
   }
 
-  return formatted.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatted.format("MMM D, YYYY");
 }
 
 function formatSignedDelta(value: number | null) {

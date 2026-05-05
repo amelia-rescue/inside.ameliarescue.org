@@ -2,6 +2,7 @@ import { Link, redirect } from "react-router";
 import type { Route } from "./+types/email-events";
 import { appContext } from "~/context";
 import { EmailEventStore, type EmailEvent } from "~/lib/email-event-store";
+import { DateDisplay } from "~/components/date-display";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -29,12 +30,12 @@ export async function loader({ context }: Route.LoaderArgs) {
   return { ...c, emailEvents };
 }
 
-function formatTimestamp(value?: string) {
+function Timestamp({ value }: { value?: string }) {
   if (!value) {
-    return "-";
+    return <>-</>;
   }
 
-  return new Date(value).toLocaleString();
+  return <DateDisplay value={value} format="shortDateTime" />;
 }
 
 function statusBadgeClass(status: string) {
@@ -110,12 +111,12 @@ export default function AdminEmailEvents({ loaderData }: Route.ComponentProps) {
                     <tr key={event.message_id}>
                       <td>
                         <div className="text-sm">
-                          {formatTimestamp(
-                            event.last_event_at ?? event.sent_at,
-                          )}
+                          <Timestamp
+                            value={event.last_event_at ?? event.sent_at}
+                          />
                         </div>
                         <div className="text-base-content/60 text-xs">
-                          Sent: {formatTimestamp(event.sent_at)}
+                          Sent: <Timestamp value={event.sent_at} />
                         </div>
                       </td>
                       <td>

@@ -12,6 +12,7 @@ import {
   FiChevronRight,
 } from "react-icons/fi";
 import { useEffect, useState } from "react";
+import { DateDisplay } from "~/components/date-display";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -28,7 +29,7 @@ export async function loader({ context }: Route.LoaderArgs) {
   if (!c) {
     throw new Error("App context not found");
   }
-  return c;
+  return { ...c, currentDate: new Date().toISOString() };
 }
 
 export default function Index({ loaderData }: Route.ComponentProps) {
@@ -68,12 +69,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-semibold">Quick Actions</h2>
           <div className="badge badge-primary badge-outline">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+            <DateDisplay value={loaderData.currentDate} format="longDate" />
           </div>
         </div>
 
@@ -260,6 +256,9 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                     <span className="font-semibold">Install app</span>.
                   </li>
                   <li>Confirm the install prompt.</li>
+                  <li>
+                    If the icon doesn't appear, try restarting your phone.
+                  </li>
                 </ol>
               </div>
             </div>

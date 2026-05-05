@@ -8,6 +8,7 @@ import {
 } from "~/lib/truck-check/truck-check-schema-store";
 import { IoWarning } from "react-icons/io5";
 import { useEffect, useRef, useState } from "react";
+import { DateDisplay } from "~/components/date-display";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -679,14 +680,10 @@ export default function ManageTruckChecks({
                             </span>
                           </div>
                           <p className="mt-1 text-xs opacity-50">
-                            {new Date(schema.createdAt).toLocaleDateString(
-                              undefined,
-                              {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
+                            <DateDisplay
+                              value={schema.createdAt}
+                              format="mediumDate"
+                            />
                           </p>
                         </div>
                         <button
