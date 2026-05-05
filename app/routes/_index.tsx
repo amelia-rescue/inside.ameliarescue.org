@@ -66,13 +66,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     <>
       {/* Quick Actions Grid */}
       <div className="mb-12">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-semibold">Quick Actions</h2>
-          <div className="badge badge-primary badge-outline">
-            <DateDisplay value={loaderData.currentDate} format="longDate" />
-          </div>
-        </div>
-
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Link
             to="/roster"
