@@ -129,6 +129,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const preferenceFetcher = useFetcher();
   const revalidator = useRevalidator();
   const submittedPreferencesRef = useRef<string | null>(null);
+  const revalidatedPreferencesRef = useRef<string | null>(null);
   const location = useLocation();
   const theme = loaderData?.theme || "forest";
   const locale = loaderData?.locale || "en-US";
@@ -169,7 +170,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [locale, preferenceFetcher, preferenceFetcher.state, timeZone]);
 
   useEffect(() => {
-    if (preferenceFetcher.state === "idle" && preferenceFetcher.data) {
+    const submittedPreferences = submittedPreferencesRef.current;
+
+    if (
+      preferenceFetcher.state === "idle" &&
+      preferenceFetcher.data &&
+      submittedPreferences &&
+      revalidatedPreferencesRef.current !== submittedPreferences
+    ) {
+      revalidatedPreferencesRef.current = submittedPreferences;
       revalidator.revalidate();
     }
   }, [preferenceFetcher.data, preferenceFetcher.state, revalidator]);
