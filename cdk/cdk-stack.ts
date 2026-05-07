@@ -47,6 +47,9 @@ export class CdkStack extends cdk.Stack {
       authCertificate,
     } = props;
 
+    const lambdaInsightsVersion =
+      lambda.LambdaInsightsVersion.VERSION_1_0_498_0;
+
     const sesStatusTopic = new sns.Topic(this, "SesStatusTopic", {
       topicName: "inside-amelia-rescue-ses-status-events",
       displayName: "inside.ameliarescue.org SES status events",
@@ -428,6 +431,7 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(15),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
+        insightsVersion: lambdaInsightsVersion,
         logGroup,
         bundling: {
           // so react-router/architect wants aws-sdk v2? so stupid
@@ -520,6 +524,7 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(300),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
+        insightsVersion: lambdaInsightsVersion,
         logGroup: certificationReminderLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -600,6 +605,7 @@ export class CdkStack extends cdk.Stack {
         memorySize: 512,
         timeout: cdk.Duration.seconds(30),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
+        insightsVersion: lambdaInsightsVersion,
         logGroup: sesStatusLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -646,6 +652,7 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(300),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
+        insightsVersion: lambdaInsightsVersion,
         logGroup: certificationSnapshotLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -729,6 +736,7 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(300),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
+        insightsVersion: lambdaInsightsVersion,
         logGroup: trainingStatusSnapshotLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -799,6 +807,7 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(60),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
+        insightsVersion: lambdaInsightsVersion,
         logGroup: truckCheckLockLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -851,6 +860,7 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(30),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
+        insightsVersion: lambdaInsightsVersion,
         logGroup: websocketLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
