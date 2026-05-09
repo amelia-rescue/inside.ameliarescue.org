@@ -8,6 +8,10 @@ const requestLogger: Route.MiddlewareFunction = async function (
 ) {
   const start = performance.now();
   let response: Response;
+  const ipAddress =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("cf-connecting-ip");
 
   try {
     response = await next();
@@ -22,6 +26,8 @@ const requestLogger: Route.MiddlewareFunction = async function (
       path: url.pathname,
       query: Object.fromEntries(query.entries()),
       user: user?.user_id,
+      agent: request.headers.get("user-agent"),
+      ip_address: ipAddress,
     });
     return response;
   } catch (error) {
@@ -38,6 +44,13 @@ const requestLogger: Route.MiddlewareFunction = async function (
     const query = url.searchParams;
     const { user } = await getUser(request);
 
+    if (error instanceof Error) {
+      log.error("error occurred", {
+        error: error.message,
+        stack: error.stack,
+      });
+    }
+
     log.info("request_log", {
       status: response.status,
       time: performance.now() - start,
@@ -45,6 +58,8 @@ const requestLogger: Route.MiddlewareFunction = async function (
       path: url.pathname,
       query: Object.fromEntries(query.entries()),
       user: user?.user_id,
+      agent: request.headers.get("user-agent"),
+      ip_address: ipAddress,
     });
     return response;
   }

@@ -22,6 +22,7 @@ import { authMiddleware } from "./middleware/auth";
 import { requestLogger } from "./middleware/logger";
 import { appContext } from "./context";
 import { Toaster } from "./components/toaster";
+import { log } from "./lib/logger";
 
 export const middleware: Route.MiddlewareFunction[] = [
   requestLogger,
@@ -67,6 +68,17 @@ export async function action({ request }: Route.ActionArgs) {
   const theme = formData.get("theme");
   const locale = formData.get("locale");
   const timeZone = formData.get("timeZone");
+
+  log.info("preferences_update", {
+    theme,
+    locale,
+    timeZone,
+    has_cookie:
+      request.headers.get("cookie")?.includes("preferences=") ?? false,
+    user_agent: request.headers.get("user-agent"),
+    ip_address: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim(),
+    user: appContext.defaultValue?.user?.user_id,
+  });
 
   const { getPreferences, setPreferences } =
     await import("./lib/preferences.server");
