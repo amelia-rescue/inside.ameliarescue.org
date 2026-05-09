@@ -9,6 +9,8 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as apigatewayv2Integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as cloudwatchActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cognito from "aws-cdk-lib/aws-cognito";
@@ -33,6 +35,7 @@ export interface CdkStackProps extends cdk.StackProps {
   hostedZone: route53.IHostedZone;
   appCertificate: acm.ICertificate;
   authCertificate: acm.ICertificate;
+  alarmEmail: string;
 }
 
 export class CdkStack extends cdk.Stack {
@@ -45,10 +48,28 @@ export class CdkStack extends cdk.Stack {
       hostedZone,
       appCertificate,
       authCertificate,
+      alarmEmail,
     } = props;
 
     const lambdaInsightsVersion =
       lambda.LambdaInsightsVersion.VERSION_1_0_498_0;
+
+    const operationalAlarmsTopic = new sns.Topic(
+      this,
+      "OperationalAlarmsTopic",
+      {
+        topicName: "inside-amelia-rescue-operational-alarms",
+        displayName: "inside.ameliarescue.org operational alarms",
+      },
+    );
+
+    operationalAlarmsTopic.addSubscription(
+      new subscriptions.EmailSubscription(alarmEmail),
+    );
+
+    const operationalAlarmAction = new cloudwatchActions.SnsAction(
+      operationalAlarmsTopic,
+    );
 
     const sesStatusTopic = new sns.Topic(this, "SesStatusTopic", {
       topicName: "inside-amelia-rescue-ses-status-events",
@@ -986,6 +1007,80 @@ export class CdkStack extends cdk.Stack {
       path: "/",
       methods: [apigatewayv2.HttpMethod.ANY],
       integration: lambdaIntegration,
+    });
+
+    const errorAlarmPeriod = cdk.Duration.minutes(5);
+    const apiServerErrorAlarm = new cloudwatch.Alarm(
+      this,
+      "HttpApiServerErrorAlarm",
+      {
+        alarmName: "inside-amelia-rescue-http-api-5xx-errors",
+        alarmDescription:
+          "Alarm when the inside.ameliarescue.org HTTP API returns any 5xx response.",
+        metric: httpApi.metricServerError({
+          period: errorAlarmPeriod,
+          statistic: "Sum",
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        comparisonOperator:
+          cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      },
+    );
+    apiServerErrorAlarm.addAlarmAction(operationalAlarmAction);
+
+    [
+      {
+        id: "ReactRouterHandlerErrorAlarm",
+        alarmName: "inside-amelia-rescue-lambda-errors",
+        monitoredFunction: lambdaFunction,
+      },
+      {
+        id: "CertificationReminderErrorAlarm",
+        alarmName: "inside-amelia-rescue-certification-reminder-errors",
+        monitoredFunction: certificationReminderFunction,
+      },
+      {
+        id: "SesStatusHandlerErrorAlarm",
+        alarmName: "inside-amelia-rescue-ses-status-handler-errors",
+        monitoredFunction: sesStatusFunction,
+      },
+      {
+        id: "CertificationSnapshotErrorAlarm",
+        alarmName: "inside-amelia-rescue-certification-snapshot-errors",
+        monitoredFunction: certificationSnapshotFunction,
+      },
+      {
+        id: "TrainingStatusSnapshotErrorAlarm",
+        alarmName: "inside-amelia-rescue-training-status-snapshot-errors",
+        monitoredFunction: trainingStatusSnapshotFunction,
+      },
+      {
+        id: "TruckCheckLockErrorAlarm",
+        alarmName: "inside-amelia-rescue-truck-check-lock-errors",
+        monitoredFunction: truckCheckLockFunction,
+      },
+      {
+        id: "WebSocketErrorAlarm",
+        alarmName: "inside-amelia-rescue-websocket-errors",
+        monitoredFunction: websocketFunction,
+      },
+    ].forEach(({ id, alarmName, monitoredFunction }) => {
+      const alarm = new cloudwatch.Alarm(this, id, {
+        alarmName,
+        alarmDescription: `Alarm when ${monitoredFunction.functionName} has any invocation error.`,
+        metric: monitoredFunction.metricErrors({
+          period: errorAlarmPeriod,
+          statistic: "Sum",
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        comparisonOperator:
+          cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      });
+      alarm.addAlarmAction(operationalAlarmAction);
     });
 
     // Create S3 bucket for static assets

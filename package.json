@@ -37,6 +37,7 @@
     "arktype": "^2.1.29",
     "chart.js": "^4.5.1",
     "dayjs": "^1.11.19",
+    "dotenv": "^17.4.2",
     "isbot": "^5",
     "oauth4webapi": "^3.8.2",
     "react": "^19.1.1",
