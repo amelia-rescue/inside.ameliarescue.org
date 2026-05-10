@@ -1,5 +1,5 @@
 import { useLoaderData, Link } from "react-router";
-import type { Route } from "./+types/training-status";
+import type { Route } from "./+types/certification-status";
 import { appContext } from "~/context";
 import { useState, useMemo } from "react";
 import {
@@ -352,7 +352,7 @@ export default function TrainingStatus() {
           <li>
             <Link to="/">Home</Link>
           </li>
-          <li>Training Status</li>
+          <li>Certification Status</li>
         </ul>
       </div>
 
@@ -360,7 +360,7 @@ export default function TrainingStatus() {
         <div className="card-body gap-6 p-4 sm:p-6 lg:p-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="card-title text-2xl">Training Status</h1>
+              <h1 className="card-title text-2xl">Certification Status</h1>
               <p className="text-sm opacity-70">
                 {trainingData.length} members tracked
               </p>
@@ -369,14 +369,12 @@ export default function TrainingStatus() {
 
           <div className="divider my-0" />
 
+          <p className="text-base">
+            This page shows the certifications across the organization that are
+            either required by local protocols, the training officer, or by law.
+          </p>
+
           <div className="flex flex-col gap-3 pt-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Member-level Detail</h2>
-              <p className="text-sm opacity-70">
-                Search and review member training status before diving into the
-                dashboard summary.
-              </p>
-            </div>
             <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:items-center">
               <div className="form-control w-full lg:w-auto">
                 <input
@@ -387,6 +385,8 @@ export default function TrainingStatus() {
                   onChange={(e) => setGlobalFilter(e.target.value)}
                 />
               </div>
+            </div>
+            <div>
               <a
                 href="/api/training-status/export"
                 className="btn btn-secondary w-full sm:w-auto"

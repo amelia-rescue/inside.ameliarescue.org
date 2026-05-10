@@ -20,7 +20,7 @@ export default [
   ]),
   route("account/security", "./routes/security.tsx"),
   route("roster", "./routes/roster.tsx"),
-  route("training-status", "./routes/training-status.tsx"),
+  route("certification-status", "./routes/certification-status.tsx"),
   route("documents", "./routes/documents.tsx"),
   route("documents/view", "./routes/documents.view.tsx"),
   route("truck-check", "./routes/truck-check.tsx"),

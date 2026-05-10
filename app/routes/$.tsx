@@ -10,5 +10,5 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function CatchAll() {
-  return null;
+  return <div>Not Found</div>;
 }

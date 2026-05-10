@@ -90,7 +90,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           </Link>
 
           <Link
-            to="/training-status"
+            to="/certification-status"
             className="card bg-base-100 group shadow-xl transition-all duration-300 hover:shadow-2xl"
           >
             <div className="card-body">
@@ -98,10 +98,10 @@ export default function Index({ loaderData }: Route.ComponentProps) {
                 <div className="bg-secondary/10 text-secondary rounded-full p-3 transition-transform group-hover:scale-110">
                   <FiBookOpen className="h-6 w-6" />
                 </div>
-                <h2 className="card-title">Training Status</h2>
+                <h2 className="card-title">Certification Status</h2>
               </div>
               <p className="mb-4 text-sm opacity-70">
-                Track certifications and training status across the team.
+                Track certification status across the organization.
               </p>
               <div className="card-actions justify-end">
                 <span className="btn btn-sm btn-secondary group-hover:btn-secondary-content">

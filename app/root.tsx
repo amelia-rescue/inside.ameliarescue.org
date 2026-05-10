@@ -146,7 +146,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const theme = loaderData?.theme || "forest";
   const locale = loaderData?.locale || "en-US";
   const timeZone = loaderData?.timeZone || "UTC";
-  const isWideContentRoute = location.pathname === "/training-status";
+  const isWideContentRoute = location.pathname === "/certification-status";
   const themeColor =
     theme === "light"
       ? "#f5f5f5"
