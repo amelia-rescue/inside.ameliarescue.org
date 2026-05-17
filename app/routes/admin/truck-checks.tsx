@@ -7,8 +7,98 @@ import {
   type TruckCheckSchema,
 } from "~/lib/truck-check/truck-check-schema-store";
 import { IoWarning } from "react-icons/io5";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { DateDisplay } from "~/components/date-display";
+
+type JsonEditorProps = {
+  value: string;
+  onChange: (value: string) => void;
+  hasError: boolean;
+};
+
+function JsonEditor({ value, onChange, hasError }: JsonEditorProps) {
+  const [CodeMirrorEditor, setCodeMirrorEditor] =
+    useState<ComponentType<any> | null>(null);
+  const [extensions, setExtensions] = useState<any[]>([]);
+  const [theme, setTheme] = useState<any>(undefined);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([
+      import("@uiw/react-codemirror"),
+      import("@codemirror/lang-json"),
+      import("@codemirror/theme-one-dark"),
+      import("@codemirror/lint"),
+    ]).then(([codeMirrorModule, jsonModule, themeModule, lintModule]) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setCodeMirrorEditor(() => codeMirrorModule.default);
+      setExtensions([
+        jsonModule.json(),
+        lintModule.linter(jsonModule.jsonParseLinter()),
+        lintModule.lintGutter(),
+      ]);
+      setTheme(themeModule.oneDark);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return (
+    <div
+      className={`overflow-hidden rounded-lg border ${
+        hasError ? "border-error" : "border-base-300"
+      } ${
+        isFullscreen
+          ? "bg-base-100 fixed inset-4 z-50 flex flex-col shadow-2xl"
+          : ""
+      }`}
+    >
+      <div className="bg-base-200 border-base-300 flex items-center justify-between border-b px-3 py-2">
+        <span className="text-sm font-medium">JSON Editor</span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs"
+          onClick={() => setIsFullscreen(!isFullscreen)}
+        >
+          {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+        </button>
+      </div>
+      {CodeMirrorEditor ? (
+        <CodeMirrorEditor
+          value={value}
+          height={isFullscreen ? "calc(100vh - 8.5rem)" : "420px"}
+          extensions={extensions}
+          theme={theme}
+          basicSetup={{
+            bracketMatching: true,
+            closeBrackets: true,
+            codeFolding: true,
+            foldGutter: true,
+            highlightActiveLine: true,
+            highlightActiveLineGutter: true,
+            lineNumbers: true,
+          }}
+          onChange={onChange}
+        />
+      ) : (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={14}
+          className="textarea w-full flex-1 rounded-none border-0 font-mono text-sm"
+          placeholder="[]"
+        />
+      )}
+    </div>
+  );
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -236,7 +326,7 @@ export default function ManageTruckChecks({
   const { trucks, schemas } = loaderData;
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [activeTab, setActiveTab] = useState<"trucks" | "schemas">("trucks");
+  const [activeTab, setActiveTab] = useState<"trucks" | "schemas">("schemas");
 
   // Truck form state
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null);
@@ -348,9 +438,20 @@ export default function ManageTruckChecks({
 
       {/* Trucks Tab */}
       {activeTab === "trucks" && (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8">
+          <div className="alert order-0">
+            <div>
+              <h2 className="font-semibold">Truck setup</h2>
+              <p className="text-sm">
+                Create one truck record for each unit that needs a truck check.
+                Each truck must be assigned to an existing schema, which
+                controls the checklist fields shown to crews.
+              </p>
+            </div>
+          </div>
+
           {/* Truck Form */}
-          <div className="card bg-base-100 rounded-xl shadow-xl">
+          <div className="card bg-base-100 order-2 rounded-xl shadow-xl">
             <div className="card-body">
               <h2 className="card-title">
                 {editingTruck ? "Edit Truck" : "Create New Truck"}
@@ -467,7 +568,7 @@ export default function ManageTruckChecks({
           </div>
 
           {/* Trucks List */}
-          <div className="card bg-base-100 rounded-xl shadow-xl">
+          <div className="card bg-base-100 order-1 rounded-xl shadow-xl">
             <div className="card-body">
               <h2 className="card-title">Existing Trucks</h2>
               {trucks.length === 0 ? (
@@ -520,9 +621,47 @@ export default function ManageTruckChecks({
 
       {/* Schemas Tab */}
       {activeTab === "schemas" && (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8">
+          <div className="alert order-0">
+            <div>
+              <h2 className="font-semibold">Schema setup</h2>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Schemas define the sections and fields used for truck checks.
+                  Edit the JSON array below to add sections and checklist
+                  fields. Updating an existing schema creates a new version.
+                </p>
+                <p>
+                  Each section needs <code>id</code>, <code>title</code>, and a
+                  <code>fields</code> array. Every field needs <code>type</code>{" "}
+                  and <code>label</code>, and can also include{" "}
+                  <code>required</code> and <code>helpText</code>.
+                </p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>
+                    <code>checkbox</code>: yes/no checklist item, with optional{" "}
+                    <code>defaultValue</code>.
+                  </li>
+                  <li>
+                    <code>text</code>: free-text notes, with optional{" "}
+                    <code>placeholder</code> and <code>maxLength</code>.
+                  </li>
+                  <li>
+                    <code>number</code>: numeric entry, with optional{" "}
+                    <code>min</code>, <code>max</code>, and <code>unit</code>.
+                  </li>
+                  <li>
+                    <code>select</code>: dropdown choice, with an{" "}
+                    <code>options</code> array of <code>value</code>/
+                    <code>label</code> pairs.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Schema Form */}
-          <div className="card bg-base-100 rounded-xl shadow-xl">
+          <div className="card bg-base-100 order-2 rounded-xl shadow-xl">
             <div className="card-body">
               <h2 className="card-title">
                 {editingSchema
@@ -596,15 +735,15 @@ export default function ManageTruckChecks({
                       )
                     )}
                   </label>
-                  <textarea
+                  <input
+                    type="hidden"
                     name="sections"
                     value={schemaFormData.sectionsJson}
-                    onChange={(e) => handleSectionsJsonChange(e.target.value)}
-                    rows={14}
-                    className={`textarea textarea-bordered w-full font-mono text-sm ${
-                      jsonError ? "textarea-error" : ""
-                    }`}
-                    placeholder="[]"
+                  />
+                  <JsonEditor
+                    value={schemaFormData.sectionsJson}
+                    onChange={handleSectionsJsonChange}
+                    hasError={!!jsonError}
                   />
                   <label className="label">
                     <span className="label-text-alt opacity-60">
@@ -645,7 +784,7 @@ export default function ManageTruckChecks({
           </div>
 
           {/* Schemas List */}
-          <div className="card bg-base-100 rounded-xl shadow-xl">
+          <div className="card bg-base-100 order-1 rounded-xl shadow-xl">
             <div className="card-body">
               <h2 className="card-title">Existing Schemas</h2>
               {schemas.length === 0 ? (
