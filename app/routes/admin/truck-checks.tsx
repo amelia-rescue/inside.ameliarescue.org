@@ -443,9 +443,9 @@ export default function ManageTruckChecks({
             <div>
               <h2 className="font-semibold">Truck setup</h2>
               <p className="text-sm">
-                Create one truck record for each unit that needs a truck check.
-                Each truck must be assigned to an existing schema, which
-                controls the checklist fields shown to crews.
+                Define the different vehicles that need truck checks here.
+                Different trucks can have different schemas which allows you to
+                customize the checklist for each one.
               </p>
             </div>
           </div>
@@ -632,9 +632,9 @@ export default function ManageTruckChecks({
                   fields. Updating an existing schema creates a new version.
                 </p>
                 <p>
-                  Each section needs <code>id</code>, <code>title</code>, and a
-                  <code>fields</code> array. Every field needs <code>type</code>{" "}
-                  and <code>label</code>, and can also include{" "}
+                  Each section needs <code>id</code>, <code>title</code>, and a{" "}
+                  <code>fields</code> array. Every field needs
+                  <code>type</code> and <code>label</code>, and can also include{" "}
                   <code>required</code> and <code>helpText</code>.
                 </p>
                 <ul className="list-disc space-y-1 pl-5">
