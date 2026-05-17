@@ -1139,64 +1139,74 @@ export default function TruckCheckDynamic() {
 
       {/* Form Sections */}
       <div className="space-y-4">
-        {schema.sections.map((section: any) => (
-          <div
-            key={section.id}
-            className="collapse-arrow bg-base-200 collapse rounded-xl"
-          >
-            <input
-              type="checkbox"
-              checked={!!openSections[section.id]}
-              onChange={() =>
-                setOpenSections((prev) => ({
-                  ...prev,
-                  [section.id]: !prev[section.id],
-                }))
-              }
-            />
-            <div className="collapse-title text-xl font-medium">
-              <div className="flex items-center justify-between gap-3 pr-8">
-                <span>{section.title}</span>
-                {(() => {
-                  const progress = sectionProgress.find(
-                    ({ sectionId }) => sectionId === section.id,
-                  );
+        {schema.sections.map((section: any) => {
+          const isOpen = !!openSections[section.id];
 
-                  if (!progress || progress.requiredCount === 0) {
-                    return (
-                      <span className="badge badge-outline badge-sm shrink-0 whitespace-nowrap">
-                        Optional
+          return (
+            <div
+              key={section.id}
+              className={`collapse-arrow bg-base-200 collapse rounded-xl ${
+                isOpen ? "collapse-open" : "collapse-close"
+              }`}
+            >
+              <button
+                type="button"
+                className="collapse-title w-full cursor-pointer text-left text-xl font-medium"
+                aria-expanded={isOpen}
+                aria-controls={`truck-check-section-${section.id}`}
+                onClick={() =>
+                  setOpenSections((prev) => ({
+                    ...prev,
+                    [section.id]: !prev[section.id],
+                  }))
+                }
+              >
+                <div className="flex items-center justify-between gap-3 pr-8">
+                  <span>{section.title}</span>
+                  {(() => {
+                    const progress = sectionProgress.find(
+                      ({ sectionId }) => sectionId === section.id,
+                    );
+
+                    if (!progress || progress.requiredCount === 0) {
+                      return (
+                        <span className="badge badge-outline badge-sm shrink-0 whitespace-nowrap">
+                          Optional
+                        </span>
+                      );
+                    }
+
+                    return progress.remainingRequiredCount === 0 ? (
+                      <span className="badge badge-success badge-sm shrink-0 whitespace-nowrap">
+                        {progress.completedRequiredCount}/
+                        {progress.requiredCount} required
+                      </span>
+                    ) : (
+                      <span className="badge badge-warning badge-sm shrink-0 whitespace-nowrap">
+                        {progress.remainingRequiredCount} remaining
                       </span>
                     );
-                  }
-
-                  return progress.remainingRequiredCount === 0 ? (
-                    <span className="badge badge-success badge-sm shrink-0 whitespace-nowrap">
-                      {progress.completedRequiredCount}/{progress.requiredCount}{" "}
-                      required
-                    </span>
-                  ) : (
-                    <span className="badge badge-warning badge-sm shrink-0 whitespace-nowrap">
-                      {progress.remainingRequiredCount} remaining
-                    </span>
-                  );
-                })()}
-              </div>
-              {section.description && (
-                <p className="mt-1 text-sm font-normal opacity-70">
-                  {section.description}
-                </p>
-              )}
-            </div>
-            <div className="collapse-content">
-              <div className="space-y-3 pt-4">
-                {section.fields.map((field: any) =>
-                  renderField(field, section.id),
+                  })()}
+                </div>
+                {section.description && (
+                  <p className="mt-1 text-sm font-normal opacity-70">
+                    {section.description}
+                  </p>
                 )}
+              </button>
+              <div
+                id={`truck-check-section-${section.id}`}
+                className="collapse-content"
+              >
+                <div className="space-y-3 pt-4">
+                  {section.fields.map((field: any) =>
+                    renderField(field, section.id),
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Sticky Action Bar */}
