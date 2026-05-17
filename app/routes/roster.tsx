@@ -109,12 +109,16 @@ export default function Roster() {
                     </div>
                   </div>
 
-                  <div>
-                    <div className="text-xs font-semibold opacity-60">Note</div>
-                    <div className="mt-1 text-sm whitespace-normal">
-                      {user.note || "—"}
+                  {user.note && (
+                    <div>
+                      <div className="text-xs font-semibold opacity-60">
+                        Note
+                      </div>
+                      <div className="mt-1 text-sm whitespace-normal">
+                        {user.note}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             ))}
