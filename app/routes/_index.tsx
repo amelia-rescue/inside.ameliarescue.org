@@ -11,9 +11,12 @@ import {
   FiSettings,
   FiExternalLink,
   FiChevronRight,
+  FiX,
 } from "react-icons/fi";
 import { useEffect, useState } from "react";
 import { DateDisplay } from "~/components/date-display";
+
+type MobilePlatform = "ios" | "android" | "unknown";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -36,13 +39,23 @@ export async function loader({ context }: Route.LoaderArgs) {
 export default function Index({ loaderData }: Route.ComponentProps) {
   const { user } = loaderData;
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [mobilePlatform, setMobilePlatform] =
+    useState<MobilePlatform>("unknown");
+  const [isHomeScreenInstructionsHidden, setIsHomeScreenInstructionsHidden] =
+    useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    const standaloneMediaQuery = window.matchMedia(
+      "(display-mode: standalone)",
+    );
+    const mobileMediaQuery = window.matchMedia(
+      "(hover: none) and (pointer: coarse), (max-width: 768px)",
+    );
 
     const updateStandaloneState = () => {
       const iosStandalone =
@@ -52,19 +65,106 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           (window.navigator as Navigator & { standalone?: boolean }).standalone,
         );
 
-      setIsStandalone(mediaQuery.matches || iosStandalone);
+      setIsStandalone(standaloneMediaQuery.matches || iosStandalone);
     };
 
+    const updateMobileDeviceState = () => {
+      setIsMobileDevice(mobileMediaQuery.matches);
+    };
+
+    const userAgent = window.navigator.userAgent;
+    const isIOS =
+      /iPad|iPhone|iPod/.test(userAgent) ||
+      (/Macintosh/.test(userAgent) && window.navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/.test(userAgent);
+
+    if (isIOS) {
+      setMobilePlatform("ios");
+    } else if (isAndroid) {
+      setMobilePlatform("android");
+    }
+
     updateStandaloneState();
-    mediaQuery.addEventListener("change", updateStandaloneState);
+    updateMobileDeviceState();
+    standaloneMediaQuery.addEventListener("change", updateStandaloneState);
+    mobileMediaQuery.addEventListener("change", updateMobileDeviceState);
 
     return () => {
-      mediaQuery.removeEventListener("change", updateStandaloneState);
+      standaloneMediaQuery.removeEventListener("change", updateStandaloneState);
+      mobileMediaQuery.removeEventListener("change", updateMobileDeviceState);
     };
   }, []);
 
   return (
     <>
+      {isMobileDevice && !isStandalone && !isHomeScreenInstructionsHidden && (
+        <div className="card bg-base-100 relative mb-12 shadow-xl">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm btn-circle absolute top-3 right-3"
+            aria-label="Hide home screen instructions"
+            onClick={() => setIsHomeScreenInstructionsHidden(true)}
+          >
+            <FiX className="h-5 w-5" />
+          </button>
+          <div className="card-body gap-6">
+            <div className="flex flex-col gap-2 pr-10 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="card-title text-2xl">Add to your home screen</h2>
+                <p className="text-base-content/70 max-w-2xl text-sm md:text-base">
+                  Get one-tap access on your phone without installing a native
+                  app.
+                </p>
+              </div>
+              <div className="badge badge-success badge-outline">
+                Works best on Safari and Chrome
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              {(mobilePlatform === "ios" || mobilePlatform === "unknown") && (
+                <div className="bg-base-200 rounded-box p-5">
+                  <h3 className="mb-3 text-lg font-semibold">
+                    iPhone and iPad
+                  </h3>
+                  <ol className="list-decimal space-y-2 pl-5 text-sm md:text-base">
+                    <li>Open Inside Amelia Rescue in Safari.</li>
+                    <li>Tap the Share button.</li>
+                    <li>
+                      Choose{" "}
+                      <span className="font-semibold">Add to Home Screen</span>.
+                    </li>
+                    <li>
+                      Tap <span className="font-semibold">Add</span> to finish.
+                    </li>
+                  </ol>
+                </div>
+              )}
+
+              {(mobilePlatform === "android" ||
+                mobilePlatform === "unknown") && (
+                <div className="bg-base-200 rounded-box p-5">
+                  <h3 className="mb-3 text-lg font-semibold">Android</h3>
+                  <ol className="list-decimal space-y-2 pl-5 text-sm md:text-base">
+                    <li>Open Inside Amelia Rescue in Chrome.</li>
+                    <li>Tap the browser menu.</li>
+                    <li>
+                      Choose{" "}
+                      <span className="font-semibold">Add to Home screen</span>{" "}
+                      or <span className="font-semibold">Install app</span>.
+                    </li>
+                    <li>Confirm the install prompt.</li>
+                    <li>
+                      If the icon doesn't appear, try restarting your phone.
+                    </li>
+                  </ol>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions Grid */}
       <div className="mb-12">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -233,59 +333,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           )}
         </div>
       </div>
-
-      {!isStandalone && (
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body gap-6">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="card-title text-2xl">Add to your home screen</h2>
-                <p className="text-base-content/70 max-w-2xl text-sm md:text-base">
-                  Get one-tap access on your phone without installing a native
-                  app.
-                </p>
-              </div>
-              <div className="badge badge-success badge-outline">
-                Works best on Safari and Chrome
-              </div>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="bg-base-200 rounded-box p-5">
-                <h3 className="mb-3 text-lg font-semibold">iPhone and iPad</h3>
-                <ol className="list-decimal space-y-2 pl-5 text-sm md:text-base">
-                  <li>Open Inside Amelia Rescue in Safari.</li>
-                  <li>Tap the Share button.</li>
-                  <li>
-                    Choose{" "}
-                    <span className="font-semibold">Add to Home Screen</span>.
-                  </li>
-                  <li>
-                    Tap <span className="font-semibold">Add</span> to finish.
-                  </li>
-                </ol>
-              </div>
-
-              <div className="bg-base-200 rounded-box p-5">
-                <h3 className="mb-3 text-lg font-semibold">Android</h3>
-                <ol className="list-decimal space-y-2 pl-5 text-sm md:text-base">
-                  <li>Open Inside Amelia Rescue in Chrome.</li>
-                  <li>Tap the browser menu.</li>
-                  <li>
-                    Choose{" "}
-                    <span className="font-semibold">Add to Home screen</span> or{" "}
-                    <span className="font-semibold">Install app</span>.
-                  </li>
-                  <li>Confirm the install prompt.</li>
-                  <li>
-                    If the icon doesn't appear, try restarting your phone.
-                  </li>
-                </ol>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
