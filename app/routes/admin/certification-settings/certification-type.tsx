@@ -103,6 +103,11 @@ export default function CreateCertificationType({
           <li>
             <Link to="/admin">Admin</Link>
           </li>
+          <li>
+            <Link to="/admin/certification-settings">
+              Certification Settings
+            </Link>
+          </li>
           <li>Certification Types</li>
         </ul>
       </div>
@@ -126,7 +131,10 @@ export default function CreateCertificationType({
             purposes. For example, firefighter I may not be required by a
             strictly EMS agency. You can specify which certifications are
             required through{" "}
-            <Link className="text-primary" to="/admin/tracks">
+            <Link
+              className="text-primary"
+              to="/admin/certification-settings/tracks"
+            >
               tracks
             </Link>
             .

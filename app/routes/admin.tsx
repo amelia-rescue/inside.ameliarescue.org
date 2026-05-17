@@ -2,6 +2,13 @@ import { Link, redirect } from "react-router";
 import type { Route } from "./+types/admin";
 import { appContext } from "~/context";
 import { UserStore } from "~/lib/user-store";
+import {
+  IoPeople,
+  IoClipboard,
+  IoMail,
+  IoBus,
+  IoChevronForward,
+} from "react-icons/io5";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -38,25 +45,17 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         "Create users, edit profiles, set temporary passwords, and deactivate accounts.",
       to: "/admin/users",
       cta: "Open user administration",
+      icon: IoPeople,
+      iconColor: "text-primary",
     },
     {
-      title: "Certification Types",
-      description: "Manage certification definitions used across the site.",
-      to: "/admin/certification-type",
-      cta: "Manage certification types",
-    },
-    {
-      title: "Roles",
+      title: "Certification Settings",
       description:
-        "Configure membership roles and their allowed training tracks.",
-      to: "/admin/roles",
-      cta: "Manage roles",
-    },
-    {
-      title: "Tracks",
-      description: "Maintain training tracks available for role assignments.",
-      to: "/admin/tracks",
-      cta: "Manage tracks",
+        "Manage certification types, membership roles, and training tracks.",
+      to: "/admin/certification-settings",
+      cta: "Open certification settings",
+      icon: IoClipboard,
+      iconColor: "text-success",
     },
     {
       title: "Email Events",
@@ -64,12 +63,16 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
         "Inspect sent-email delivery history and SES event outcomes.",
       to: "/admin/email-events",
       cta: "View email events",
+      icon: IoMail,
+      iconColor: "text-info",
     },
     {
       title: "Truck Checks",
       description: "Manage truck definitions and checklist schemas.",
       to: "/admin/truck-checks",
       cta: "Manage truck checks",
+      icon: IoBus,
+      iconColor: "text-warning",
     },
   ] as const;
 
@@ -103,10 +106,16 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
             className="card bg-base-100 shadow-xl transition-transform hover:-translate-y-0.5 hover:shadow-2xl"
           >
             <div className="card-body">
-              <h2 className="card-title">{page.title}</h2>
+              <div className="flex items-start justify-between">
+                <h2 className="card-title">{page.title}</h2>
+                <page.icon className={`h-6 w-6 ${page.iconColor}`} />
+              </div>
               <p className="text-base-content/70 text-sm">{page.description}</p>
               <div className="card-actions justify-end pt-3">
-                <span className="btn btn-ghost btn-sm">{page.cta}</span>
+                <span className="btn btn-ghost btn-sm flex items-center gap-1">
+                  {page.cta}
+                  <IoChevronForward className="h-4 w-4" />
+                </span>
               </div>
             </div>
           </Link>

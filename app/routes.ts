@@ -11,12 +11,18 @@ export default [
   ...prefix("admin", [
     route("users", "./routes/admin/users.tsx"),
     route("create-user", "./routes/admin/create-user.tsx"),
-    route("certification-type", "./routes/admin/certification-type.tsx"),
     route("email-events", "./routes/admin/email-events.tsx"),
-    route("roles", "./routes/admin/roles.tsx"),
-    route("tracks", "./routes/admin/tracks.tsx"),
     route("update-user/:user_id", "./routes/admin/update-user.tsx"),
     route("truck-checks", "./routes/admin/truck-checks.tsx"),
+    ...prefix("certification-settings", [
+      index("./routes/admin/certification-settings/index.tsx"),
+      route(
+        "certification-type",
+        "./routes/admin/certification-settings/certification-type.tsx",
+      ),
+      route("roles", "./routes/admin/certification-settings/roles.tsx"),
+      route("tracks", "./routes/admin/certification-settings/tracks.tsx"),
+    ]),
   ]),
   route("account/security", "./routes/security.tsx"),
   route("roster", "./routes/roster.tsx"),

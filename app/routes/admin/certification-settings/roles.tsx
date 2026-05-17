@@ -1,21 +1,21 @@
 import { data, Link, useFetcher, redirect } from "react-router";
-import type { Route } from "./+types/tracks";
+import type { Route } from "./+types/roles";
 import { appContext } from "~/context";
-import { trackSchema, TrackStore, type Track } from "~/lib/track-store";
-import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
+import { roleSchema, RoleStore, type Role } from "~/lib/role-store";
+import { TrackStore } from "~/lib/track-store";
 import { type } from "arktype";
 import { IoWarning } from "react-icons/io5";
 import { useEffect, useRef, useState } from "react";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Manage Tracks - Admin - Amelia Rescue" },
-    { name: "description", content: "Create and manage certification tracks" },
+    { title: "Manage Roles - Admin - Amelia Rescue" },
+    { name: "description", content: "Create and manage membership roles" },
   ];
 }
 
 export const handle = {
-  breadcrumb: "Manage Tracks",
+  breadcrumb: "Manage Roles",
 };
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -29,39 +29,37 @@ export async function loader({ context }: Route.LoaderArgs) {
     throw redirect("/");
   }
 
+  const roleStore = RoleStore.make();
   const trackStore = TrackStore.make();
-  const certificationTypeStore = CertificationTypeStore.make();
-  const [tracks, certificationTypes] = await Promise.all([
+  const [roles, tracks] = await Promise.all([
+    roleStore.listRoles(),
     trackStore.listTracks(),
-    certificationTypeStore.listCertificationTypes(),
   ]);
-  return { ...c, tracks, certificationTypes };
+  return { ...c, roles, tracks };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
-  const requiredCertifications = formData.getAll(
-    "required_certifications",
-  ) as string[];
+  const allowedTracks = formData.getAll("allowed_tracks") as string[];
 
   const formValues = {
     name: formData.get("name"),
     description: formData.get("description"),
-    required_certifications: requiredCertifications,
+    allowed_tracks: allowedTracks,
   };
 
-  const track = trackSchema(formValues);
-  if (track instanceof type.errors) {
-    return data({ error: track.summary, formValues }, { status: 400 });
+  const role = roleSchema(formValues);
+  if (role instanceof type.errors) {
+    return data({ error: role.summary, formValues }, { status: 400 });
   }
 
   try {
-    const store = TrackStore.make();
+    const store = RoleStore.make();
     if (intent === "update") {
-      await store.updateTrack(track);
+      await store.updateRole(role);
     } else {
-      await store.createTrack(track);
+      await store.createRole(role);
     }
   } catch (error) {
     if (error instanceof Error) {
@@ -73,8 +71,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { success: true, intent };
 }
 
-export default function ManageTracks({ loaderData }: Route.ComponentProps) {
-  const { tracks, certificationTypes } = loaderData;
+export default function ManageRoles({ loaderData }: Route.ComponentProps) {
+  const { roles, tracks } = loaderData;
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
@@ -103,32 +101,38 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
           <li>
             <Link to="/admin">Admin</Link>
           </li>
-          <li>Tracks</li>
+          <li>
+            <Link to="/admin/certification-settings">
+              Certification Settings
+            </Link>
+          </li>
+          <li>Roles</li>
         </ul>
       </div>
 
       <div className="card bg-base-100 shadow-lg">
         <div className="card-body">
-          <h2 className="card-title mb-4">New Track</h2>
+          <h2 className="card-title mb-4">New Role</h2>
 
           <div className="alert alert-warning mb-4">
             <IoWarning className="h-6 w-6 shrink-0" />
             <span>
-              <strong>Warning:</strong> Tracks cannot be deleted once created.
-              Please ensure the track ID, name, and description are correct.
+              <strong>Warning:</strong> Roles cannot be deleted once created.
+              Please ensure the name and description are correct.
             </span>
           </div>
 
           <p className="text-base-content/80 mb-4 text-sm">
-            Tracks are a collection of certification types. A{" "}
-            <Link to="/admin/roles" className="link link-primary">
-              role
+            Roles define what a member does within the organization (e.g.,
+            Provider, Driver, Observer). A single member may be assigned
+            multiple roles such as Driver and Provider. Roles are made up of{" "}
+            <Link
+              to="/admin/certification-settings/tracks"
+              className="link link-primary"
+            >
+              tracks
             </Link>{" "}
-            such as a paramedic provider may require multiple{" "}
-            <Link to="/admin/certification-type" className="link link-primary">
-              certifications
-            </Link>{" "}
-            such as NREMT-P, CPR, ACLS etc..
+            which drive the required certifications per member.
           </p>
 
           {fetcher.data && "error" in fetcher.data && (
@@ -144,7 +148,7 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
               fetcher.data.intent === "update"
             ) && (
               <div className="alert alert-success mb-4">
-                <span>Track created successfully!</span>
+                <span>Role created successfully!</span>
               </div>
             )}
 
@@ -158,14 +162,14 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
               <input
                 type="text"
                 name="name"
-                placeholder="EMT"
+                placeholder="Provider"
                 className="input input-bordered w-full"
                 autoComplete="off"
                 required
               />
               <label className="label">
                 <span className="label-text-alt">
-                  The display name for this track
+                  The display name for this role
                 </span>
               </label>
             </div>
@@ -176,47 +180,46 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
               </label>
               <textarea
                 name="description"
-                placeholder="Emergency Medical Technician certification track"
+                placeholder="Medical care provider on ambulance"
                 className="textarea textarea-bordered w-full"
                 rows={3}
                 required
               />
               <label className="label">
                 <span className="label-text-alt">
-                  A brief description of this track
+                  A brief description of this role
                 </span>
               </label>
             </div>
 
             <div className="form-control w-full">
               <label className="label">
-                <span className="label-text">Required Certifications</span>
+                <span className="label-text">Allowed Tracks</span>
               </label>
               <div className="flex flex-col gap-2">
-                {certificationTypes.length === 0 ? (
+                {tracks.length === 0 ? (
                   <p className="text-base-content/70 text-sm">
-                    No certification types available. Create certification types
-                    first.
+                    No tracks available. Create tracks first.
                   </p>
                 ) : (
-                  certificationTypes.map(
-                    (certType: {
+                  tracks.map(
+                    (track: {
                       name: string;
                       description: string;
-                      expires: boolean;
+                      required_certifications: string[];
                     }) => (
                       <label
-                        key={certType.name}
+                        key={track.name}
                         className="flex cursor-pointer items-center gap-3"
                       >
                         <input
                           type="checkbox"
-                          name="required_certifications"
-                          value={certType.name}
+                          name="allowed_tracks"
+                          value={track.name}
                           className="checkbox checkbox-sm"
                         />
                         <span>
-                          {certType.name} - {certType.description}
+                          {track.name} - {track.description}
                         </span>
                       </label>
                     ),
@@ -225,7 +228,7 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
               </div>
               <label className="label">
                 <span className="label-text-alt">
-                  Select which certifications are required for this track
+                  Select which tracks members with this role can be assigned to
                 </span>
               </label>
             </div>
@@ -235,7 +238,7 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
                 Cancel
               </Link>
               <button type="submit" className="btn btn-success">
-                Create Track
+                Create Role
               </button>
             </div>
           </fetcher.Form>
@@ -244,51 +247,46 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
 
       <div className="card bg-base-100 shadow-lg">
         <div className="card-body">
-          <h2 className="card-title mb-4">Existing Tracks</h2>
-          {tracks.length === 0 ? (
+          <h2 className="card-title mb-4">Existing Roles</h2>
+          {roles.length === 0 ? (
             <p className="text-base-content/70">
-              No tracks have been created yet.
+              No roles have been created yet.
             </p>
           ) : (
             <ul className="divide-base-300 divide-y">
-              {tracks.map((track: Track) => (
+              {roles.map((role: Role) => (
                 <li
-                  key={track.name}
+                  key={role.name}
                   className="flex items-center justify-between py-3"
                 >
                   <div className="flex-1">
-                    <div className="font-medium">{track.name}</div>
+                    <div className="font-medium">{role.name}</div>
                     <div className="text-base-content/70 text-sm">
-                      {track.description}
+                      {role.description}
                     </div>
-                    {track.required_certifications.length > 0 && (
+                    {role.allowed_tracks.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {track.required_certifications.map(
-                          (certName: string) => {
-                            const cert = certificationTypes.find(
-                              (c: {
-                                name: string;
-                                description: string;
-                                expires: boolean;
-                              }) => c.name === certName,
-                            );
-                            return (
-                              <span
-                                key={certName}
-                                className="badge badge-sm badge-secondary"
-                              >
-                                {cert?.name || certName}
-                              </span>
-                            );
-                          },
-                        )}
+                        {role.allowed_tracks.map((trackName: string) => {
+                          const track = tracks.find(
+                            (t: {
+                              name: string;
+                              description: string;
+                              required_certifications: string[];
+                            }) => t.name === trackName,
+                          );
+                          return (
+                            <span
+                              key={trackName}
+                              className="badge badge-sm badge-primary"
+                            >
+                              {track?.name || trackName}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
-                  <UpdateModal
-                    track={track}
-                    certificationTypes={certificationTypes}
-                  />
+                  <UpdateModal role={role} tracks={tracks} />
                 </li>
               ))}
             </ul>
@@ -300,14 +298,14 @@ export default function ManageTracks({ loaderData }: Route.ComponentProps) {
 }
 
 function UpdateModal(props: {
-  track: Track;
-  certificationTypes: Array<{
+  role: Role;
+  tracks: Array<{
     name: string;
     description: string;
-    expires: boolean;
+    required_certifications: string[];
   }>;
 }) {
-  const { track, certificationTypes } = props;
+  const { role, tracks } = props;
   const ref = useRef<HTMLDialogElement>(null);
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -346,7 +344,7 @@ function UpdateModal(props: {
               ✕
             </button>
           </form>
-          <h3 className="mb-4 text-lg font-bold">Update Track</h3>
+          <h3 className="mb-4 text-lg font-bold">Update Role</h3>
 
           {fetcher.data && "error" in fetcher.data && (
             <div className="alert alert-error mb-4">
@@ -356,7 +354,7 @@ function UpdateModal(props: {
 
           {showSuccessMessage && (
             <div className="alert alert-success mb-4">
-              <span>Track updated successfully!</span>
+              <span>Role updated successfully!</span>
             </div>
           )}
 
@@ -370,7 +368,7 @@ function UpdateModal(props: {
               <input
                 type="text"
                 name="name"
-                defaultValue={track.name}
+                defaultValue={role.name}
                 className="input input-bordered w-full"
                 autoComplete="off"
                 required
@@ -383,7 +381,7 @@ function UpdateModal(props: {
               </label>
               <textarea
                 name="description"
-                defaultValue={track.description}
+                defaultValue={role.description}
                 className="textarea textarea-bordered w-full"
                 rows={3}
                 required
@@ -392,35 +390,35 @@ function UpdateModal(props: {
 
             <div className="form-control w-full">
               <label className="label">
-                <span className="label-text">Required Certifications</span>
+                <span className="label-text">Allowed Tracks</span>
               </label>
               <div className="flex flex-col gap-2">
-                {certificationTypes.length === 0 ? (
+                {tracks.length === 0 ? (
                   <p className="text-base-content/70 text-sm">
-                    No certification types available.
+                    No tracks available.
                   </p>
                 ) : (
-                  certificationTypes.map(
-                    (certType: {
+                  tracks.map(
+                    (track: {
                       name: string;
                       description: string;
-                      expires: boolean;
+                      required_certifications: string[];
                     }) => (
                       <label
-                        key={certType.name}
+                        key={track.name}
                         className="flex cursor-pointer items-center gap-3"
                       >
                         <input
                           type="checkbox"
-                          name="required_certifications"
-                          value={certType.name}
-                          defaultChecked={track.required_certifications.includes(
-                            certType.name,
+                          name="allowed_tracks"
+                          value={track.name}
+                          defaultChecked={role.allowed_tracks.includes(
+                            track.name,
                           )}
                           className="checkbox checkbox-sm"
                         />
                         <span>
-                          {certType.name} - {certType.description}
+                          {track.name} - {track.description}
                         </span>
                       </label>
                     ),
