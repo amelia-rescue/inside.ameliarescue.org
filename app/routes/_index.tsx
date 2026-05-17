@@ -7,6 +7,7 @@ import {
   FiFileText,
   FiTruck,
   FiShoppingBag,
+  FiAward,
   FiSettings,
   FiExternalLink,
   FiChevronRight,
@@ -175,6 +176,33 @@ export default function Index({ loaderData }: Route.ComponentProps) {
               <div className="card-actions justify-end">
                 <span className="btn btn-sm btn-warning group-hover:btn-warning-content">
                   Shop <FiChevronRight className="ml-1 h-3 w-3" />
+                </span>
+              </div>
+            </div>
+          </a>
+
+          <a
+            href="https://app.targetsolutions.com/auth/index.cfm?action=login.showlogin&customerid=34621&customerpath=vacee"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="card bg-base-100 group shadow-xl transition-all duration-300 hover:shadow-2xl"
+          >
+            <div className="card-body">
+              <div className="mb-2 flex items-center gap-4">
+                <div className="bg-success/10 text-success rounded-full p-3 transition-transform group-hover:scale-110">
+                  <FiAward className="h-6 w-6" />
+                </div>
+                <h2 className="card-title flex items-center gap-2">
+                  Free CEUs
+                  <FiExternalLink className="h-4 w-4 opacity-60" />
+                </h2>
+              </div>
+              <p className="mb-4 text-sm opacity-70">
+                You won't wait until the last minute right?
+              </p>
+              <div className="card-actions justify-end">
+                <span className="btn btn-sm btn-success group-hover:btn-success-content">
+                  Train <FiChevronRight className="ml-1 h-3 w-3" />
                 </span>
               </div>
             </div>
