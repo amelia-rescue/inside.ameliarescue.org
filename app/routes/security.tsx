@@ -1,6 +1,12 @@
 import { appContext } from "~/context";
 import type { Route } from "./+types/security";
-import { IoKey, IoLogOut, IoShieldCheckmark, IoTrash } from "react-icons/io5";
+import {
+  IoFingerPrint,
+  IoKey,
+  IoLogOut,
+  IoShieldCheckmark,
+  IoTrash,
+} from "react-icons/io5";
 import { Form, Link, redirect } from "react-router";
 import {
   listWebAuthnCredentials,
@@ -107,10 +113,26 @@ export default function Security({ loaderData }: Route.ComponentProps) {
               Passkeys
             </h2>
             <p className="text-sm opacity-70">
-              Passkeys let you sign in using your device's biometrics
-              (fingerprint, face recognition) or security key. They're more
-              secure than passwords and faster to use.
+              Passkeys let you sign in using your device's biometrics (Face ID,
+              Touch ID, or fingerprint) or a security key. They're more secure
+              than passwords and get you logged in instantly with just a glance
+              or a touch — no typing required.
             </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="bg-base-200/50 flex items-center gap-3 rounded-lg p-3">
+                <IoFingerPrint className="text-primary text-xl" />
+                <span className="text-sm">
+                  Log in with Face ID, Touch ID, or fingerprint
+                </span>
+              </div>
+              <div className="bg-base-200/50 flex items-center gap-3 rounded-lg p-3">
+                <IoShieldCheckmark className="text-primary text-xl" />
+                <span className="text-sm">
+                  No passwords to remember or type
+                </span>
+              </div>
+            </div>
 
             <div className="divider"></div>
 
@@ -163,12 +185,16 @@ export default function Security({ loaderData }: Route.ComponentProps) {
                 <div className="divider"></div>
               </>
             ) : (
-              <div className="alert alert-info">
-                <IoShieldCheckmark />
-                <span className="text-sm">
-                  No passkeys registered yet. Add a passkey to enable secure,
-                  passwordless authentication.
-                </span>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="bg-primary/10 mb-4 rounded-full p-4">
+                  <IoFingerPrint className="text-primary text-4xl" />
+                </div>
+                <p className="text-lg font-medium">No passkeys yet</p>
+                <p className="mt-1 max-w-sm text-sm opacity-60">
+                  Add a passkey to sign in with Face ID, Touch ID, or your
+                  fingerprint — it's faster and you never have to type your
+                  password again.
+                </p>
               </div>
             )}
 

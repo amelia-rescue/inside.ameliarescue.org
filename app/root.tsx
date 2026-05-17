@@ -244,7 +244,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       to="/account/security"
                       className="btn btn-ghost btn-sm"
                     >
-                      Account
+                      Security
                     </Link>
                   )}
                   <div className="dropdown dropdown-end">
