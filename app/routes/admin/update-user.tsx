@@ -102,6 +102,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name"),
     website_role: formData.get("website_role"),
+    note: formData.get("note"),
     membership_roles: membershipRoleEntries,
   };
 
@@ -288,6 +289,20 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
+            </div>
+
+            <div className="form-control w-full">
+              <label className="label">
+                <span className="label-text">Note</span>
+              </label>
+              <input
+                type="text"
+                name="note"
+                defaultValue={user.note ?? ""}
+                className="input input-bordered w-full"
+                autoComplete="off"
+                maxLength={100}
+              />
             </div>
 
             <div className="form-control w-full">

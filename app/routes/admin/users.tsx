@@ -275,8 +275,9 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                 <tr>
                   <th>Name</th>
                   <th>Website Role</th>
+                  <th className="w-40 max-w-40">Note</th>
                   <th>Last Login</th>
-                  <th className="w-56 min-w-56 text-right">Actions</th>
+                  <th className="w-80 min-w-80 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,6 +301,9 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                         {user.website_role}
                       </span>
                     </td>
+                    <td className="w-40 max-w-40 whitespace-normal">
+                      {user.note || "—"}
+                    </td>
                     <td>
                       <span className="text-sm">
                         {user.last_login_at
@@ -307,11 +311,11 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                           : "Never"}
                       </span>
                     </td>
-                    <td className="w-56 min-w-56 text-right align-top">
+                    <td className="w-80 min-w-80 text-right align-top">
                       <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
                         <button
                           type="button"
-                          className="btn btn-sm btn-ghost text-warning"
+                          className="btn btn-sm btn-ghost text-warning whitespace-nowrap"
                           disabled={fetcher.state !== "idle"}
                           onClick={() =>
                             openTempPasswordModal(
@@ -325,7 +329,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                         </button>
                         <Link
                           to={`/admin/update-user/${user.user_id}`}
-                          className="btn btn-sm btn-ghost"
+                          className="btn btn-sm btn-ghost whitespace-nowrap"
                         >
                           Edit
                         </Link>
@@ -336,7 +340,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                               `${user.first_name} ${user.last_name}`,
                             )
                           }
-                          className="btn btn-sm btn-error btn-ghost"
+                          className="btn btn-sm btn-error btn-ghost whitespace-nowrap"
                         >
                           Delete
                         </button>

@@ -108,6 +108,13 @@ export default function Roster() {
                       )}
                     </div>
                   </div>
+
+                  <div>
+                    <div className="text-xs font-semibold opacity-60">Note</div>
+                    <div className="mt-1 text-sm whitespace-normal">
+                      {user.note || "—"}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -121,6 +128,7 @@ export default function Roster() {
                   <th>Phone</th>
                   <th>Email</th>
                   <th>Roles</th>
+                  <th>Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,6 +190,7 @@ export default function Roster() {
                         )}
                       </div>
                     </td>
+                    <td className="whitespace-normal">{user.note || "—"}</td>
                   </tr>
                 ))}
               </tbody>

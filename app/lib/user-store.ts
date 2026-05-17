@@ -33,6 +33,7 @@ export const userSchema = type({
   "phone?": "string",
   "profile_picture_url?": "string",
   "last_login_at?": "string",
+  "note?": "string",
 });
 userSchema.onUndeclaredKey("delete");
 
