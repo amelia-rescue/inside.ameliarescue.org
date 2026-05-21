@@ -18,6 +18,7 @@ export const certificationSchema = type({
   "issued_on?": "string",
   "expires_on?": "string",
   uploaded_at: "string",
+  created_by: "string",
 });
 certificationSchema.onUndeclaredKey("delete");
 

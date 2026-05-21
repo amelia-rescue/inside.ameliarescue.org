@@ -27,6 +27,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
     });
 
     expect(certification).toMatchObject({
@@ -35,6 +36,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
       created_at: expect.any(String),
       updated_at: expect.any(String),
     });
@@ -65,6 +67,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
     });
 
     await expect(
@@ -74,6 +77,7 @@ describe("certification store test", () => {
         certification_type_name: "CPR",
         file_url: "https://example.com/cert2.pdf",
         uploaded_at: "2024-01-02T00:00:00Z",
+        created_by: "test-user",
       }),
     ).rejects.toBeInstanceOf(CertificationAlreadyExists);
   });
@@ -88,6 +92,7 @@ describe("certification store test", () => {
         certification_type_name: "EMT-Basic",
         file_url: "https://example.com/cert1.pdf",
         uploaded_at: "2024-01-01T00:00:00Z",
+        created_by: "test-user",
       },
       {
         certification_id: "cert-2",
@@ -95,6 +100,7 @@ describe("certification store test", () => {
         certification_type_name: "CPR",
         file_url: "https://example.com/cert2.pdf",
         uploaded_at: "2024-01-02T00:00:00Z",
+        created_by: "test-user",
       },
       {
         certification_id: "cert-3",
@@ -102,6 +108,7 @@ describe("certification store test", () => {
         certification_type_name: "EVOC",
         file_url: "https://example.com/cert3.pdf",
         uploaded_at: "2024-01-03T00:00:00Z",
+        created_by: "test-user",
       },
     ];
 
@@ -136,6 +143,7 @@ describe("certification store test", () => {
         certification_type_name: "EMT-Basic",
         file_url: "https://example.com/cert1.pdf",
         uploaded_at: "2024-01-01T00:00:00Z",
+        created_by: "test-user",
       },
       {
         certification_id: "cert-2",
@@ -143,6 +151,7 @@ describe("certification store test", () => {
         certification_type_name: "CPR",
         file_url: "https://example.com/cert2.pdf",
         uploaded_at: "2024-01-02T00:00:00Z",
+        created_by: "test-user",
       },
       {
         certification_id: "cert-3",
@@ -150,6 +159,7 @@ describe("certification store test", () => {
         certification_type_name: "EVOC",
         file_url: "https://example.com/cert3.pdf",
         uploaded_at: "2024-01-03T00:00:00Z",
+        created_by: "test-user",
       },
     ];
 
@@ -170,6 +180,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
     });
 
     const updated = await store.updateCertification({
@@ -178,6 +189,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/cert-updated.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
       expires_on: "2025-01-01",
     });
 
@@ -195,6 +207,7 @@ describe("certification store test", () => {
         certification_type_name: "EMT-Basic",
         file_url: "https://example.com/cert.pdf",
         uploaded_at: "2024-01-01T00:00:00Z",
+        created_by: "test-user",
       }),
     ).rejects.toBeInstanceOf(CertificationNotFound);
   });
@@ -208,6 +221,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
     });
 
     await store.deleteCertification("cert-123");
@@ -234,6 +248,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
       expires_on: "2025-01-01",
     });
 
@@ -245,6 +260,7 @@ describe("certification store test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert2.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
     });
 
     expect(withoutExpiration.expires_on).toBeUndefined();
@@ -260,6 +276,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/old-cert1.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
       expires_on: "2025-01-01",
     });
 
@@ -270,6 +287,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/old-cert2.pdf",
       uploaded_at: "2024-02-01T00:00:00Z",
+      created_by: "test-user",
       expires_on: "2025-02-01",
     });
 
@@ -280,6 +298,7 @@ describe("certification store test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cpr.pdf",
       uploaded_at: "2024-01-15T00:00:00Z",
+      created_by: "test-user",
     });
 
     // Verify we have 3 certifications before soft-delete
@@ -318,6 +337,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/user1-cert.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
     });
 
     await store.createCertification({
@@ -326,6 +346,7 @@ describe("certification store test", () => {
       certification_type_name: "EMT-Basic",
       file_url: "https://example.com/user2-cert.pdf",
       uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
     });
 
     // Soft-delete user-123's EMT certifications

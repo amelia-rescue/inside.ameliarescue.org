@@ -24,6 +24,7 @@ export interface TrainingStatusExportRow {
   issued_on: string;
   expires_on: string;
   uploaded_at: string;
+  created_by: string;
   file_url: string;
   generated_at: string;
 }
@@ -210,6 +211,7 @@ export function buildTrainingStatusData({
         issued_on: certification?.issued_on || "",
         expires_on: certification?.expires_on || "",
         uploaded_at: certification?.uploaded_at || "",
+        created_by: certification?.created_by || "",
         file_url: certification?.file_url || "",
         generated_at: generatedAt,
       });
@@ -297,6 +299,7 @@ const trainingStatusCsvColumns: Array<keyof TrainingStatusExportRow> = [
   "issued_on",
   "expires_on",
   "uploaded_at",
+  "created_by",
   "file_url",
   "generated_at",
 ];

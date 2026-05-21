@@ -124,6 +124,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
+      created_by: "test-user",
       expires_on: yesterday,
     });
 
@@ -133,6 +134,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -178,6 +180,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(1, "year").toISOString(),
+      created_by: "test-user",
       expires_on: twoMonthsFromNow,
     });
 
@@ -187,6 +190,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -276,6 +280,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
+      created_by: "test-user",
       expires_on: yesterday,
     });
 
@@ -285,6 +290,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -330,6 +336,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(1, "year").toISOString(),
+      created_by: "test-user",
       expires_on: twoMonthsFromNow,
     });
 
@@ -339,6 +346,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -416,6 +424,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(8, "months").toISOString(),
+      created_by: "test-user",
       expires_on: fourMonthsFromNow,
     });
 
@@ -425,6 +434,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(8, "months").toISOString(),
+      created_by: "test-user",
       expires_on: fourMonthsFromNow,
     });
 
@@ -462,6 +472,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: oneYearFromNow,
     });
 
@@ -471,6 +482,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: oneYearFromNow,
     });
 
@@ -507,6 +519,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().subtract(1, "day").toISOString(),
     });
 
@@ -516,6 +529,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -536,6 +550,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(1, "year").toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(2, "months").toISOString(),
     });
 
@@ -545,6 +560,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(1, "year").toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -593,6 +609,7 @@ describe("certification reminder test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
+      created_by: "test-user",
       expires_on: yesterday,
     });
 
@@ -602,6 +619,7 @@ describe("certification reminder test", () => {
       certification_type_name: "First Aid",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 

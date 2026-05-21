@@ -55,6 +55,7 @@ describe("buildTrainingStatusDashboardData", () => {
             issued_on: "2025-01-01",
             expires_on: "2026-05-01",
             uploaded_at: "2025-01-02T00:00:00.000Z",
+            created_by: "test-user",
           },
         ],
         u2: [
@@ -66,6 +67,7 @@ describe("buildTrainingStatusDashboardData", () => {
             issued_on: "2024-01-01",
             expires_on: "2024-12-31",
             uploaded_at: "2024-01-02T00:00:00.000Z",
+            created_by: "test-user",
           },
         ],
       },
@@ -223,6 +225,7 @@ describe("buildTrainingStatusDashboardData", () => {
             issued_on: "2025-01-01",
             expires_on: "2027-01-01",
             uploaded_at: "2025-01-02T00:00:00.000Z",
+            created_by: "test-user",
           },
         ],
       },

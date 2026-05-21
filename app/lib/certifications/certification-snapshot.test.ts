@@ -89,6 +89,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -149,6 +150,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "ACLS",
       file_url: "https://example.com/acls.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -158,6 +160,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "PALS",
       file_url: "https://example.com/pals.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -192,6 +195,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cpr.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().subtract(1, "day").toISOString(),
     });
 
@@ -290,6 +294,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert1.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(6, "months").toISOString(),
     });
 
@@ -300,6 +305,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert2.pdf",
       uploaded_at: dayjs().subtract(2, "years").toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().subtract(1, "month").toISOString(),
     });
 
@@ -393,6 +399,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -402,6 +409,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cert.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -462,6 +470,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "ACLS",
       file_url: "https://example.com/acls.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -511,6 +520,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "CPR",
       file_url: "https://example.com/cpr.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: dayjs().add(1, "year").toISOString(),
     });
 
@@ -546,6 +556,7 @@ describe("certification snapshot test", () => {
       certification_type_name: "Orientation",
       file_url: "https://example.com/orientation.pdf",
       uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
       expires_on: "not-a-date",
     });
 

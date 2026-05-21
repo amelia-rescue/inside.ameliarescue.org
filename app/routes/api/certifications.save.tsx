@@ -4,8 +4,14 @@ import { CertificationStore } from "~/lib/certifications/certification-store";
 import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
 import dayjs from "dayjs";
 import { log } from "~/lib/logger";
+import { appContext } from "~/context";
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
+  const ctx = context.get(appContext);
+  if (!ctx) {
+    throw new Error("Context not found");
+  }
+
   const formData = await request.formData();
   const certificationId = formData.get("certification_id") as string;
   const userId = formData.get("user_id") as string;
@@ -60,6 +66,11 @@ export async function action({ request }: Route.ActionArgs) {
       uploaded_at: new Date().toISOString(),
       expires_on,
       issued_on,
+      created_by: ctx.user.user_id,
+    });
+
+    log.info("certification saved", {
+      certification,
     });
 
     return data({ success: true, certification });
