@@ -245,6 +245,7 @@ export class CdkStack extends cdk.Stack {
       tableName: "aes_users",
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
+      pointInTimeRecovery: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -254,6 +255,7 @@ export class CdkStack extends cdk.Stack {
       partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "session_id", type: dynamodb.AttributeType.STRING },
       timeToLiveAttribute: "expires_at",
+      pointInTimeRecovery: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -267,6 +269,7 @@ export class CdkStack extends cdk.Stack {
           name: "name",
           type: dynamodb.AttributeType.STRING,
         },
+        pointInTimeRecovery: true,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -281,6 +284,7 @@ export class CdkStack extends cdk.Stack {
           name: "certification_id",
           type: dynamodb.AttributeType.STRING,
         },
+        pointInTimeRecovery: true,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -298,6 +302,7 @@ export class CdkStack extends cdk.Stack {
         name: "name",
         type: dynamodb.AttributeType.STRING,
       },
+      pointInTimeRecovery: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -308,6 +313,7 @@ export class CdkStack extends cdk.Stack {
         name: "name",
         type: dynamodb.AttributeType.STRING,
       },
+      pointInTimeRecovery: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -321,6 +327,7 @@ export class CdkStack extends cdk.Stack {
           name: "reminder_id",
           type: dynamodb.AttributeType.STRING,
         },
+        pointInTimeRecovery: true,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -344,6 +351,7 @@ export class CdkStack extends cdk.Stack {
           name: "snapshot_date",
           type: dynamodb.AttributeType.STRING,
         },
+        pointInTimeRecovery: true,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -355,6 +363,7 @@ export class CdkStack extends cdk.Stack {
         name: "message_id",
         type: dynamodb.AttributeType.STRING,
       },
+      pointInTimeRecovery: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -381,6 +390,7 @@ export class CdkStack extends cdk.Stack {
           type: dynamodb.AttributeType.STRING,
         },
         timeToLiveAttribute: "ttl",
+        pointInTimeRecovery: true,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -392,6 +402,7 @@ export class CdkStack extends cdk.Stack {
         name: "id",
         type: dynamodb.AttributeType.STRING,
       },
+      pointInTimeRecovery: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -409,6 +420,7 @@ export class CdkStack extends cdk.Stack {
           name: "range_key",
           type: dynamodb.AttributeType.STRING,
         },
+        pointInTimeRecovery: true,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
