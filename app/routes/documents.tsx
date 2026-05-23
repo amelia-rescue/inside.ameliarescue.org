@@ -38,13 +38,14 @@ export default function Documents() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const formatDocumentName = (name: string) => {
-    return name
+    const formattedName = name
       .replaceAll("-", " ")
       .replaceAll("_", " ")
       .split(/\s+/)
       .filter(Boolean)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
+
+    return formattedName.charAt(0).toUpperCase() + formattedName.slice(1);
   };
 
   const openUploadDialog = () => {

@@ -17,8 +17,8 @@ export async function action({ request }: Route.ActionArgs) {
     return data({ error: "Missing file extension" }, { status: 400 });
   }
 
-  const lowercasedName = documentName.trim().toLowerCase();
-  if (!lowercasedName) {
+  const trimmedName = documentName.trim();
+  if (!trimmedName) {
     return data({ error: "Invalid document name" }, { status: 400 });
   }
 
@@ -30,7 +30,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     const s3Helper = S3Helper.make();
-    const key = `files/documents/${lowercasedName}.${fileExtension.toLowerCase()}`;
+    const key = `files/documents/${trimmedName}.${fileExtension.toLowerCase()}`;
 
     const uploadUrl = await s3Helper.getPresignedUploadUrl(key, contentType);
     const fileUrl = s3Helper.getFileUrl(key);
