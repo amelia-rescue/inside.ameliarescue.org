@@ -557,7 +557,6 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(300),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
-        insightsVersion: lambdaInsightsVersion,
         logGroup: certificationReminderLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -638,7 +637,6 @@ export class CdkStack extends cdk.Stack {
         memorySize: 512,
         timeout: cdk.Duration.seconds(30),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
-        insightsVersion: lambdaInsightsVersion,
         logGroup: sesStatusLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -685,7 +683,6 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(300),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
-        insightsVersion: lambdaInsightsVersion,
         logGroup: certificationSnapshotLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -769,7 +766,6 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(300),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
-        insightsVersion: lambdaInsightsVersion,
         logGroup: trainingStatusSnapshotLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -840,7 +836,6 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(60),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
-        insightsVersion: lambdaInsightsVersion,
         logGroup: truckCheckLockLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
@@ -893,7 +888,6 @@ export class CdkStack extends cdk.Stack {
         memorySize: 1024,
         timeout: cdk.Duration.seconds(30),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
-        insightsVersion: lambdaInsightsVersion,
         logGroup: websocketLogGroup,
         bundling: {
           externalModules: ["@aws-sdk/*", "aws-sdk"],
