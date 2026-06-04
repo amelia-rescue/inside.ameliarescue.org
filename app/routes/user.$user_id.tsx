@@ -184,6 +184,10 @@ export default function User() {
                   <dd className="font-medium">{user.phone || "—"}</dd>
                   <dt className="opacity-70">Email</dt>
                   <dd className="font-medium">{user.email}</dd>
+                  <dt className="opacity-70">User ID</dt>
+                  <dd className="font-mono text-xs break-all">
+                    {user.user_id}
+                  </dd>
                   {user.last_login_at && (
                     <>
                       <dt className="opacity-70">Last Login</dt>

@@ -1,4 +1,11 @@
-import { useFetcher, useLoaderData, Link, useRevalidator } from "react-router";
+import {
+  useFetcher,
+  useLoaderData,
+  Link,
+  useRevalidator,
+  Form,
+} from "react-router";
+import { IoLogOut } from "react-icons/io5";
 import type { Route } from "./+types/profile";
 import { appContext } from "~/context";
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -216,18 +223,26 @@ export default function Profile() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {user.membership_roles.map((assignment, index) => (
-                <span
-                  key={index}
-                  className={`badge ${
-                    assignment.precepting ? "badge-warning" : "badge-primary"
-                  }`}
-                >
-                  {assignment.role_name} - {assignment.track_name}
-                  {assignment.precepting && " (Precepting)"}
-                </span>
-              ))}
+            <div className="flex flex-col gap-3 sm:items-end">
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                {user.membership_roles.map((assignment, index) => (
+                  <span
+                    key={index}
+                    className={`badge ${
+                      assignment.precepting ? "badge-warning" : "badge-primary"
+                    }`}
+                  >
+                    {assignment.role_name} - {assignment.track_name}
+                    {assignment.precepting && " (Precepting)"}
+                  </span>
+                ))}
+              </div>
+              <Form method="post" action="/auth/logout">
+                <button type="submit" className="btn btn-sm btn-error">
+                  <IoLogOut />
+                  Sign Out
+                </button>
+              </Form>
             </div>
           </div>
 
@@ -251,6 +266,10 @@ export default function Profile() {
                   <dd className="font-medium">{user.phone}</dd>
                   <dt className="opacity-70">Email</dt>
                   <dd className="font-medium">{user.email}</dd>
+                  <dt className="opacity-70">User ID</dt>
+                  <dd className="font-mono text-xs break-all">
+                    {user.user_id}
+                  </dd>
                   {user.last_login_at && (
                     <>
                       <dt className="opacity-70">Last Login</dt>

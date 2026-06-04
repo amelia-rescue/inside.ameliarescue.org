@@ -147,6 +147,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const locale = loaderData?.locale || "en-US";
   const timeZone = loaderData?.timeZone || "UTC";
   const isWideContentRoute = location.pathname === "/certification-status";
+  const contentWidthClass = isWideContentRoute ? "max-w-[1800px]" : "max-w-7xl";
   const themeColor =
     theme === "light"
       ? "#f5f5f5"
@@ -229,7 +230,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <NavigationLoadingIndicator />
         <div className="bg-base-200 flex min-h-screen flex-col">
           <div className="navbar bg-base-100 shadow">
-            <div className="mx-auto w-full max-w-5xl px-4">
+            <div
+              className={`mx-auto w-full px-4 sm:px-6 lg:px-8 ${contentWidthClass}`}
+            >
               <div className="flex w-full items-center justify-between">
                 <Link to="/" aria-label="Inside Amelia Rescue">
                   <img
@@ -307,9 +310,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <main
-            className={`mx-auto w-full flex-1 px-4 py-10 ${
-              isWideContentRoute ? "max-w-[1800px]" : "max-w-5xl"
-            }`}
+            className={`mx-auto w-full flex-1 px-4 py-10 sm:px-6 lg:px-8 ${contentWidthClass}`}
           >
             {children}
           </main>

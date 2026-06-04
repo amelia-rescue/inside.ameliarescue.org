@@ -6,12 +6,42 @@ import {
   useNavigate,
   useSearchParams,
 } from "react-router";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  createColumnHelper,
+  flexRender,
+  type SortingState,
+  type FilterFn,
+} from "@tanstack/react-table";
+import { FaMagnifyingGlass } from "react-icons/fa6";
 import type { Route } from "./+types/users";
 import { appContext } from "~/context";
 import { EmailService } from "~/lib/email-service";
 import { UserStore } from "~/lib/user-store";
 import { showToast } from "~/components/toaster";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type AdminUser = Awaited<ReturnType<typeof loader>>["users"][number];
+
+const columnHelper = createColumnHelper<AdminUser>();
+
+const fuzzyGlobalFilter: FilterFn<AdminUser> = (row, _columnId, value) => {
+  const user = row.original;
+  const haystack = [
+    user.first_name,
+    user.last_name,
+    user.email,
+    user.user_id,
+    user.website_role,
+    user.note ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(String(value).trim().toLowerCase());
+};
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -124,6 +154,8 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
   const [tempPasswordUserName, setTempPasswordUserName] = useState<string>("");
   const [tempPasswordUserEmail, setTempPasswordUserEmail] =
     useState<string>("");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
 
   const openDeleteModal = (userId: string, userName: string) => {
     setDeleteUserId(userId);
@@ -239,6 +271,116 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
     }
   }, [fetcher.state, fetcher.data]);
 
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor((row) => `${row.first_name} ${row.last_name}`, {
+        id: "name",
+        header: "Name",
+        cell: (info) => {
+          const user = info.row.original;
+          return (
+            <Link
+              to={`/admin/update-user/${user.user_id}`}
+              className="group hover:bg-base-200 block rounded-lg px-1 py-1 transition-colors"
+            >
+              <div className="text-base-content decoration-base-content/50 font-medium underline underline-offset-2">
+                {user.first_name} {user.last_name}
+              </div>
+              <div className="text-base-content/70 decoration-base-content/30 group-hover:text-base-content text-sm underline underline-offset-2">
+                {user.email}
+              </div>
+            </Link>
+          );
+        },
+      }),
+      columnHelper.accessor("website_role", {
+        id: "website_role",
+        header: "Website Role",
+        cell: (info) => (
+          <span className="badge badge-neutral">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor((row) => row.note ?? "", {
+        id: "note",
+        header: "Note",
+        cell: (info) => (
+          <span className="whitespace-normal">{info.getValue() || "—"}</span>
+        ),
+      }),
+      columnHelper.accessor((row) => row.last_login_at ?? "", {
+        id: "last_login",
+        header: "Last Login",
+        cell: (info) => {
+          const value = info.getValue();
+          return (
+            <span className="text-sm">
+              {value
+                ? `${value.slice(0, 10)} ${value.slice(11, 16)} UTC`
+                : "Never"}
+            </span>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: "actions",
+        header: () => <span className="block text-right">Actions</span>,
+        cell: (info) => {
+          const user = info.row.original;
+          return (
+            <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost text-warning whitespace-nowrap"
+                disabled={fetcher.state !== "idle"}
+                onClick={() =>
+                  openTempPasswordModal(
+                    user.user_id,
+                    `${user.first_name} ${user.last_name}`,
+                    user.email,
+                  )
+                }
+              >
+                Set Temporary Password
+              </button>
+              <Link
+                to={`/admin/update-user/${user.user_id}`}
+                className="btn btn-sm btn-ghost whitespace-nowrap"
+              >
+                Edit
+              </Link>
+              <button
+                onClick={() =>
+                  openDeleteModal(
+                    user.user_id,
+                    `${user.first_name} ${user.last_name}`,
+                  )
+                }
+                className="btn btn-sm btn-error btn-ghost whitespace-nowrap"
+              >
+                Delete
+              </button>
+            </div>
+          );
+        },
+      }),
+    ],
+    [fetcher.state],
+  );
+
+  const table = useReactTable({
+    data: users,
+    columns,
+    state: { sorting, globalFilter },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: fuzzyGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  });
+
+  const rows = table.getRowModel().rows;
+
   return (
     <>
       <div className="breadcrumbs mb-4 text-sm">
@@ -268,88 +410,78 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
 
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
-          <h2 className="card-title">Users ({users.length})</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="card-title">
+              Users ({rows.length} of {users.length})
+            </h2>
+            <label className="input input-bordered flex items-center gap-2 sm:w-80">
+              <FaMagnifyingGlass className="h-4 w-4 opacity-70" />
+              <input
+                type="search"
+                className="grow"
+                placeholder="Search by name, email, ID, role, or note"
+                value={globalFilter}
+                onChange={(event) => setGlobalFilter(event.target.value)}
+              />
+            </label>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="table">
+            <table className="table min-w-max">
               <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Website Role</th>
-                  <th className="w-40 max-w-40">Note</th>
-                  <th>Last Login</th>
-                  <th className="w-80 min-w-80 text-right">Actions</th>
-                </tr>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <th key={header.id} className="whitespace-nowrap">
+                        {header.isPlaceholder ? null : (
+                          <div
+                            className={
+                              header.column.getCanSort()
+                                ? "flex cursor-pointer items-center gap-1 select-none"
+                                : "flex items-center"
+                            }
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                            {header.column.getCanSort() && (
+                              <span className="text-xs opacity-50">
+                                {{
+                                  asc: "↑",
+                                  desc: "↓",
+                                }[header.column.getIsSorted() as string] ?? "↕"}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
               </thead>
               <tbody>
-                {users.map((user) => (
-                  <tr key={user.user_id}>
-                    <td>
-                      <Link
-                        to={`/admin/update-user/${user.user_id}`}
-                        className="group hover:bg-base-200 block rounded-lg px-1 py-1 transition-colors"
-                      >
-                        <div className="text-base-content decoration-base-content/50 font-medium underline underline-offset-2">
-                          {user.first_name} {user.last_name}
-                        </div>
-                        <div className="text-base-content/70 decoration-base-content/30 group-hover:text-base-content text-sm underline underline-offset-2">
-                          {user.email}
-                        </div>
-                      </Link>
-                    </td>
-                    <td>
-                      <span className="badge badge-neutral">
-                        {user.website_role}
-                      </span>
-                    </td>
-                    <td className="w-40 max-w-40 whitespace-normal">
-                      {user.note || "—"}
-                    </td>
-                    <td>
-                      <span className="text-sm">
-                        {user.last_login_at
-                          ? `${user.last_login_at.slice(0, 10)} ${user.last_login_at.slice(11, 16)} UTC`
-                          : "Never"}
-                      </span>
-                    </td>
-                    <td className="w-80 min-w-80 text-right align-top">
-                      <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-ghost text-warning whitespace-nowrap"
-                          disabled={fetcher.state !== "idle"}
-                          onClick={() =>
-                            openTempPasswordModal(
-                              user.user_id,
-                              `${user.first_name} ${user.last_name}`,
-                              user.email,
-                            )
-                          }
-                        >
-                          Set Temporary Password
-                        </button>
-                        <Link
-                          to={`/admin/update-user/${user.user_id}`}
-                          className="btn btn-sm btn-ghost whitespace-nowrap"
-                        >
-                          Edit
-                        </Link>
-                        <button
-                          onClick={() =>
-                            openDeleteModal(
-                              user.user_id,
-                              `${user.first_name} ${user.last_name}`,
-                            )
-                          }
-                          className="btn btn-sm btn-error btn-ghost whitespace-nowrap"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="align-top">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
+
+            {rows.length === 0 && (
+              <div className="text-base-content/60 py-6 text-center text-sm">
+                No users match your search.
+              </div>
+            )}
           </div>
         </div>
       </div>
