@@ -294,8 +294,16 @@ export default function TruckCheck() {
               ))}
             </select>
             <div className="modal-action">
-              <button type="submit" className="btn btn-primary">
-                Start New Check
+              <button
+                type="submit"
+                className={`btn ${fetcher.state !== "idle" ? "btn-disabled" : "btn-primary"}`}
+                disabled={fetcher.state !== "idle"}
+              >
+                {fetcher.state !== "idle" ? (
+                  <span className="loading loading-spinner" />
+                ) : (
+                  "Start New Check"
+                )}
               </button>
             </div>
           </fetcher.Form>
