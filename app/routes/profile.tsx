@@ -177,6 +177,135 @@ export default function Profile() {
     }
   }, [success, errors]);
 
+  type CertRow = (typeof certification_data)[number];
+
+  const formatCertDate = (value?: string | null) =>
+    value && value !== "null" ? value : "N/A";
+
+  const getStatusBadge = (certType: CertRow) => {
+    switch (certType.status) {
+      case "active":
+        return <span className="badge badge-sm badge-success">Active</span>;
+      case "expiring_soon":
+        return (
+          <span className="badge badge-sm badge-warning">Expiring Soon</span>
+        );
+      case "expired":
+        return <span className="badge badge-sm badge-error">Expired</span>;
+      default:
+        return (
+          <span
+            className={`badge badge-sm ${
+              certType.is_required ? "badge-error" : "badge-ghost"
+            }`}
+          >
+            Missing
+          </span>
+        );
+    }
+  };
+
+  const renderCertCard = (certType: CertRow) => (
+    <div key={certType.name} className="card bg-base-200">
+      <div className="card-body gap-3 p-4">
+        <div className="flex flex-col gap-2">
+          <div className="font-semibold break-words">{certType.name}</div>
+          <div className="flex flex-wrap gap-2">
+            {certType.is_required ? (
+              <span className="badge badge-sm badge-primary">Required</span>
+            ) : (
+              <span className="badge badge-sm badge-ghost">Optional</span>
+            )}
+            {getStatusBadge(certType)}
+          </div>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <dt className="opacity-70">Issued</dt>
+          <dd className="font-medium">
+            {formatCertDate(certType.existing_cert?.issued_on)}
+          </dd>
+          <dt className="opacity-70">Expires</dt>
+          <dd className="font-medium">
+            {formatCertDate(certType.existing_cert?.expires_on)}
+          </dd>
+        </dl>
+
+        <div className="flex flex-wrap gap-2">
+          {certType.existing_cert?.file_url ? (
+            <a
+              href={certType.existing_cert.file_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-xs btn-info flex-1"
+            >
+              View
+            </a>
+          ) : null}
+          <button
+            type="button"
+            className="btn btn-xs btn-primary flex-1"
+            onClick={() => {
+              setSelectedCertType(certType);
+              certModalRef.current?.showModal();
+            }}
+          >
+            {certType.existing_cert ? "Update" : "Upload"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderCertRow = (certType: CertRow) => (
+    <tr key={certType.name}>
+      <td>{certType.name}</td>
+      <td>
+        {certType.is_required ? (
+          <span className="badge badge-sm badge-primary">Required</span>
+        ) : (
+          <span className="text-base-content/50">—</span>
+        )}
+      </td>
+      <td>{formatCertDate(certType.existing_cert?.issued_on)}</td>
+      <td>{formatCertDate(certType.existing_cert?.expires_on)}</td>
+      <td>{getStatusBadge(certType)}</td>
+      <td>
+        {certType.existing_cert?.file_url ? (
+          <a
+            href={certType.existing_cert.file_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-xs btn-info"
+          >
+            View
+          </a>
+        ) : (
+          <span className="text-base-content/50">—</span>
+        )}
+      </td>
+      <td>
+        <button
+          type="button"
+          className="btn btn-xs btn-primary"
+          onClick={() => {
+            setSelectedCertType(certType);
+            certModalRef.current?.showModal();
+          }}
+        >
+          {certType.existing_cert ? "Update" : "Upload"}
+        </button>
+      </td>
+    </tr>
+  );
+
+  const visibleCerts = certification_data.filter(
+    (c) => c.is_required || c.existing_cert,
+  );
+  const hiddenCerts = certification_data.filter(
+    (c) => !c.is_required && !c.existing_cert,
+  );
+
   return (
     <>
       <div className="breadcrumbs mb-4 text-sm">
@@ -248,59 +377,38 @@ export default function Profile() {
 
           <div className="divider" />
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="card bg-base-200">
-              <div className="card-body">
-                <div className="flex items-center justify-between gap-4">
-                  <h2 className="card-title text-base">Contact</h2>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary"
-                    onClick={() => ref.current?.showModal()}
-                  >
-                    Update Contact
-                  </button>
-                </div>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <dt className="opacity-70">Phone</dt>
-                  <dd className="font-medium">{user.phone}</dd>
-                  <dt className="opacity-70">Email</dt>
-                  <dd className="font-medium">{user.email}</dd>
-                  <dt className="opacity-70">User ID</dt>
-                  <dd className="font-mono text-xs break-all">
-                    {user.user_id}
-                  </dd>
-                  {user.last_login_at && (
-                    <>
-                      <dt className="opacity-70">Last Login</dt>
-                      <dd className="font-medium">
-                        <DateDisplay
-                          value={user.last_login_at}
-                          format="shortDateTime"
-                        />
-                      </dd>
-                    </>
-                  )}
-                </dl>
+          <div className="card bg-base-200">
+            <div className="card-body">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => ref.current?.showModal()}
+                >
+                  Update Contact
+                </button>
               </div>
-            </div>
-
-            <div className="card bg-base-200">
-              <div className="card-body">
-                <div className="flex items-center justify-between gap-4">
-                  <h2 className="card-title text-base">Membership</h2>
-                  <Link
-                    to="/account/security"
-                    className="btn btn-sm btn-primary"
-                  >
-                    Account Security
-                  </Link>
-                </div>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <dt className="opacity-70">Website Role</dt>
-                  <dd className="font-medium">{user.website_role}</dd>
-                </dl>
-              </div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <dt className="opacity-70">Phone</dt>
+                <dd className="font-medium">{user.phone}</dd>
+                <dt className="opacity-70">Email</dt>
+                <dd className="font-medium">{user.email}</dd>
+                <dt className="opacity-70">User ID</dt>
+                <dd className="font-mono text-xs break-all">{user.user_id}</dd>
+                {user.last_login_at && (
+                  <>
+                    <dt className="opacity-70">Last Login</dt>
+                    <dd className="font-medium">
+                      <DateDisplay
+                        value={user.last_login_at}
+                        format="shortDateTime"
+                      />
+                    </dd>
+                  </>
+                )}
+                <dt className="opacity-70">Website Role</dt>
+                <dd className="font-medium">{user.website_role}</dd>
+              </dl>
             </div>
           </div>
 
@@ -362,82 +470,7 @@ export default function Profile() {
             <h2 className="card-title">Certifications</h2>
 
             <div className="grid gap-3 sm:hidden">
-              {certification_data.map((certType) => (
-                <div key={certType.name} className="card bg-base-200">
-                  <div className="card-body gap-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold">
-                          {certType.name}
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          {certType.is_required ? (
-                            <span className="badge badge-sm badge-primary">
-                              Required
-                            </span>
-                          ) : (
-                            <span className="badge badge-sm badge-ghost">
-                              Optional
-                            </span>
-                          )}
-
-                          {certType.status === "active" ? (
-                            <span className="badge badge-sm badge-success">
-                              Active
-                            </span>
-                          ) : certType.status === "expiring_soon" ? (
-                            <span className="badge badge-sm badge-warning">
-                              Expiring Soon
-                            </span>
-                          ) : certType.status === "expired" ? (
-                            <span className="badge badge-sm badge-error">
-                              Expired
-                            </span>
-                          ) : (
-                            <span className="badge badge-sm badge-ghost">
-                              Missing
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex shrink-0 flex-col items-end gap-2">
-                        {certType.existing_cert?.file_url ? (
-                          <a
-                            href={certType.existing_cert.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-xs btn-ghost"
-                          >
-                            View
-                          </a>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-primary"
-                          onClick={() => {
-                            setSelectedCertType(certType);
-                            certModalRef.current?.showModal();
-                          }}
-                        >
-                          {certType.existing_cert ? "Update" : "Upload"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                      <dt className="opacity-70">Issued</dt>
-                      <dd className="font-medium">
-                        {certType.existing_cert?.issued_on || "—"}
-                      </dd>
-                      <dt className="opacity-70">Expires</dt>
-                      <dd className="font-medium">
-                        {certType.existing_cert?.expires_on || "—"}
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              ))}
+              {visibleCerts.map((certType) => renderCertCard(certType))}
             </div>
 
             <div className="hidden overflow-x-auto sm:block">
@@ -454,83 +487,43 @@ export default function Profile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {certification_data.map((certType) => {
-                    const getStatusBadge = () => {
-                      switch (certType.status) {
-                        case "active":
-                          return (
-                            <span className="badge badge-sm badge-success">
-                              Active
-                            </span>
-                          );
-                        case "expiring_soon":
-                          return (
-                            <span className="badge badge-sm badge-warning">
-                              Expiring Soon
-                            </span>
-                          );
-                        case "expired":
-                          return (
-                            <span className="badge badge-sm badge-error">
-                              Expired
-                            </span>
-                          );
-                        case "missing":
-                          return (
-                            <span className="badge badge-sm badge-ghost">
-                              Missing
-                            </span>
-                          );
-                      }
-                    };
-
-                    return (
-                      <tr key={certType.name}>
-                        <td>{certType.name}</td>
-                        <td>
-                          {certType.is_required ? (
-                            <span className="badge badge-sm badge-primary">
-                              Required
-                            </span>
-                          ) : (
-                            <span className="text-base-content/50">—</span>
-                          )}
-                        </td>
-                        <td>{certType.existing_cert?.issued_on || "—"}</td>
-                        <td>{certType.existing_cert?.expires_on || "—"}</td>
-                        <td>{getStatusBadge()}</td>
-                        <td>
-                          {certType.existing_cert?.file_url ? (
-                            <a
-                              href={certType.existing_cert.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn btn-xs btn-ghost"
-                            >
-                              View
-                            </a>
-                          ) : (
-                            <span className="text-base-content/50">—</span>
-                          )}
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-xs btn-primary"
-                            onClick={() => {
-                              setSelectedCertType(certType);
-                              certModalRef.current?.showModal();
-                            }}
-                          >
-                            {certType.existing_cert ? "Update" : "Upload"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {visibleCerts.map((certType) => renderCertRow(certType))}
                 </tbody>
               </table>
             </div>
+
+            {hiddenCerts.length > 0 && (
+              <details className="collapse-arrow bg-base-200 collapse mt-2">
+                <summary className="collapse-title text-sm font-medium">
+                  {hiddenCerts.length} other optional certification
+                  {hiddenCerts.length === 1 ? "" : "s"} not on file
+                </summary>
+                <div className="collapse-content">
+                  <div className="grid gap-3 sm:hidden">
+                    {hiddenCerts.map((certType) => renderCertCard(certType))}
+                  </div>
+
+                  <div className="hidden overflow-x-auto sm:block">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Required</th>
+                          <th>Issued</th>
+                          <th>Expires</th>
+                          <th>Status</th>
+                          <th>View</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {hiddenCerts.map((certType) => renderCertRow(certType))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
+            )}
           </div>
         </div>
       </div>
