@@ -371,7 +371,7 @@ export default function TrainingStatus() {
 
           <p className="text-base">
             This page shows the certifications across the organization that are
-            either required by local protocols, the training officer, by law, or because someone in government has a dogmatic insistence on death marches by antiquated powerpoints.
+            either required by local protocols, the training officer, by law, or because someone in government has a dogmatic insistence on antiquated powerpoints.
           </p>
 
           <div className="flex flex-col gap-3 pt-2 lg:flex-row lg:items-center lg:justify-between">
