@@ -9,4 +9,8 @@ export interface Context {
   timeZone: string;
 }
 
-export const appContext = createContext<Context | undefined>(undefined);
+// React Router's RouterContextProvider.get throws "No value found for context"
+// when the context was never set AND its defaultValue is undefined. Use null so
+// excluded paths (e.g. /auth/login, where authMiddleware skips context.set) can
+// safely call context.get and receive null instead of throwing.
+export const appContext = createContext<Context | null>(null);
