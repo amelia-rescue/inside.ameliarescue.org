@@ -304,4 +304,85 @@ describe("user store test", () => {
     await store.deletePermanently(user_id);
     await expect(store.getUser(user_id)).rejects.toBeInstanceOf(UserNotFound);
   });
+
+  it("should be able to get a user by email", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+
+    const { user_id, email } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
+      email: "lookup@example.com",
+      website_role: "admin",
+      membership_roles: [
+        { role_name: "Provider", track_name: "EMT", precepting: false },
+      ],
+    });
+
+    const user = await store.getByEmail(email);
+    expect(user.user_id).toBe(user_id);
+    expect(user.email).toBe("lookup@example.com");
+    expect(user.first_name).toBe("Test");
+    expect(user.last_name).toBe("User");
+  });
+
+  it("should throw UserNotFound when getting by email that does not exist", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+
+    await expect(
+      store.getByEmail("nonexistent@example.com"),
+    ).rejects.toBeInstanceOf(UserNotFound);
+  });
+
+  it("should throw UserNotFound when getting a soft-deleted user by email", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+
+    const { user_id, email } = await store.createUser({
+      first_name: "Test",
+      last_name: "User",
+      email: "deleted@example.com",
+      website_role: "admin",
+      membership_roles: [
+        { role_name: "Provider", track_name: "EMT", precepting: false },
+      ],
+    });
+
+    await store.softDelete(user_id);
+    await expect(store.getByEmail(email)).rejects.toBeInstanceOf(UserNotFound);
+  });
+
+  it("should find active user when both deleted and active users share the same email", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+
+    // Create and delete first user
+    const deletedUser = await store.createUser({
+      first_name: "Deleted",
+      last_name: "User",
+      email: "shared@example.com",
+      website_role: "user",
+      membership_roles: [
+        { role_name: "Junior", track_name: "EMT", precepting: false },
+      ],
+    });
+    await store.softDelete(deletedUser.user_id);
+
+    // Create new active user with same email (new cognito mock response)
+    cognitoSendSpy.mockResolvedValueOnce({
+      User: { Username: crypto.randomUUID() },
+    });
+    const activeUser = await store.createUser({
+      first_name: "Active",
+      last_name: "User",
+      email: "shared@example.com",
+      website_role: "admin",
+      membership_roles: [
+        { role_name: "Provider", track_name: "EMT", precepting: false },
+      ],
+    });
+
+    // Should find the active user, not the deleted one
+    const foundUser = await store.getByEmail("shared@example.com");
+    expect(foundUser.user_id).toBe(activeUser.user_id);
+    expect(foundUser.first_name).toBe("Active");
+    expect(foundUser.deleted_at).toBeUndefined();
+  });
 });

@@ -11,6 +11,12 @@ export async function setupDynamo() {
     {
       tableName: "aes_users",
       partitionKey: "user_id",
+      gsi: [
+        {
+          indexName: "EmailIndex",
+          partitionKey: "email",
+        },
+      ],
     },
     {
       tableName: "aes_user_sessions",

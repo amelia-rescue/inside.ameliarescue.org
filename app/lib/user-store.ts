@@ -4,6 +4,7 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  QueryCommand,
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
@@ -97,6 +98,25 @@ export class UserStore {
   ): Promise<DocumentUser> {
     const user = await this.getUserIncludingDeleted(user_id);
     if (!options?.includeDeleted && user.deleted_at) {
+      throw new UserNotFound();
+    }
+    return user;
+  }
+
+  public async getByEmail(email: string): Promise<DocumentUser> {
+    const command = new QueryCommand({
+      TableName: this.tableName,
+      IndexName: "EmailIndex",
+      KeyConditionExpression: "email = :email",
+      FilterExpression: "attribute_not_exists(deleted_at)",
+      ExpressionAttributeValues: {
+        ":email": email,
+      },
+      Limit: 1,
+    });
+    const response = await UserStore.client.send(command);
+    const user = response.Items?.[0] as DocumentUser | undefined;
+    if (!user) {
       throw new UserNotFound();
     }
     return user;

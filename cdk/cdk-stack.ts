@@ -249,6 +249,11 @@ export class CdkStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    usersTable.addGlobalSecondaryIndex({
+      indexName: "EmailIndex",
+      partitionKey: { name: "email", type: dynamodb.AttributeType.STRING },
+    });
+
     const userSessionsTable = new dynamodb.Table(this, "UserSessionsTable", {
       tableName: "aes_user_sessions",
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
