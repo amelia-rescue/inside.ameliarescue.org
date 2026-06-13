@@ -660,7 +660,7 @@ export default function Profile() {
       >
         <div className="modal-box max-w-2xl">
           <form method="dialog">
-            <button className="btn btn-sm btn-circle btn-ghost absolute top-2 right-2">
+            <button className="btn btn-sm btn-circle btn-ghost absolute top-2 right-2 z-10">
               ✕
             </button>
           </form>
