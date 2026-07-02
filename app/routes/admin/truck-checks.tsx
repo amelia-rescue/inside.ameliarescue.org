@@ -6,9 +6,16 @@ import {
   type Truck,
   type TruckCheckSchema,
 } from "~/lib/truck-check/truck-check-schema-store";
-import { IoWarning } from "react-icons/io5";
-import { useEffect, useState, type ComponentType } from "react";
+import { IoGitCompare, IoWarning } from "react-icons/io5";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from "react";
 import { DateDisplay } from "~/components/date-display";
+import { createTwoFilesPatch } from "diff";
 
 type JsonEditorProps = {
   value: string;
@@ -100,6 +107,287 @@ function JsonEditor({ value, onChange, hasError }: JsonEditorProps) {
   );
 }
 
+type DiffViewerProps = {
+  value: string;
+};
+
+function DiffViewer({ value }: DiffViewerProps) {
+  const [CodeMirrorEditor, setCodeMirrorEditor] =
+    useState<ComponentType<any> | null>(null);
+  const [extensions, setExtensions] = useState<any[]>([]);
+  const [theme, setTheme] = useState<any>(undefined);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([
+      import("@uiw/react-codemirror"),
+      import("@codemirror/theme-one-dark"),
+      import("@codemirror/view"),
+      import("@codemirror/state"),
+    ]).then(([codeMirrorModule, themeModule, viewModule, stateModule]) => {
+      if (!isMounted) {
+        return;
+      }
+
+      const { EditorView, Decoration, ViewPlugin } = viewModule;
+      const { RangeSetBuilder } = stateModule;
+
+      const addedLine = Decoration.line({ class: "cm-diff-added" });
+      const removedLine = Decoration.line({ class: "cm-diff-removed" });
+      const hunkLine = Decoration.line({ class: "cm-diff-hunk" });
+      const headerLine = Decoration.line({ class: "cm-diff-header" });
+
+      function buildDiffDecorations(view: any) {
+        const builder = new RangeSetBuilder<any>();
+        for (const { from, to } of view.visibleRanges) {
+          let pos = from;
+          while (pos <= to) {
+            const line = view.state.doc.lineAt(pos);
+            const text = line.text;
+            if (
+              text.startsWith("+++") ||
+              text.startsWith("---") ||
+              text.startsWith("===") ||
+              text.startsWith("Index:")
+            ) {
+              builder.add(line.from, line.from, headerLine);
+            } else if (text.startsWith("@@")) {
+              builder.add(line.from, line.from, hunkLine);
+            } else if (text.startsWith("+")) {
+              builder.add(line.from, line.from, addedLine);
+            } else if (text.startsWith("-")) {
+              builder.add(line.from, line.from, removedLine);
+            }
+            pos = line.to + 1;
+          }
+        }
+        return builder.finish();
+      }
+
+      const diffHighlightPlugin = ViewPlugin.fromClass(
+        class {
+          decorations: any;
+
+          constructor(view: any) {
+            this.decorations = buildDiffDecorations(view);
+          }
+
+          update(update: any) {
+            if (update.docChanged || update.viewportChanged) {
+              this.decorations = buildDiffDecorations(update.view);
+            }
+          }
+        },
+        {
+          decorations: (v: any) => v.decorations,
+        },
+      );
+
+      const diffTheme = EditorView.baseTheme({
+        ".cm-diff-added": {
+          backgroundColor: "rgba(46, 160, 67, 0.25)",
+        },
+        ".cm-diff-removed": {
+          backgroundColor: "rgba(248, 81, 73, 0.25)",
+        },
+        ".cm-diff-hunk": {
+          backgroundColor: "rgba(56, 139, 253, 0.15)",
+          color: "#79c0ff",
+        },
+        ".cm-diff-header": {
+          color: "#8b949e",
+          fontWeight: "bold",
+        },
+      });
+
+      setCodeMirrorEditor(() => codeMirrorModule.default);
+      setExtensions([EditorView.lineWrapping, diffHighlightPlugin, diffTheme]);
+      setTheme(themeModule.oneDark);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return (
+    <div
+      className={`border-base-300 overflow-hidden rounded-lg border ${
+        isFullscreen
+          ? "bg-base-100 fixed inset-4 z-50 flex flex-col shadow-2xl"
+          : ""
+      }`}
+    >
+      <div className="bg-base-200 border-base-300 flex items-center justify-between border-b px-3 py-2">
+        <span className="text-sm font-medium">Diff</span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs"
+          onClick={() => setIsFullscreen(!isFullscreen)}
+        >
+          {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+        </button>
+      </div>
+      {CodeMirrorEditor ? (
+        <CodeMirrorEditor
+          value={value}
+          height={isFullscreen ? "calc(100vh - 8.5rem)" : "420px"}
+          extensions={extensions}
+          theme={theme}
+          editable={false}
+          readOnly={true}
+          basicSetup={{
+            codeFolding: true,
+            foldGutter: true,
+            highlightActiveLine: false,
+            highlightActiveLineGutter: false,
+            lineNumbers: true,
+          }}
+        />
+      ) : (
+        <pre
+          className="textarea w-full flex-1 rounded-none border-0 font-mono text-sm"
+          style={{ minHeight: "420px" }}
+        >
+          {value}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+type HistoryModalProps = {
+  schema: TruckCheckSchema;
+  allVersions: TruckCheckSchema[];
+};
+
+function HistoryModal({ schema, allVersions }: HistoryModalProps) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const versions = useMemo(() => {
+    return allVersions
+      .filter((s) => s.schemaId === schema.schemaId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [allVersions, schema.schemaId]);
+
+  const current = versions[selectedIndex];
+  const previous = versions[selectedIndex + 1];
+
+  const diffText = useMemo(() => {
+    if (!current || !previous) {
+      return "";
+    }
+
+    const oldText =
+      JSON.stringify(
+        {
+          title: previous.title,
+          version: previous.version,
+          sections: previous.sections,
+        },
+        null,
+        2,
+      ) + "\n";
+    const newText =
+      JSON.stringify(
+        {
+          title: current.title,
+          version: current.version,
+          sections: current.sections,
+        },
+        null,
+        2,
+      ) + "\n";
+
+    return createTwoFilesPatch(
+      `v${previous.version}`,
+      `v${current.version}`,
+      oldText,
+      newText,
+      previous.createdAt,
+      current.createdAt,
+    );
+  }, [current, previous]);
+
+  function open() {
+    setSelectedIndex(0);
+    ref.current?.showModal();
+  }
+
+  return (
+    <>
+      <button type="button" onClick={open} className="btn btn-sm btn-ghost">
+        <IoGitCompare className="mr-1" />
+        History
+      </button>
+      <dialog ref={ref} className="modal">
+        <div className="modal-box w-11/12 max-w-5xl">
+          <form method="dialog">
+            <button className="btn btn-sm btn-circle btn-ghost absolute top-2 right-2">
+              ✕
+            </button>
+          </form>
+          <h3 className="text-lg font-bold">History: {schema.title}</h3>
+          <p className="mb-2 text-sm opacity-70">
+            {versions.length} version{versions.length !== 1 ? "s" : ""} saved
+          </p>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm">
+              {current && previous ? (
+                <span>
+                  Comparing v{current.version} (
+                  <DateDisplay
+                    value={current.createdAt}
+                    format="shortDateTime"
+                  />
+                  ) to v{previous.version} (
+                  <DateDisplay
+                    value={previous.createdAt}
+                    format="shortDateTime"
+                  />
+                  )
+                </span>
+              ) : (
+                <span>No previous version to compare</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={selectedIndex === 0}
+                onClick={() => setSelectedIndex((i) => Math.max(0, i - 1))}
+              >
+                ← Newer
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={selectedIndex >= versions.length - 2}
+                onClick={() =>
+                  setSelectedIndex((i) => Math.min(versions.length - 2, i + 1))
+                }
+              >
+                Older →
+              </button>
+            </div>
+          </div>
+          {current && previous ? (
+            <DiffViewer value={diffText} />
+          ) : (
+            <div className="border-base-300 bg-base-200 rounded-lg border p-8 text-center text-sm opacity-70">
+              Only one version exists. Create a new version to see a diff.
+            </div>
+          )}
+        </div>
+      </dialog>
+    </>
+  );
+}
+
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Manage Truck Checks - Admin - Amelia Rescue" },
@@ -144,7 +432,12 @@ export async function loader({ context }: Route.LoaderArgs) {
     {} as Record<string, TruckCheckSchema>,
   );
 
-  return { ...c, trucks, schemas: Object.values(uniqueSchemas) };
+  return {
+    ...c,
+    trucks,
+    schemas: Object.values(uniqueSchemas),
+    allSchemas: schemas,
+  };
 }
 
 const VALID_FIELD_TYPES = ["checkbox", "text", "number", "select", "photo"];
@@ -323,7 +616,7 @@ export async function action({ request }: Route.ActionArgs) {
 export default function ManageTruckChecks({
   loaderData,
 }: Route.ComponentProps) {
-  const { trucks, schemas } = loaderData;
+  const { trucks, schemas, allSchemas } = loaderData;
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [activeTab, setActiveTab] = useState<"trucks" | "schemas">("schemas");
@@ -825,12 +1118,18 @@ export default function ManageTruckChecks({
                             />
                           </p>
                         </div>
-                        <button
-                          onClick={() => handleEditSchema(schema)}
-                          className="btn btn-sm btn-ghost"
-                        >
-                          New Version
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <HistoryModal
+                            schema={schema}
+                            allVersions={allSchemas}
+                          />
+                          <button
+                            onClick={() => handleEditSchema(schema)}
+                            className="btn btn-sm btn-ghost"
+                          >
+                            New Version
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
