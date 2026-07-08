@@ -10,6 +10,7 @@ export interface TruckCheckSchema {
   title: string;
   sections: SchemaSection[];
   createdAt: string;
+  created_by: string;
 }
 
 export interface SchemaSection {

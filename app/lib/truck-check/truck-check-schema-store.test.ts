@@ -144,6 +144,7 @@ describe("truck check schema store test", () => {
       const store = TruckCheckSchemaStore.make();
 
       const schema = await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "ALS Truck Check v1",
         sections: [
@@ -166,6 +167,7 @@ describe("truck check schema store test", () => {
         version: 1,
         title: "ALS Truck Check v1",
         createdAt: expect.any(String),
+        created_by: "user-1",
       });
 
       const retrieved = await store.getSchema(schema.schemaId);
@@ -184,6 +186,7 @@ describe("truck check schema store test", () => {
       const store = TruckCheckSchemaStore.make();
 
       const schema = await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "ALS Truck Check v1",
         sections: [],
@@ -217,6 +220,7 @@ describe("truck check schema store test", () => {
           version: 1,
           title: "Test",
           sections: [],
+          created_by: "user-1",
         }),
       ).rejects.toBeInstanceOf(SchemaNotFound);
     });
@@ -225,6 +229,7 @@ describe("truck check schema store test", () => {
       const store = TruckCheckSchemaStore.make();
 
       const schema = await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "ALS Truck Check v1",
         sections: [],
@@ -249,18 +254,21 @@ describe("truck check schema store test", () => {
       const store = TruckCheckSchemaStore.make();
 
       await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "ALS Truck Check v1",
         sections: [],
       });
 
       await store.createSchema({
+        created_by: "user-1",
         version: 2,
         title: "ALS Truck Check v2",
         sections: [],
       });
 
       await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "BLS Truck Check v1",
         sections: [],
@@ -281,6 +289,7 @@ describe("truck check schema store test", () => {
       const store = TruckCheckSchemaStore.make();
 
       const schema = await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "Comprehensive Truck Check",
         sections: [
@@ -346,12 +355,14 @@ describe("truck check schema store test", () => {
       const store = TruckCheckSchemaStore.make();
 
       const v1 = await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "Schema v1",
         sections: [],
       });
 
       const v2 = await store.updateSchema({
+        created_by: "user-2",
         schemaId: v1.schemaId,
         version: 2,
         title: "Schema v2",
@@ -361,6 +372,8 @@ describe("truck check schema store test", () => {
       expect(v2.schemaId).toBe(v1.schemaId);
       expect(v2.createdAt).not.toBe(v1.createdAt);
       expect(v2.title).toBe("Schema v2");
+      expect(v1.created_by).toBe("user-1");
+      expect(v2.created_by).toBe("user-2");
 
       const latest = await store.getSchema(v1.schemaId);
       expect(latest.title).toBe("Schema v2");
@@ -371,12 +384,14 @@ describe("truck check schema store test", () => {
       const store = TruckCheckSchemaStore.make();
 
       const v1 = await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "Schema v1",
         sections: [],
       });
 
       const v2 = await store.updateSchema({
+        created_by: "user-2",
         schemaId: v1.schemaId,
         version: 2,
         title: "Schema v2",
@@ -389,6 +404,7 @@ describe("truck check schema store test", () => {
       );
       expect(retrievedV1.title).toBe("Schema v1");
       expect(retrievedV1.version).toBe(1);
+      expect(retrievedV1.created_by).toBe("user-1");
 
       const retrievedV2 = await store.getSchemaVersion(
         v2.schemaId,
@@ -396,18 +412,21 @@ describe("truck check schema store test", () => {
       );
       expect(retrievedV2.title).toBe("Schema v2");
       expect(retrievedV2.version).toBe(2);
+      expect(retrievedV2.created_by).toBe("user-2");
     });
 
     it("should list all versions of a schema", async () => {
       const store = TruckCheckSchemaStore.make();
 
       const v1 = await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "Schema v1",
         sections: [],
       });
 
       await store.updateSchema({
+        created_by: "user-2",
         schemaId: v1.schemaId,
         version: 2,
         title: "Schema v2",
@@ -415,6 +434,7 @@ describe("truck check schema store test", () => {
       });
 
       await store.updateSchema({
+        created_by: "user-2",
         schemaId: v1.schemaId,
         version: 3,
         title: "Schema v3",
@@ -424,6 +444,7 @@ describe("truck check schema store test", () => {
       const versions = await store.listSchemaVersions(v1.schemaId);
       expect(versions.length).toBe(3);
       expect(versions[0].title).toBe("Schema v3");
+      expect(versions[0].created_by).toBe("user-2");
       expect(versions[1].title).toBe("Schema v2");
       expect(versions[2].title).toBe("Schema v1");
     });
@@ -432,12 +453,14 @@ describe("truck check schema store test", () => {
       const store = TruckCheckSchemaStore.make();
 
       const v1 = await store.createSchema({
+        created_by: "user-1",
         version: 1,
         title: "Schema v1",
         sections: [],
       });
 
       const v2 = await store.updateSchema({
+        created_by: "user-2",
         schemaId: v1.schemaId,
         version: 2,
         title: "Schema v2",

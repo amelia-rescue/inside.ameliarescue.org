@@ -6,6 +6,7 @@ import {
   type Truck,
   type TruckCheckSchema,
 } from "~/lib/truck-check/truck-check-schema-store";
+import { UserStore } from "~/lib/user-store";
 import { IoGitCompare, IoWarning } from "react-icons/io5";
 import {
   useEffect,
@@ -261,9 +262,10 @@ function DiffViewer({ value }: DiffViewerProps) {
 type HistoryModalProps = {
   schema: TruckCheckSchema;
   allVersions: TruckCheckSchema[];
+  userNames: Record<string, string>;
 };
 
-function HistoryModal({ schema, allVersions }: HistoryModalProps) {
+function HistoryModal({ schema, allVersions, userNames }: HistoryModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -342,12 +344,16 @@ function HistoryModal({ schema, allVersions }: HistoryModalProps) {
                   <DateDisplay
                     value={current.createdAt}
                     format="shortDateTime"
-                  />
-                  ) to v{previous.version} (
+                  />{" "}
+                  by{" "}
+                  <strong>{userNames[current.created_by] ?? "Unknown"}</strong>)
+                  to v{previous.version} (
                   <DateDisplay
                     value={previous.createdAt}
                     format="shortDateTime"
-                  />
+                  />{" "}
+                  by{" "}
+                  <strong>{userNames[previous.created_by] ?? "Unknown"}</strong>
                   )
                 </span>
               ) : (
@@ -413,10 +419,20 @@ export async function loader({ context }: Route.LoaderArgs) {
   }
 
   const store = TruckCheckSchemaStore.make();
-  const [trucks, schemas] = await Promise.all([
+  const userStore = UserStore.make();
+  const [trucks, schemas, users] = await Promise.all([
     store.listTrucks(),
     store.listSchemas(),
+    userStore.listUsers(true),
   ]);
+
+  const userNames = users.reduce(
+    (acc, user) => {
+      acc[user.user_id] = `${user.first_name} ${user.last_name}`;
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
 
   // Get unique schemas by schemaId (latest version only)
   const uniqueSchemas = schemas.reduce(
@@ -437,6 +453,7 @@ export async function loader({ context }: Route.LoaderArgs) {
     trucks,
     schemas: Object.values(uniqueSchemas),
     allSchemas: schemas,
+    userNames,
   };
 }
 
@@ -519,7 +536,15 @@ function validateSectionsJson(json: string): {
   return { sections: parsed };
 }
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
+  const ctx = context.get(appContext);
+  if (!ctx) {
+    throw new Error("App context not found");
+  }
+  if (ctx.user.website_role !== "admin") {
+    throw redirect("/");
+  }
+
   const formData = await request.formData();
   const intent = formData.get("intent");
   const store = TruckCheckSchemaStore.make();
@@ -589,7 +614,12 @@ export async function action({ request }: Route.ActionArgs) {
       }
 
       if (intent === "create-schema") {
-        await store.createSchema({ version, title, sections: sections! });
+        await store.createSchema({
+          version,
+          title,
+          sections: sections!,
+          created_by: ctx.user.user_id,
+        });
       } else {
         const schemaId = validateString(formData, "schemaId", "Schema ID");
         if (typeof schemaId !== "string")
@@ -599,6 +629,7 @@ export async function action({ request }: Route.ActionArgs) {
           version,
           title,
           sections: sections!,
+          created_by: ctx.user.user_id,
         });
       }
       return { success: true, intent };
@@ -616,7 +647,7 @@ export async function action({ request }: Route.ActionArgs) {
 export default function ManageTruckChecks({
   loaderData,
 }: Route.ComponentProps) {
-  const { trucks, schemas, allSchemas } = loaderData;
+  const { trucks, schemas, allSchemas, userNames } = loaderData;
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [activeTab, setActiveTab] = useState<"trucks" | "schemas">("schemas");
@@ -1122,6 +1153,7 @@ export default function ManageTruckChecks({
                           <HistoryModal
                             schema={schema}
                             allVersions={allSchemas}
+                            userNames={userNames}
                           />
                           <button
                             onClick={() => handleEditSchema(schema)}
