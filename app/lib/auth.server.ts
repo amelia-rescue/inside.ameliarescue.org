@@ -52,6 +52,7 @@ const client = {
 export async function getLoginUrl(
   request: Request,
   redirectPath: string = "/auth/callback",
+  options?: { loginHint?: string },
 ) {
   const appUrl = getAppUrl(request);
   const redirectUri = `${appUrl}${redirectPath}`;
@@ -73,6 +74,10 @@ export async function getLoginUrl(
   );
   url.searchParams.set("code_challenge", codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
+
+  if (options?.loginHint) {
+    url.searchParams.set("login_hint", options.loginHint);
+  }
 
   return {
     url: url.toString(),

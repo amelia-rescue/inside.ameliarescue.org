@@ -11,9 +11,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const url = new URL(request.url);
   const redirectTo = url.searchParams.get("redirectTo") || "/";
+  const loginHint = url.searchParams.get("login_hint") || undefined;
 
   // Generate login URL with PKCE
-  const loginData = await getLoginUrl(request);
+  const loginData = await getLoginUrl(request, "/auth/callback", { loginHint });
   const { url: loginUrl, codeVerifier } = loginData;
 
   // Store code verifier and redirect path in session

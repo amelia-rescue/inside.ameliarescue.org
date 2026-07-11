@@ -36,7 +36,7 @@ export class EmailService {
           <p>An administrator reset your inside.ameliarescue.org password.</p>
           <p><strong>Username:</strong> ${user.email}</p>
           <p><strong>Temporary password:</strong> ${temporaryPassword}</p>
-          <p>Please sign in at <a href="${appUrl}">${appUrl}</a> and change your password when prompted.</p>
+          <p>Please <a href="${appUrl}/auth/login?login_hint=${encodeURIComponent(user.email)}">sign in here</a> and change your password when prompted. This temporary password will expire in 30 days.</p>
           <p>Thank you,<br/>https://inside.ameliarescue.org</p>
         </body>
       </html>
@@ -49,7 +49,8 @@ An administrator reset your inside.ameliarescue.org password.
 Username: ${user.email}
 Temporary password: ${temporaryPassword}
 
-Please sign in at ${appUrl} and change your password when prompted.
+Please sign in here and change your password when prompted: ${appUrl}/auth/login?login_hint=${encodeURIComponent(user.email)}
+This temporary password will expire in 30 days.
 
 Thank you,
 https://inside.ameliarescue.org

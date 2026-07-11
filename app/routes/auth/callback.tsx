@@ -43,7 +43,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     // Get user info
     const userInfo = await getUserInfo(tokens.access_token);
-    const user_id = userInfo.sub as string;
+    const legacyUserId = userInfo["custom:user_id"];
+    const user_id =
+      typeof legacyUserId === "string"
+        ? legacyUserId
+        : (userInfo.sub as string);
 
     // Record last login time (non-fatal if it fails)
     try {

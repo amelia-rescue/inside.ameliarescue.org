@@ -112,7 +112,6 @@ export class UserStore {
       ExpressionAttributeValues: {
         ":email": email,
       },
-      Limit: 1,
     });
     const response = await UserStore.client.send(command);
     const user = response.Items?.[0] as DocumentUser | undefined;
@@ -197,7 +196,7 @@ export class UserStore {
     await UserStore.cognito.send(
       new AdminSetUserPasswordCommand({
         UserPoolId: this.cognitoUserPoolId,
-        Username: user.user_id,
+        Username: user.email,
         Password: temporaryPassword,
         Permanent: false,
       }),
@@ -273,7 +272,7 @@ export class UserStore {
       await UserStore.cognito.send(
         new AdminDeleteUserCommand({
           UserPoolId: this.cognitoUserPoolId,
-          Username: user_id,
+          Username: existingUser.email,
         }),
       );
     } catch (error) {

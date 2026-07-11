@@ -174,7 +174,7 @@ export class CdkStack extends cdk.Stack {
         tempPasswordValidity: cdk.Duration.days(passwordExpiryDays),
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
       email: cognito.UserPoolEmail.withSES({
         fromEmail: `noreply@${appDomainName}`,
         fromName: "Inside Amelia Rescue",
@@ -218,8 +218,112 @@ export class CdkStack extends cdk.Stack {
       preventUserExistenceErrors: true,
     });
 
-    // Create Cognito Domain for hosted UI
-    const userPoolDomain = userPool.addDomain("UserPoolDomain", {
+    const userPoolV2 = new cognito.UserPool(this, "UserPoolV2", {
+      userPoolName: "inside-amelia-rescue-users-v2",
+      selfSignUpEnabled: false,
+      signInAliases: {
+        email: true,
+      },
+      signInCaseSensitive: false,
+      userVerification: {
+        emailSubject: "Verify your email for inside.ameliarescue.org",
+        emailBody:
+          "Your verification code for inside.ameliarescue.org is {####}.",
+        smsMessage: "Your inside.ameliarescue.org verification code is {####}.",
+      },
+      userInvitation: {
+        emailSubject: "You're invited to inside.ameliarescue.org",
+        emailBody: `Your username is {username} and temporary password is {####}. Your temporary password will expire in ${passwordExpiryDays} days. Open https://inside.ameliarescue.org/auth/login?login_hint={username} to sign in and set your password.`,
+        smsMessage: `Your inside.ameliarescue.org username is {username} and temporary password is {####}.`,
+      },
+      deviceTracking: {
+        challengeRequiredOnNewDevice: true,
+        deviceOnlyRememberedOnUserPrompt: false,
+      },
+      autoVerify: {
+        email: true,
+      },
+      standardAttributes: {
+        email: {
+          required: true,
+          mutable: true,
+        },
+        givenName: {
+          required: true,
+          mutable: true,
+        },
+        familyName: {
+          required: true,
+          mutable: true,
+        },
+      },
+      customAttributes: {
+        user_id: new cognito.StringAttribute({ mutable: false }),
+      },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireDigits: false,
+        requireSymbols: false,
+        tempPasswordValidity: cdk.Duration.days(passwordExpiryDays),
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      email: cognito.UserPoolEmail.withSES({
+        fromEmail: `noreply@${appDomainName}`,
+        fromName: "Inside Amelia Rescue",
+        sesVerifiedDomain: appDomainName,
+      }),
+    });
+
+    const userPoolClientV2 = new cognito.UserPoolClient(
+      this,
+      "UserPoolClientV2",
+      {
+        userPool: userPoolV2,
+        userPoolClientName: "inside-amelia-rescue-client-v2",
+        authFlows: {
+          userPassword: true,
+          userSrp: true,
+          user: true,
+        },
+        accessTokenValidity: cdk.Duration.days(1),
+        refreshTokenValidity: cdk.Duration.days(30),
+        oAuth: {
+          flows: {
+            authorizationCodeGrant: true,
+          },
+          scopes: [
+            cognito.OAuthScope.EMAIL,
+            cognito.OAuthScope.OPENID,
+            cognito.OAuthScope.PROFILE,
+            cognito.OAuthScope.COGNITO_ADMIN,
+          ],
+          callbackUrls: [
+            "http://localhost:5173/auth/callback",
+            `https://${appDomainName}/auth/callback`,
+          ],
+          logoutUrls: [
+            "http://localhost:5173/auth/logout-complete",
+            `https://${appDomainName}/auth/logout-complete`,
+          ],
+        },
+        generateSecret: false,
+        preventUserExistenceErrors: true,
+        readAttributes: new cognito.ClientAttributes()
+          .withStandardAttributes({
+            email: true,
+            emailVerified: true,
+            givenName: true,
+            familyName: true,
+          })
+          .withCustomAttributes("user_id"),
+      },
+    );
+
+    // Attach custom domain to V2 pool (domain was removed from old pool above)
+    const userPoolV2Domain = userPoolV2.addDomain("UserPoolV2Domain", {
       customDomain: {
         domainName: authDomainName,
         certificate: authCertificate,
@@ -227,18 +331,18 @@ export class CdkStack extends cdk.Stack {
       managedLoginVersion: cognito.ManagedLoginVersion.NEWER_MANAGED_LOGIN,
     });
 
-    const managedLoginBranding = new cognito.CfnManagedLoginBranding(
+    const managedLoginBrandingV2 = new cognito.CfnManagedLoginBranding(
       this,
-      "ManagedLoginBranding",
+      "ManagedLoginBrandingV2",
       {
-        userPoolId: userPool.userPoolId,
-        clientId: userPoolClient.userPoolClientId,
+        userPoolId: userPoolV2.userPoolId,
+        clientId: userPoolClientV2.userPoolClientId,
         useCognitoProvidedValues: true,
       },
     );
 
-    managedLoginBranding.addDependency(
-      userPoolDomain.node.defaultChild as cognito.CfnUserPoolDomain,
+    managedLoginBrandingV2.addDependency(
+      userPoolV2Domain.node.defaultChild as cognito.CfnUserPoolDomain,
     );
 
     const usersTable = new dynamodb.Table(this, "UsersTable", {
@@ -482,9 +586,9 @@ export class CdkStack extends cdk.Stack {
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
           NODE_ENV: "production",
-          COGNITO_USER_POOL_ID: userPool.userPoolId,
-          COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
-          COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPool.userPoolId}`,
+          COGNITO_USER_POOL_ID: userPoolV2.userPoolId,
+          COGNITO_CLIENT_ID: userPoolClientV2.userPoolClientId,
+          COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPoolV2.userPoolId}`,
           COGNITO_DOMAIN: authDomainName,
           SESSION_SECRET_ARN: sessionSecret.secretArn,
           APP_URL: `https://${appDomainName}`,
@@ -530,14 +634,16 @@ export class CdkStack extends cdk.Stack {
     sessionSecret.grantRead(lambdaFunction);
 
     // Grant Lambda permissions to manage Cognito users
-    userPool.grant(
-      lambdaFunction,
-      "cognito-idp:AdminCreateUser",
-      "cognito-idp:AdminSetUserPassword",
-      "cognito-idp:AdminUpdateUserAttributes",
-      "cognito-idp:AdminGetUser",
-      "cognito-idp:AdminDeleteUser",
-    );
+    for (const cognitoUserPool of [userPool, userPoolV2]) {
+      cognitoUserPool.grant(
+        lambdaFunction,
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminUpdateUserAttributes",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminDeleteUser",
+      );
+    }
 
     // Create CloudWatch log group for certification reminder Lambda function
     const certificationReminderLogGroup = new logs.LogGroup(
@@ -905,9 +1011,9 @@ export class CdkStack extends cdk.Stack {
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
           NODE_ENV: "production",
-          COGNITO_USER_POOL_ID: userPool.userPoolId,
-          COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
-          COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPool.userPoolId}`,
+          COGNITO_USER_POOL_ID: userPoolV2.userPoolId,
+          COGNITO_CLIENT_ID: userPoolClientV2.userPoolClientId,
+          COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPoolV2.userPoolId}`,
           COGNITO_DOMAIN: authDomainName,
           SESSION_SECRET_ARN: sessionSecret.secretArn,
           APP_URL: `https://${appDomainName}`,
@@ -937,14 +1043,16 @@ export class CdkStack extends cdk.Stack {
     truckChecksTable.grantReadWriteData(websocketFunction);
     fileUploadsBucket.grantReadWrite(websocketFunction);
     sessionSecret.grantRead(websocketFunction);
-    userPool.grant(
-      websocketFunction,
-      "cognito-idp:AdminCreateUser",
-      "cognito-idp:AdminSetUserPassword",
-      "cognito-idp:AdminUpdateUserAttributes",
-      "cognito-idp:AdminGetUser",
-      "cognito-idp:AdminDeleteUser",
-    );
+    for (const cognitoUserPool of [userPool, userPoolV2]) {
+      cognitoUserPool.grant(
+        websocketFunction,
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminUpdateUserAttributes",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminDeleteUser",
+      );
+    }
 
     // Create WebSocket API
     const webSocketApi = new apigatewayv2.WebSocketApi(this, "WebSocketApi", {
@@ -1230,14 +1338,14 @@ export class CdkStack extends cdk.Stack {
       },
     );
 
-    userPoolDomain.node.addDependency(appAliasRecord);
-    userPoolDomain.node.addDependency(appAliasRecordAAAA);
+    userPoolV2Domain.node.addDependency(appAliasRecord);
+    userPoolV2Domain.node.addDependency(appAliasRecordAAAA);
 
     new route53.ARecord(this, "AuthAliasRecord", {
       zone: hostedZone,
       recordName: "auth",
       target: route53.RecordTarget.fromAlias(
-        new targets.UserPoolDomainTarget(userPoolDomain),
+        new targets.UserPoolDomainTarget(userPoolV2Domain),
       ),
     });
 
@@ -1284,6 +1392,14 @@ export class CdkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "UserPoolClientId", {
       value: userPoolClient.userPoolClientId,
+    });
+
+    new cdk.CfnOutput(this, "UserPoolV2Id", {
+      value: userPoolV2.userPoolId,
+    });
+
+    new cdk.CfnOutput(this, "UserPoolV2ClientId", {
+      value: userPoolClientV2.userPoolClientId,
     });
 
     new cdk.CfnOutput(this, "UsersTableName", {

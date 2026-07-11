@@ -179,7 +179,7 @@ describe("user store test", () => {
         input: {
           Password: result.temporaryPassword,
           Permanent: false,
-          Username: user_id,
+          Username: "test@example.com",
           UserPoolId: "inside-amelia-rescue-users",
         },
       }),
@@ -235,7 +235,17 @@ describe("user store test", () => {
     const actualActiveId = activeUser.user_id;
     const actualDeletedId = deletedUser.user_id;
 
+    cognitoSendSpy.mockClear();
     await store.softDelete(actualDeletedId);
+
+    expect(cognitoSendSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: {
+          Username: "deleted@example.com",
+          UserPoolId: "inside-amelia-rescue-users",
+        },
+      }),
+    );
 
     const withoutDeleted = await store.listUsers();
     expect(withoutDeleted.map((u) => u.user_id)).toEqual([actualActiveId]);

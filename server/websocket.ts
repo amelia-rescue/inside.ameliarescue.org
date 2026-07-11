@@ -139,7 +139,9 @@ async function handleConnect({
       throw new Error("access token required for authentication");
     }
     const userInfo = await getUserInfo(access_token);
-    const user_id = userInfo.sub;
+    const legacyUserId = userInfo["custom:user_id"];
+    const user_id =
+      typeof legacyUserId === "string" ? legacyUserId : userInfo.sub;
     if (typeof user_id !== "string") {
       throw new Error("unable to get user_id from access token");
     }
