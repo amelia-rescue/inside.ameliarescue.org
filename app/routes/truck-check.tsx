@@ -320,7 +320,7 @@ export default function TruckCheck() {
             Collaborative truck inspection checklists
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <a className="btn btn-ghost btn-sm" href="/truck-check-legacy">
             Legacy Google Sheet
           </a>
