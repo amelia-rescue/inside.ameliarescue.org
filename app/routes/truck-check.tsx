@@ -375,10 +375,12 @@ export default function TruckCheck() {
       </dialog>
       <div className="space-y-4">
         {allChecks.length === 0 ? (
-          <div className="card bg-base-200">
-            <div className="card-body text-center">
-              <p className="opacity-60">
-                No truck checks yet. Start your first check!
+          <div className="card border-base-300 bg-base-100 border border-dashed">
+            <div className="card-body items-center py-12 text-center">
+              <div className="mb-2 text-4xl opacity-40">✓</div>
+              <h2 className="text-lg font-semibold">No truck checks yet</h2>
+              <p className="max-w-sm text-sm opacity-60">
+                Start your first check to begin tracking truck readiness.
               </p>
             </div>
           </div>
@@ -392,79 +394,92 @@ export default function TruckCheck() {
               (contributor) =>
                 `${contributor.first_name} ${contributor.last_name}`.trim(),
             );
+            const isComplete =
+              check.requiredTotal > 0 &&
+              check.requiredCompleted === check.requiredTotal;
 
             return (
-              <div key={check.id} className="card bg-base-100 shadow-xl">
-                <div className="card-body">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h2 className="card-title break-words">
+              <article
+                key={check.id}
+                className="rounded-box border-base-300 bg-base-100 overflow-hidden border shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="flex flex-col gap-5 p-4 sm:p-5 lg:flex-row lg:items-center lg:gap-6">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="min-w-0 truncate text-lg font-bold sm:text-xl">
                         {truck?.displayName || check.truck}
                       </h2>
-                      <p className="mt-1 text-sm opacity-70">
-                        <DateDisplay
-                          value={check.created_at}
-                          format="shortDate"
-                        />{" "}
-                        at{" "}
-                        <DateDisplay
-                          value={check.created_at}
-                          format="shortTime"
-                        />
-                      </p>
-                      <div className="mt-3 flex flex-wrap items-start gap-2">
-                        {check.locked && (
-                          <span className="badge badge-error">Locked</span>
-                        )}
-                        <span
-                          className={`badge badge-sm ${
-                            check.requiredTotal > 0 &&
-                            check.requiredCompleted === check.requiredTotal
-                              ? "badge-success"
-                              : "badge-outline"
-                          }`}
-                        >
-                          {check.requiredCompleted}/{check.requiredTotal}
+                      {isRecent && (
+                        <span className="badge badge-info badge-sm">
+                          Recent
                         </span>
-                        {check.problemCount > 0 && (
-                          <button
-                            type="button"
-                            className="btn btn-error btn-sm"
-                            onClick={() => openProblemModal(check)}
-                          >
-                            {check.problemCount} problem
-                            {check.problemCount === 1 ? "" : "s"}
-                          </button>
-                        )}
+                      )}
+                      {check.locked && (
+                        <span className="badge badge-error badge-sm">
+                          Locked
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm opacity-60">
+                      <DateDisplay
+                        value={check.created_at}
+                        format="shortDate"
+                      />{" "}
+                      at{" "}
+                      <DateDisplay
+                        value={check.created_at}
+                        format="shortTime"
+                      />
+                      <span className="mx-2">·</span>
+                      <span className="font-mono text-xs">
+                        #{check.id.slice(0, 8)}
+                      </span>
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${isComplete ? "bg-success" : "bg-warning"}`}
+                        />
+                        <span>
+                          <span className="font-semibold">
+                            {check.requiredCompleted}/{check.requiredTotal}
+                          </span>{" "}
+                          complete
+                        </span>
                       </div>
-                      <div className="mt-1 text-sm break-words opacity-60">
+                      <div className="max-w-full min-w-0 truncate opacity-70">
                         {contributorNames.length > 0
                           ? contributorNames.join(", ")
                           : "No contributors"}
                       </div>
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
-                      <span className="text-sm opacity-60">
-                        Check #{check.id.slice(0, 8)}
-                      </span>
-                      <div className="flex gap-2">
-                        <a
-                          href={`/truck-checks/${check.id}`}
-                          className={`btn btn-sm ${check.locked ? "btn-outline" : "btn-primary"}`}
-                        >
-                          {check.locked ? "View" : "Edit"}
-                        </a>
-                      </div>
-                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row lg:w-44 lg:flex-col">
+                    {check.problemCount > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-error btn-sm sm:flex-1"
+                        onClick={() => openProblemModal(check)}
+                      >
+                        {check.problemCount} problem
+                        {check.problemCount === 1 ? "" : "s"} found
+                      </button>
+                    )}
+                    <a
+                      href={`/truck-checks/${check.id}`}
+                      className={`btn btn-sm sm:flex-1 ${check.locked ? "btn-outline" : "btn-primary"}`}
+                    >
+                      {check.locked ? "View check" : "Edit check"}
+                    </a>
                   </div>
                 </div>
-              </div>
+              </article>
             );
           })
         )}
 
         {currentLastKey && (
-          <div className="flex justify-center">
+          <div className="flex justify-center pt-2">
             <button
               className={`btn ${truckCheckFetcher.state !== "idle" ? "btn-disabled" : "btn-outline"}`}
               disabled={truckCheckFetcher.state !== "idle"}
@@ -483,7 +498,9 @@ export default function TruckCheck() {
               }}
               type="button"
             >
-              {truckCheckFetcher.state !== "idle" ? "Loading..." : "Load More"}
+              {truckCheckFetcher.state !== "idle"
+                ? "Loading..."
+                : "Load more checks"}
             </button>
           </div>
         )}
