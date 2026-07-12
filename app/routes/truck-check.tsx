@@ -131,7 +131,12 @@ export async function action({ context, request }: Route.ActionArgs) {
       created_by: ctx.user.user_id,
       truck: truck,
       data: {},
-      contributors: [ctx.user.user_id],
+      contributors: {
+        [ctx.user.user_id]: {
+          first_name: ctx.user.first_name,
+          last_name: ctx.user.last_name,
+        },
+      },
       locked: false,
       schema_id: schema.schemaId,
       schema_created_at: schema.createdAt,
@@ -324,13 +329,17 @@ export default function TruckCheck() {
             const checkDate = new Date(check.created_at);
             const isRecent =
               Date.now() - checkDate.getTime() < 24 * 60 * 60 * 1000;
+            const contributorNames = Object.values(check.contributors).map(
+              (contributor) =>
+                `${contributor.first_name} ${contributor.last_name}`.trim(),
+            );
 
             return (
               <div key={check.id} className="card bg-base-100 shadow-xl">
                 <div className="card-body">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h2 className="card-title">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="card-title break-words">
                         {truck?.displayName || check.truck}
                       </h2>
                       <p className="mt-1 text-sm opacity-70">
@@ -344,7 +353,7 @@ export default function TruckCheck() {
                           format="shortTime"
                         />
                       </p>
-                      <div className="mt-3 flex items-center gap-2">
+                      <div className="mt-3 flex flex-wrap items-start gap-2">
                         {check.locked && (
                           <span className="badge badge-error">Locked</span>
                         )}
@@ -358,13 +367,14 @@ export default function TruckCheck() {
                         >
                           {check.requiredCompleted}/{check.requiredTotal}
                         </span>
-                        <span className="text-sm opacity-60">
-                          {check.contributors.length} contributor
-                          {check.contributors.length !== 1 ? "s" : ""}
-                        </span>
+                      </div>
+                      <div className="mt-1 text-sm break-words opacity-60">
+                        {contributorNames.length > 0
+                          ? contributorNames.join(", ")
+                          : "No contributors"}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex shrink-0 flex-col items-end gap-2">
                       <span className="text-sm opacity-60">
                         Check #{check.id.slice(0, 8)}
                       </span>

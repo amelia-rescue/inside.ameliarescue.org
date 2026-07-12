@@ -22,6 +22,7 @@ const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
 type HandlerResponse = { statusCode: number; body: string };
 type ConnectedUser = { userId: string; userName: string };
+type ContributorRecord = { first_name: string; last_name: string };
 
 type HandleConnectParams = {
   event: ApiGatewayWebSocketEvent;
@@ -410,23 +411,12 @@ async function handleJoinTruckCheck({
   const truckCheckStore = TruckCheckStore.make();
   const truckCheck = await truckCheckStore.getTruckCheck(truckCheckId);
 
-  let contributorNames: { userId: string; userName: string }[] = [];
-  const namePromises = (truckCheck.contributors || []).map(
-    async (cId: string) => {
-      try {
-        const userResult = await userStore.getUser(cId, {
-          includeDeleted: true,
-        });
-        return {
-          userId: cId,
-          userName: `${userResult.first_name} ${userResult.last_name}`,
-        };
-      } catch {
-        return { userId: cId, userName: "Unknown" };
-      }
-    },
+  const contributorNames = Object.entries(truckCheck.contributors || {}).map(
+    ([contributorUserId, contributor]) => ({
+      userId: contributorUserId,
+      userName: `${contributor.first_name} ${contributor.last_name}`.trim(),
+    }),
   );
-  contributorNames = await Promise.all(namePromises);
 
   const connectedUsers = await getConnectedUsersForTruckCheck({
     connectionsTableName,
@@ -496,26 +486,33 @@ async function handleUpdateField({
   let updatedContributorNames:
     | { userId: string; userName: string }[]
     | undefined;
-  if (userId && !(updatedField.contributors || []).includes(userId)) {
+  if (userId && !updatedField.contributors?.[userId]) {
+    const userStore = UserStore.make();
+    let contributor: ContributorRecord = {
+      first_name: "Unknown",
+      last_name: "",
+    };
+    try {
+      const userResult = await userStore.getUser(userId, {
+        includeDeleted: true,
+      });
+      contributor = {
+        first_name: userResult.first_name,
+        last_name: userResult.last_name,
+      };
+    } catch {}
     const updatedCheck = await truckCheckStore.updateTruckCheck({
       id: truckCheckId,
-      contributors: [userId],
+      contributors: {
+        [userId]: contributor,
+      },
     });
-    const userStore = UserStore.make();
-    const namePromises = updatedCheck.contributors.map(async (cId: string) => {
-      try {
-        const userResult = await userStore.getUser(cId, {
-          includeDeleted: true,
-        });
-        return {
-          userId: cId,
-          userName: `${userResult.first_name} ${userResult.last_name}`,
-        };
-      } catch {
-        return { userId: cId, userName: "Unknown" };
-      }
-    });
-    updatedContributorNames = await Promise.all(namePromises);
+    updatedContributorNames = Object.entries(updatedCheck.contributors).map(
+      ([contributorUserId, contributor]) => ({
+        userId: contributorUserId,
+        userName: `${contributor.first_name} ${contributor.last_name}`.trim(),
+      }),
+    );
   }
 
   await broadcastToTruckCheck({

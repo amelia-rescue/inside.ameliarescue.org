@@ -7,6 +7,15 @@ import {
   type TruckCheck,
 } from "./truck-check-store";
 
+function contributors(...userIds: string[]) {
+  return Object.fromEntries(
+    userIds.map((userId) => [
+      userId,
+      { first_name: userId, last_name: "Contributor" },
+    ]),
+  );
+}
+
 describe("truck check store test", () => {
   let dynamo: DynaliteServer;
 
@@ -25,7 +34,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
@@ -34,7 +43,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
       created_at: expect.any(String),
       updated_at: expect.any(String),
@@ -46,7 +55,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
       created_at: expect.any(String),
       updated_at: expect.any(String),
@@ -68,7 +77,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
@@ -76,7 +85,7 @@ describe("truck check store test", () => {
       created_by: "user-789",
       truck: "Ambulance 2",
       data: { oil_level: "low" },
-      contributors: ["user-789"],
+      contributors: contributors("user-789"),
       locked: false,
     });
 
@@ -92,7 +101,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
@@ -101,7 +110,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good", fuel: "3/4" },
-      contributors: ["user-456", "user-789"],
+      contributors: contributors("user-456", "user-789"),
       locked: true,
     });
 
@@ -110,13 +119,15 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full", tire_pressure: "good", fuel: "3/4" },
-      contributors: ["user-456", "user-789"],
+      contributors: contributors("user-456", "user-789"),
       locked: true,
     });
 
     const retrieved = await store.getTruckCheck(created.id);
     expect(retrieved.locked).toBe(true);
-    expect(retrieved.contributors).toEqual(["user-456", "user-789"]);
+    expect(retrieved.contributors).toEqual(
+      contributors("user-456", "user-789"),
+    );
     expect(retrieved.data).toEqual({
       oil_level: "full",
       tire_pressure: "good",
@@ -133,7 +144,7 @@ describe("truck check store test", () => {
         created_by: "user-456",
         truck: "Ambulance 1",
         data: {},
-        contributors: [],
+        contributors: {},
         locked: false,
       }),
     ).rejects.toBeInstanceOf(TruckCheckNotFound);
@@ -146,7 +157,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
@@ -173,21 +184,21 @@ describe("truck check store test", () => {
         created_by: "user-123",
         truck: "Ambulance 1",
         data: { oil_level: "full" },
-        contributors: ["user-123"],
+        contributors: contributors("user-123"),
         locked: false,
       },
       {
         created_by: "user-456",
         truck: "Ambulance 2",
         data: { tire_pressure: "good" },
-        contributors: ["user-456"],
+        contributors: contributors("user-456"),
         locked: true,
       },
       {
         created_by: "user-789",
         truck: "Ambulance 3",
         data: { fuel: "full" },
-        contributors: ["user-789", "user-123"],
+        contributors: contributors("user-789", "user-123"),
         locked: false,
       },
     ];
@@ -214,7 +225,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "full" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
@@ -223,7 +234,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { oil_level: "low" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: true,
     });
 
@@ -258,7 +269,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: complexData,
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
@@ -275,22 +286,24 @@ describe("truck check store test", () => {
       created_by: "user-123",
       truck: "Ambulance 1",
       data: { initial_check: "complete" },
-      contributors: ["user-123"],
+      contributors: contributors("user-123"),
       locked: false,
     });
 
-    expect(truckCheck.contributors).toEqual(["user-123"]);
+    expect(truckCheck.contributors).toEqual(contributors("user-123"));
 
     const updated = await store.updateTruckCheck({
       id: truckCheck.id,
       created_by: "user-123",
       truck: "Ambulance 1",
       data: { initial_check: "complete", secondary_check: "complete" },
-      contributors: ["user-123", "user-456", "user-789"],
+      contributors: contributors("user-123", "user-456", "user-789"),
       locked: false,
     });
 
-    expect(updated.contributors).toEqual(["user-123", "user-456", "user-789"]);
+    expect(updated.contributors).toEqual(
+      contributors("user-123", "user-456", "user-789"),
+    );
   });
 
   it("should handle locked status changes", async () => {
@@ -300,7 +313,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { status: "in_progress" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
@@ -311,7 +324,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { status: "complete" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: true,
     });
 
@@ -322,7 +335,7 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: { status: "complete" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
@@ -336,12 +349,12 @@ describe("truck check store test", () => {
       created_by: "user-456",
       truck: "Ambulance 1",
       data: {},
-      contributors: [],
+      contributors: {},
       locked: false,
     });
 
     expect(truckCheck.data).toEqual({});
-    expect(truckCheck.contributors).toEqual([]);
+    expect(truckCheck.contributors).toEqual({});
   });
 
   it("should merge contributors on update", async () => {
@@ -351,21 +364,21 @@ describe("truck check store test", () => {
       created_by: "user-123",
       truck: "Ambulance 1",
       data: { initial_check: "complete" },
-      contributors: ["user-123"],
+      contributors: contributors("user-123"),
       locked: false,
     });
 
-    expect(truckCheck.contributors).toEqual(["user-123"]);
+    expect(truckCheck.contributors).toEqual(contributors("user-123"));
 
     const updated = await store.updateTruckCheck({
       id: truckCheck.id,
       created_by: "user-123",
       truck: "Ambulance 1",
       data: { initial_check: "complete", secondary_check: "complete" },
-      contributors: ["user-456"],
+      contributors: contributors("user-456"),
       locked: false,
     });
 
-    expect(updated.contributors).toEqual(["user-123", "user-456"]);
+    expect(updated.contributors).toEqual(contributors("user-123", "user-456"));
   });
 });

@@ -15,7 +15,12 @@ export const truckCheckSchema = type({
   created_by: "string",
   truck: "string",
   data: "Record<string, unknown>",
-  contributors: "string[]",
+  contributors: {
+    "[string]": {
+      first_name: "string",
+      last_name: "string",
+    },
+  },
   locked: "boolean",
   "schema_id?": "string",
   "schema_created_at?": "string",
@@ -152,12 +157,10 @@ export class TruckCheckStore {
       ...existing,
       ...truckCheck,
       // merge the contributors on updates
-      contributors: [
-        ...new Set([
-          ...existing.contributors,
-          ...(truckCheck.contributors ?? []),
-        ]),
-      ],
+      contributors: {
+        ...existing.contributors,
+        ...(truckCheck.contributors ?? {}),
+      },
       created_at: existing.created_at,
       updated_at: new Date().toISOString(),
     };

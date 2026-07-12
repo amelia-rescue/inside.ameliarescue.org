@@ -19,7 +19,8 @@
     "deploy:app": "npm run build && npm run cdk deploy InsideAmeliaRescueStack -- --profile aes",
     "destroy": "npm run cdk destroy -- --profile aes",
     "diff": "npm run cdk diff -- --profile aes",
-    "migrate:users:v2": "tsx scripts/migrate-users-to-v2.ts"
+    "migrate:users:v2": "tsx scripts/migrate-users-to-v2.ts",
+    "backfill:truck-check-contributors": "tsx scripts/backfill-truck-check-contributors.ts"
   },
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.893.0",

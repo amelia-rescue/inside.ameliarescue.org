@@ -17,7 +17,6 @@ import {
   HiOutlineSignalSlash,
   HiOutlineChevronLeft,
 } from "react-icons/hi2";
-import { UserStore, type User } from "~/lib/user-store";
 import { DateDisplay } from "~/components/date-display";
 
 export function meta({}: Route.MetaArgs) {
@@ -61,8 +60,6 @@ export async function loader({ context, params }: Route.LoaderArgs) {
 
   const truckCheckStore = TruckCheckStore.make();
   const truckCheckSchemaStore = TruckCheckSchemaStore.make();
-  const userStore = UserStore.make();
-
   const truckCheck = await truckCheckStore.getTruckCheck(params.id);
   const truck = await truckCheckSchemaStore.getTruck(truckCheck.truck);
   const schema =
@@ -73,15 +70,12 @@ export async function loader({ context, params }: Route.LoaderArgs) {
         )
       : await truckCheckSchemaStore.getSchema(truck.schemaId);
 
-  let previousContributors: User[] = [];
-  if (truckCheck.locked) {
-    const contributors = await Promise.all(
-      truckCheck.contributors.map((contributor) =>
-        userStore.getUser(contributor, { includeDeleted: true }),
-      ),
-    );
-    previousContributors = contributors.map((user) => user);
-  }
+  const previousContributors = truckCheck.locked
+    ? Object.entries(truckCheck.contributors).map(([userId, contributor]) => ({
+        userId,
+        userName: `${contributor.first_name} ${contributor.last_name}`.trim(),
+      }))
+    : [];
 
   return {
     user: ctx.user,
@@ -1096,14 +1090,14 @@ export default function TruckCheckDynamic() {
           <div className="flex flex-wrap gap-2">
             {previousContributors.map((c) => (
               <div
-                key={c.user_id}
+                key={c.userId}
                 className={`badge gap-1.5 py-3 ${
-                  c.user_id === user.user_id ? "badge-primary" : "badge-outline"
+                  c.userId === user.user_id ? "badge-primary" : "badge-outline"
                 }`}
               >
                 <HiOutlineUser className="h-3.5 w-3.5" />
-                {c.first_name} {c.last_name}
-                {c.user_id === user.user_id && (
+                {c.userName}
+                {c.userId === user.user_id && (
                   <span className="opacity-60">(you)</span>
                 )}
               </div>
