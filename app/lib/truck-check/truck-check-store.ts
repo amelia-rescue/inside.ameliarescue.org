@@ -204,7 +204,7 @@ export class TruckCheckStore {
       },
       ScanIndexForward: false,
       ExclusiveStartKey: lastEvaluatedKey,
-      Limit: 20,
+      Limit: 100,
     });
     const response = await TruckCheckStore.client.send(command);
     return {
