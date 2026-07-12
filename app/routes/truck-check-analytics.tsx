@@ -124,12 +124,12 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 
   const completedChecks: DocumentTruckCheck[] = [];
   for (const check of allChecks) {
-    const completion = await calculateCompletion(
+    const completion = await calculateCompletion({
       check,
       trucks,
       schemaStore,
-      schemaCacheMap,
-    );
+      cache: schemaCacheMap,
+    });
     if (completion.isComplete) {
       completedChecks.push(check);
     }

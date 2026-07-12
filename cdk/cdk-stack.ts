@@ -1053,6 +1053,7 @@ export class CdkStack extends cdk.Stack {
     tracksTable.grantReadWriteData(websocketFunction);
     certificationRemindersTable.grantReadWriteData(websocketFunction);
     truckChecksTable.grantReadWriteData(websocketFunction);
+    truckCheckSchemasTable.grantReadData(websocketFunction);
     fileUploadsBucket.grantReadWrite(websocketFunction);
     sessionSecret.grantRead(websocketFunction);
     for (const cognitoUserPool of [userPool, userPoolV2]) {
@@ -1301,6 +1302,14 @@ export class CdkStack extends cdk.Stack {
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
           cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         },
+        "/sounds/*": {
+          origin: staticBucketOrigin,
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
         "/robots.txt": {
           origin: staticBucketOrigin,
           viewerProtocolPolicy:
@@ -1380,6 +1389,7 @@ export class CdkStack extends cdk.Stack {
           "/manifest.webmanifest",
           "/logo-192.png",
           "/logo-512.png",
+          "/sounds/*",
         ],
       },
     );

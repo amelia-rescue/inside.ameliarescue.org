@@ -18,6 +18,7 @@ import {
   HiOutlineChevronLeft,
 } from "react-icons/hi2";
 import { DateDisplay } from "~/components/date-display";
+import confetti from "canvas-confetti";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Truck Check - Inside Amelia Rescue" }];
@@ -174,6 +175,8 @@ export default function TruckCheckDynamic() {
   const lastUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownDisconnectedToastRef = useRef(false);
   const hasEverConnectedRef = useRef(false);
+  const handledCompletionEventsRef = useRef(new Set<string>());
+  const completionSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const wsUrl =
     import.meta.env?.VITE_WEBSOCKET_URL ||
@@ -374,6 +377,77 @@ export default function TruckCheckDynamic() {
               setContributors(data.contributors || []);
               break;
 
+            case "truck-check-completed": {
+              const eventId =
+                typeof data.eventId === "string" ? data.eventId : null;
+              if (eventId && handledCompletionEventsRef.current.has(eventId)) {
+                break;
+              }
+              if (eventId) {
+                handledCompletionEventsRef.current.add(eventId);
+                if (handledCompletionEventsRef.current.size > 20) {
+                  const oldestEventId = handledCompletionEventsRef.current
+                    .values()
+                    .next().value;
+                  if (oldestEventId) {
+                    handledCompletionEventsRef.current.delete(oldestEventId);
+                  }
+                }
+              }
+
+              const prefersReducedMotion = window.matchMedia(
+                "(prefers-reduced-motion: reduce)",
+              ).matches;
+              if (!prefersReducedMotion) {
+                const colors = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626"];
+                const duration = 15 * 1000;
+                const animationEnd = Date.now() + duration;
+                const defaults = {
+                  startVelocity: 30,
+                  spread: 360,
+                  ticks: 60,
+                  zIndex: 0,
+                  colors,
+                };
+                const randomInRange = (min: number, max: number) =>
+                  Math.random() * (max - min) + min;
+                const interval = setInterval(() => {
+                  const timeLeft = animationEnd - Date.now();
+                  if (timeLeft <= 0) {
+                    clearInterval(interval);
+                    return;
+                  }
+                  const particleCount = 50 * (timeLeft / duration);
+                  confetti({
+                    ...defaults,
+                    particleCount,
+                    origin: {
+                      x: randomInRange(0.1, 0.3),
+                      y: Math.random() - 0.2,
+                    },
+                  });
+                  confetti({
+                    ...defaults,
+                    particleCount,
+                    origin: {
+                      x: randomInRange(0.7, 0.9),
+                      y: Math.random() - 0.2,
+                    },
+                  });
+                }, 250);
+              }
+              if (completionSoundRef.current) {
+                completionSoundRef.current.currentTime = 0;
+                void completionSoundRef.current.play().catch(() => {});
+              }
+              showToast({
+                message: `${data.completedByName || "Someone"} completed the truck check!`,
+                type: "alert-success",
+                duration: 6000,
+              });
+              break;
+            }
+
             case "field-update":
               setFieldValues((prev) => {
                 if (data.fieldId) {
@@ -420,6 +494,20 @@ export default function TruckCheckDynamic() {
       setConnectionStatus("error");
     }
   }, [wsUrl, accessToken, truckCheck.id]);
+
+  useEffect(() => {
+    completionSoundRef.current = new Audio(
+      "/sounds/Zelda-Get-Item-Sound-Effect.mp3",
+    );
+    completionSoundRef.current.preload = "auto";
+
+    return () => {
+      if (completionSoundRef.current) {
+        completionSoundRef.current.pause();
+        completionSoundRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isLocked) return;

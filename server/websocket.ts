@@ -13,6 +13,8 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { log } from "~/lib/logger";
 import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
+import { calculateCompletion } from "~/lib/truck-check/completion";
+import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
 import type { ApiGatewayWebSocketEvent } from "types/apigateway";
 import { getUserInfo } from "~/lib/auth.server";
 import { UserStore } from "~/lib/user-store";
@@ -477,10 +479,24 @@ async function handleUpdateField({
 
   const userId = connection.user_id as string | undefined;
   const truckCheckStore = TruckCheckStore.make();
+  const truckCheckSchemaStore = TruckCheckSchemaStore.make();
+  const previousCheck = await truckCheckStore.getTruckCheck(truckCheckId);
+  const previousCompletion = await calculateCompletion({
+    check: previousCheck,
+    trucks: [],
+    schemaStore: truckCheckSchemaStore,
+    completedPercent: 1,
+  });
   const updatedField = await truckCheckStore.updateTruckCheckField({
     id: truckCheckId,
     fieldId,
     value,
+  });
+  const updatedCompletion = await calculateCompletion({
+    check: updatedField,
+    trucks: [],
+    schemaStore: truckCheckSchemaStore,
+    completedPercent: 1,
   });
 
   let updatedContributorNames:
@@ -537,6 +553,22 @@ async function handleUpdateField({
       message: {
         type: "contributors-updated",
         contributors: updatedContributorNames,
+      },
+    });
+  }
+
+  if (!previousCompletion.isComplete && updatedCompletion.isComplete) {
+    await broadcastToTruckCheck({
+      apiGatewayClient,
+      connectionsTableName,
+      truckCheckId,
+      message: {
+        type: "truck-check-completed",
+        truckCheckId,
+        eventId: crypto.randomUUID(),
+        completedByUserId: userId,
+        completedByName: connection.userName || "Someone",
+        completedAt: new Date().toISOString(),
       },
     });
   }

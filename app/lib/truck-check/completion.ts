@@ -7,6 +7,7 @@ import {
   type Truck,
 } from "./truck-check-schema-store";
 import type { TruckCheck } from "./truck-check-store";
+import { log } from "../logger";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -46,7 +47,17 @@ async function resolveSchema(
         check.schema_created_at as string,
       );
   } else {
-    const truck = trucks.find((t) => t.truckId === check.truck);
+    let truck = trucks.find((t) => t.truckId === check.truck);
+    if (!truck) {
+      try {
+        truck = await schemaStore.getTruck(check.truck);
+      } catch (error) {
+        log.warn("truck not found in list or store", {
+          truckId: check.truck,
+          error: String(error),
+        });
+      }
+    }
     if (truck) {
       key = `${truck.schemaId}:latest`;
       lookup = () => schemaStore.getSchema(truck.schemaId);
@@ -60,21 +71,35 @@ async function resolveSchema(
     try {
       schema = await lookup();
       cache.set(key, schema);
-    } catch {
+    } catch (error) {
+      log.warn("schema lookup failed", { key, error: String(error) });
       return null;
     }
   }
   return schema;
 }
 
-export async function calculateCompletion(
-  check: TruckCheck,
-  trucks: Truck[],
-  schemaStore: TruckCheckSchemaStore,
-  cache: Map<string, TruckCheckSchema> = new Map(),
-): Promise<CompletionResult> {
+export async function calculateCompletion({
+  check,
+  trucks,
+  schemaStore,
+  cache = new Map(),
+  completedPercent = 0.75,
+}: {
+  check: TruckCheck;
+  trucks: Truck[];
+  schemaStore: TruckCheckSchemaStore;
+  cache?: Map<string, TruckCheckSchema>;
+  completedPercent?: number;
+}): Promise<CompletionResult> {
   const schema = await resolveSchema(check, trucks, schemaStore, cache);
   if (!schema) {
+    log.warn("schema not found for truck check", {
+      checkId: check.id,
+      truck: check.truck,
+      schema_id: check.schema_id,
+      schema_created_at: check.schema_created_at,
+    });
     return { requiredCompleted: 0, requiredTotal: 0, isComplete: false };
   }
 
@@ -90,7 +115,13 @@ export async function calculateCompletion(
 
   const requiredTotal = requiredFieldIds.length;
   const isComplete =
-    requiredTotal > 0 && requiredCompleted / requiredTotal >= 0.75;
+    requiredTotal > 0 && requiredCompleted / requiredTotal >= completedPercent;
+
+  log.info("truck check completion calculated", {
+    requiredCompleted,
+    requiredTotal,
+    isComplete,
+  });
 
   return { requiredCompleted, requiredTotal, isComplete };
 }
