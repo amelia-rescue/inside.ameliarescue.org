@@ -3,7 +3,7 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
-  ScanCommand,
+  QueryCommand,
   DeleteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
@@ -32,6 +32,7 @@ export type TruckCheck = typeof truckCheckSchema.infer;
 interface DocumentTruckCheck extends TruckCheck {
   created_at: string;
   updated_at: string;
+  list_pk: string;
 }
 
 export class TruckCheckNotFound extends Error {
@@ -93,6 +94,7 @@ export class TruckCheckStore {
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      list_pk: "TRUCK_CHECK",
     };
 
     const command = new PutCommand({
@@ -120,7 +122,7 @@ export class TruckCheckStore {
           Key: { id },
           ConditionExpression: "attribute_exists(id)",
           UpdateExpression:
-            "SET #data.#fieldId = :value, updated_at = :updatedAt",
+            "SET list_pk = if_not_exists(list_pk, :list_pk), #data.#fieldId = :value, updated_at = :updatedAt",
           ExpressionAttributeNames: {
             "#data": "data",
             "#fieldId": fieldId,
@@ -128,6 +130,7 @@ export class TruckCheckStore {
           ExpressionAttributeValues: {
             ":value": value,
             ":updatedAt": new Date().toISOString(),
+            ":list_pk": "TRUCK_CHECK",
           },
           ReturnValues: "ALL_NEW",
         }),
@@ -163,6 +166,7 @@ export class TruckCheckStore {
       },
       created_at: existing.created_at,
       updated_at: new Date().toISOString(),
+      list_pk: existing.list_pk ?? "TRUCK_CHECK",
     };
 
     const command = new PutCommand({
@@ -191,10 +195,16 @@ export class TruckCheckStore {
     lastEvaluatedKey?: Record<string, unknown>;
     truckChecks: DocumentTruckCheck[];
   }> {
-    const command = new ScanCommand({
+    const command = new QueryCommand({
       TableName: this.tableName,
+      IndexName: "CreatedAtIndex",
+      KeyConditionExpression: "list_pk = :pk",
+      ExpressionAttributeValues: {
+        ":pk": "TRUCK_CHECK",
+      },
+      ScanIndexForward: false,
       ExclusiveStartKey: lastEvaluatedKey,
-      Limit: 100,
+      Limit: 20,
     });
     const response = await TruckCheckStore.client.send(command);
     return {

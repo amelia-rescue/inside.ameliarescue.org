@@ -223,11 +223,6 @@ export default function TruckCheck() {
   >(lastEvaluatedKey);
 
   useEffect(() => {
-    setAllChecks(truckChecks);
-    setCurrentLastKey(lastEvaluatedKey);
-  }, [truckChecks, lastEvaluatedKey]);
-
-  useEffect(() => {
     const data = truckCheckFetcher.data as
       | {
           truckChecks: typeof truckChecks;

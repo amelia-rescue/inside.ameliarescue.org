@@ -515,6 +515,18 @@ export class CdkStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    truckChecksTable.addGlobalSecondaryIndex({
+      indexName: "CreatedAtIndex",
+      partitionKey: {
+        name: "list_pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "created_at",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
     const truckCheckSchemasTable = new dynamodb.Table(
       this,
       "TruckCheckSchemasTable",

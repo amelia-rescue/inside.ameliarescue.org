@@ -75,6 +75,13 @@ export async function setupDynamo() {
     {
       tableName: "aes_truck_checks",
       partitionKey: "id",
+      gsi: [
+        {
+          indexName: "CreatedAtIndex",
+          partitionKey: "list_pk",
+          sortKey: "created_at",
+        },
+      ],
     },
     {
       tableName: "aes_truck_check_schemas",

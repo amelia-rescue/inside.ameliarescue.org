@@ -179,36 +179,38 @@ describe("truck check store test", () => {
   it("should be able to list all truck checks", async () => {
     const store = TruckCheckStore.make();
 
-    const checksToCreate: Omit<TruckCheck, "id">[] = [
-      {
-        created_by: "user-123",
-        truck: "Ambulance 1",
-        data: { oil_level: "full" },
-        contributors: contributors("user-123"),
-        locked: false,
-      },
-      {
-        created_by: "user-456",
-        truck: "Ambulance 2",
-        data: { tire_pressure: "good" },
-        contributors: contributors("user-456"),
-        locked: true,
-      },
-      {
-        created_by: "user-789",
-        truck: "Ambulance 3",
-        data: { fuel: "full" },
-        contributors: contributors("user-789", "user-123"),
-        locked: false,
-      },
-    ];
+    const check1 = await store.createTruckCheck({
+      created_by: "user-123",
+      truck: "Ambulance 1",
+      data: { oil_level: "full" },
+      contributors: contributors("user-123"),
+      locked: false,
+    });
 
-    await Promise.all(
-      checksToCreate.map((check) => store.createTruckCheck(check)),
-    );
+    const check2 = await store.createTruckCheck({
+      created_by: "user-456",
+      truck: "Ambulance 2",
+      data: { tire_pressure: "good" },
+      contributors: contributors("user-456"),
+      locked: true,
+    });
+
+    const check3 = await store.createTruckCheck({
+      created_by: "user-789",
+      truck: "Ambulance 3",
+      data: { fuel: "full" },
+      contributors: contributors("user-789", "user-123"),
+      locked: false,
+    });
 
     const { truckChecks } = await store.listTruckChecks();
     expect(truckChecks.length).toBe(3);
+    expect(truckChecks.map((c) => c.id)).toEqual([
+      check3.id,
+      check2.id,
+      check1.id,
+    ]);
+    expect(truckChecks[0].list_pk).toBe("TRUCK_CHECK");
   });
 
   it("should return an empty array when listing with no truck checks", async () => {
