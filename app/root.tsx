@@ -15,13 +15,14 @@ import {
   useRevalidator,
 } from "react-router";
 import { useEffect, useRef, useState } from "react";
+import { FiShare2 } from "react-icons/fi";
 
 import type { Route } from "./+types/root";
 import "./app.css";
 import { authMiddleware } from "./middleware/auth";
 import { requestLogger } from "./middleware/logger";
 import { appContext } from "./context";
-import { Toaster } from "./components/toaster";
+import { Toaster, showToast } from "./components/toaster";
 import { log } from "./lib/logger";
 
 export const middleware: Route.MiddlewareFunction[] = [
@@ -210,6 +211,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
     fetcher.submit(formData, { method: "post" });
   };
 
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showToast({
+        message: "Copied to clipboard",
+        type: "alert-success",
+        duration: 5000,
+      });
+    } catch {
+      showToast({
+        message: "Unable to copy",
+        type: "alert-error",
+        duration: 5000,
+      });
+    }
+  };
+
   return (
     <html lang={locale} data-theme={theme}>
       <head>
@@ -316,11 +334,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </main>
 
           <footer className="footer footer-center bg-base-300 text-base-content p-4">
-            <aside>
-              <p>
-                {loaderData?.currentYear} Amelia Emergency Squad. All rights
-                reserved.
-              </p>
+            <aside className="flex items-center gap-3">
+              <span>AES {loaderData?.currentYear}</span>
+              <button
+                onClick={handleShare}
+                className="btn btn-ghost btn-sm flex items-center gap-2"
+                aria-label="Share page link"
+                type="button"
+              >
+                <FiShare2 />
+                <span>Share page link</span>
+              </button>
             </aside>
           </footer>
         </div>
