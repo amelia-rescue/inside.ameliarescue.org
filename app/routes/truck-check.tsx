@@ -324,6 +324,9 @@ export default function TruckCheck() {
           <a className="btn btn-ghost btn-sm" href="/truck-check-legacy">
             Legacy Google Sheet
           </a>
+          <Link className="btn btn-secondary" to="/truck-check/analytics">
+            Analytics
+          </Link>
           <button className="btn btn-primary" onClick={toggleModal}>
             Start New Check
           </button>

@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { DynaliteServer } from "dynalite";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import dayjs from "dayjs";
 import { setupDynamo, teardownDynamo } from "../dynamo-local";
+import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 import {
   TruckCheckStore,
   TruckCheckNotFound,
   type TruckCheck,
+  type DocumentTruckCheck,
 } from "./truck-check-store";
 
 function contributors(...userIds: string[]) {
@@ -382,5 +387,155 @@ describe("truck check store test", () => {
     });
 
     expect(updated.contributors).toEqual(contributors("user-123", "user-456"));
+  });
+});
+
+describe("listTruckChecksInRange", () => {
+  let dynamo: DynaliteServer;
+  let documentClient: DynamoDBDocumentClient;
+
+  beforeEach(async () => {
+    dynamo = await setupDynamo();
+    documentClient = DynamoDBDocumentClient.from(
+      new DynamoDBClient({
+        endpoint: DYNALITE_ENDPOINT,
+        region: "local",
+        credentials: {
+          accessKeyId: "local",
+          secretAccessKey: "local",
+        },
+      }),
+    );
+  });
+
+  afterEach(async () => {
+    await teardownDynamo(dynamo);
+  });
+
+  async function createCheckAt(
+    store: TruckCheckStore,
+    createdAt: string,
+  ): Promise<DocumentTruckCheck> {
+    const id = crypto.randomUUID();
+    const document: DocumentTruckCheck = {
+      id,
+      created_at: createdAt,
+      updated_at: new Date().toISOString(),
+      list_pk: "TRUCK_CHECK",
+      created_by: "user-456",
+      truck: "Ambulance 1",
+      data: { oil_level: "full" },
+      contributors: contributors("user-456"),
+      locked: false,
+    };
+
+    await documentClient.send(
+      new PutCommand({
+        TableName: "aes_truck_checks",
+        Item: document,
+        ConditionExpression: "attribute_not_exists(id)",
+      }),
+    );
+
+    return store.getTruckCheck(id);
+  }
+
+  it("returns only truck checks within the date range", async () => {
+    const store = TruckCheckStore.make();
+    const now = dayjs();
+    const check1 = await createCheckAt(
+      store,
+      now.subtract(10, "day").toISOString(),
+    );
+    const check2 = await createCheckAt(
+      store,
+      now.subtract(2, "day").toISOString(),
+    );
+    const check3 = await createCheckAt(
+      store,
+      now.subtract(1, "day").toISOString(),
+    );
+
+    const { truckChecks } = await store.listTruckChecksInRange({
+      startDate: now.subtract(3, "day").toISOString(),
+      endDate: now.toISOString(),
+    });
+
+    expect(truckChecks.map((c) => c.id)).toEqual([check3.id, check2.id]);
+  });
+
+  it("returns an empty array when no truck checks fall in the range", async () => {
+    const store = TruckCheckStore.make();
+    const now = dayjs();
+    await createCheckAt(store, now.subtract(10, "day").toISOString());
+
+    const { truckChecks } = await store.listTruckChecksInRange({
+      startDate: now.subtract(5, "day").toISOString(),
+      endDate: now.toISOString(),
+    });
+
+    expect(truckChecks).toEqual([]);
+  });
+
+  it("returns all truck checks and sorts by created_at descending", async () => {
+    const store = TruckCheckStore.make();
+    const now = dayjs();
+    const check1 = await createCheckAt(
+      store,
+      now.subtract(10, "day").toISOString(),
+    );
+    const check2 = await createCheckAt(
+      store,
+      now.subtract(2, "day").toISOString(),
+    );
+    const check3 = await createCheckAt(
+      store,
+      now.subtract(1, "day").toISOString(),
+    );
+
+    const { truckChecks } = await store.listTruckChecksInRange({
+      startDate: now.subtract(15, "day").toISOString(),
+      endDate: now.toISOString(),
+    });
+
+    expect(truckChecks.map((c) => c.id)).toEqual([
+      check3.id,
+      check2.id,
+      check1.id,
+    ]);
+  });
+
+  it("paginates through results using lastEvaluatedKey", async () => {
+    const store = TruckCheckStore.make();
+    const now = dayjs();
+    const ids: string[] = [];
+    for (let i = 0; i < 101; i++) {
+      const check = await createCheckAt(
+        store,
+        now.subtract(i, "minute").toISOString(),
+      );
+      ids.push(check.id);
+    }
+
+    const firstPage = await store.listTruckChecksInRange({
+      startDate: now.subtract(200, "minute").toISOString(),
+      endDate: now.toISOString(),
+    });
+    expect(firstPage.truckChecks.length).toBe(100);
+    expect(firstPage.lastEvaluatedKey).toBeDefined();
+
+    const secondPage = await store.listTruckChecksInRange({
+      startDate: now.subtract(200, "minute").toISOString(),
+      endDate: now.toISOString(),
+      lastEvaluatedKey: firstPage.lastEvaluatedKey,
+    });
+    expect(secondPage.truckChecks.length).toBe(1);
+    expect(secondPage.lastEvaluatedKey).toBeUndefined();
+
+    const allIds = [
+      ...firstPage.truckChecks.map((c) => c.id),
+      ...secondPage.truckChecks.map((c) => c.id),
+    ];
+    expect(allIds.sort()).toEqual(ids.sort());
   });
 });

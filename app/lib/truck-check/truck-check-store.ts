@@ -29,7 +29,7 @@ truckCheckSchema.onUndeclaredKey("delete");
 
 export type TruckCheck = typeof truckCheckSchema.infer;
 
-interface DocumentTruckCheck extends TruckCheck {
+export interface DocumentTruckCheck extends TruckCheck {
   created_at: string;
   updated_at: string;
   list_pk: string;
@@ -202,6 +202,48 @@ export class TruckCheckStore {
       ExpressionAttributeValues: {
         ":pk": "TRUCK_CHECK",
       },
+      ScanIndexForward: false,
+      ExclusiveStartKey: lastEvaluatedKey,
+      Limit: 100,
+    });
+    const response = await TruckCheckStore.client.send(command);
+    return {
+      lastEvaluatedKey: response.LastEvaluatedKey,
+      truckChecks: (response.Items || []) as unknown as DocumentTruckCheck[],
+    };
+  }
+
+  public async listTruckChecksInRange(params: {
+    startDate?: string;
+    endDate?: string;
+    lastEvaluatedKey?: Record<string, unknown>;
+  }): Promise<{
+    lastEvaluatedKey?: Record<string, unknown>;
+    truckChecks: DocumentTruckCheck[];
+  }> {
+    const { startDate, endDate, lastEvaluatedKey } = params;
+    const expressionAttributeValues: Record<string, unknown> = {
+      ":pk": "TRUCK_CHECK",
+    };
+
+    let keyCondition = "list_pk = :pk";
+    if (startDate && endDate) {
+      keyCondition += " AND created_at BETWEEN :startDate AND :endDate";
+      expressionAttributeValues[":startDate"] = startDate;
+      expressionAttributeValues[":endDate"] = endDate;
+    } else if (startDate) {
+      keyCondition += " AND created_at >= :startDate";
+      expressionAttributeValues[":startDate"] = startDate;
+    } else if (endDate) {
+      keyCondition += " AND created_at <= :endDate";
+      expressionAttributeValues[":endDate"] = endDate;
+    }
+
+    const command = new QueryCommand({
+      TableName: this.tableName,
+      IndexName: "CreatedAtIndex",
+      KeyConditionExpression: keyCondition,
+      ExpressionAttributeValues: expressionAttributeValues,
       ScanIndexForward: false,
       ExclusiveStartKey: lastEvaluatedKey,
       Limit: 100,
