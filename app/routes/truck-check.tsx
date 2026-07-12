@@ -15,9 +15,22 @@ type TruckCheckListItem = Awaited<
 >["truckChecks"][number];
 type Truck = Awaited<ReturnType<TruckCheckSchemaStore["listTrucks"]>>[number];
 
+type ProblemField = {
+  fieldId: string;
+  label: string;
+};
+
+type ProblemSection = {
+  sectionTitle: string;
+  fields: ProblemField[];
+};
+
 type TruckCheckWithCompletion = TruckCheckListItem & {
   requiredCompleted: number;
   requiredTotal: number;
+  problemCount: number;
+  problemTotal: number;
+  problemSections: ProblemSection[];
 };
 
 function getFieldId(sectionId: string, fieldLabel: string): string {
@@ -67,6 +80,9 @@ async function addCompletionProgress({
           ...check,
           requiredCompleted: 0,
           requiredTotal: 0,
+          problemCount: 0,
+          problemTotal: 0,
+          problemSections: [],
         };
       }
 
@@ -81,6 +97,9 @@ async function addCompletionProgress({
             ...check,
             requiredCompleted: 0,
             requiredTotal: 0,
+            problemCount: 0,
+            problemTotal: 0,
+            problemSections: [],
           };
         }
       }
@@ -91,14 +110,48 @@ async function addCompletionProgress({
           .map((field) => getFieldId(section.id, field.label)),
       );
 
+      const checkboxFieldIds = schema.sections.flatMap((section) =>
+        section.fields.flatMap((field) =>
+          field.type === "checkbox"
+            ? [getFieldId(section.id, field.label)]
+            : [],
+        ),
+      );
+
+      const problemSections: ProblemSection[] = [];
+      for (const section of schema.sections) {
+        const problemFields: ProblemField[] = [];
+        for (const field of section.fields) {
+          if (field.type !== "checkbox") continue;
+          const fieldId = getFieldId(section.id, field.label);
+          if (check.data[fieldId] === "not-present") {
+            problemFields.push({ fieldId, label: field.label });
+          }
+        }
+        if (problemFields.length > 0) {
+          problemSections.push({
+            sectionTitle: section.title,
+            fields: problemFields,
+          });
+        }
+      }
+
       const requiredCompleted = requiredFieldIds.filter((fieldId) =>
         isFieldFilled(check.data[fieldId]),
       ).length;
+
+      const problemCount = problemSections.reduce(
+        (sum, section) => sum + section.fields.length,
+        0,
+      );
 
       return {
         ...check,
         requiredCompleted,
         requiredTotal: requiredFieldIds.length,
+        problemCount,
+        problemTotal: checkboxFieldIds.length,
+        problemSections,
       };
     }),
   );
@@ -221,6 +274,14 @@ export default function TruckCheck() {
   const [currentLastKey, setCurrentLastKey] = useState<
     Record<string, unknown> | undefined
   >(lastEvaluatedKey);
+  const [selectedCheck, setSelectedCheck] =
+    useState<TruckCheckWithCompletion | null>(null);
+  const problemModalRef = useRef<HTMLDialogElement>(null);
+
+  const openProblemModal = (check: TruckCheckWithCompletion) => {
+    setSelectedCheck(check);
+    problemModalRef.current?.showModal();
+  };
 
   useEffect(() => {
     const data = truckCheckFetcher.data as
@@ -362,6 +423,16 @@ export default function TruckCheck() {
                         >
                           {check.requiredCompleted}/{check.requiredTotal}
                         </span>
+                        {check.problemCount > 0 && (
+                          <button
+                            type="button"
+                            className="btn btn-error btn-sm"
+                            onClick={() => openProblemModal(check)}
+                          >
+                            {check.problemCount} problem
+                            {check.problemCount === 1 ? "" : "s"}
+                          </button>
+                        )}
                       </div>
                       <div className="mt-1 text-sm break-words opacity-60">
                         {contributorNames.length > 0
@@ -414,6 +485,70 @@ export default function TruckCheck() {
           </div>
         )}
       </div>
+
+      <dialog
+        ref={problemModalRef}
+        id="problem-detail-modal"
+        className="modal"
+        onClose={() => setSelectedCheck(null)}
+      >
+        <div className="modal-box max-w-3xl">
+          <form method="dialog">
+            <button
+              type="submit"
+              className="btn btn-sm btn-circle btn-ghost absolute top-2 right-2"
+            >
+              ✕
+            </button>
+          </form>
+          {selectedCheck && (
+            <>
+              <h3 className="text-lg font-bold">
+                {trucks.find((t) => t.truckId === selectedCheck.truck)
+                  ?.displayName || selectedCheck.truck}{" "}
+                Problems
+              </h3>
+              <p className="py-2 text-sm opacity-60">
+                <DateDisplay
+                  value={selectedCheck.created_at}
+                  format="shortDate"
+                />{" "}
+                at{" "}
+                <DateDisplay
+                  value={selectedCheck.created_at}
+                  format="shortTime"
+                />{" "}
+                · {selectedCheck.problemCount} problem
+                {selectedCheck.problemCount === 1 ? "" : "s"} found
+              </p>
+              <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+                {selectedCheck.problemSections.map((section) => (
+                  <div key={section.sectionTitle} className="card bg-base-200">
+                    <div className="card-body py-4">
+                      <h4 className="card-title text-base">
+                        {section.sectionTitle}
+                      </h4>
+                      <ul className="mt-2 space-y-2">
+                        {section.fields.map((field) => (
+                          <li
+                            key={field.fieldId}
+                            className="flex items-start gap-3"
+                          >
+                            <span className="border-error bg-error text-error-content flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 text-sm font-bold">
+                              ✕
+                            </span>
+                            <span className="pt-0.5">{field.label}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </dialog>
     </div>
   );
 }
