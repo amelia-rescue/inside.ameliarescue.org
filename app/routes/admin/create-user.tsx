@@ -315,10 +315,14 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                         ))}
                       </select>
 
+                      <input
+                        type="hidden"
+                        name="precepting"
+                        value={assignment.precepting ? "true" : "false"}
+                      />
                       <label className="flex cursor-pointer items-center gap-2">
                         <input
                           type="checkbox"
-                          name="precepting"
                           checked={assignment.precepting}
                           onChange={(e) =>
                             updateAssignment(
@@ -327,7 +331,6 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                               e.target.checked,
                             )
                           }
-                          value="true"
                           className="checkbox checkbox-sm"
                         />
                         <span className="text-sm">Precepting</span>
