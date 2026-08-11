@@ -25,12 +25,20 @@ type ProblemSection = {
   fields: ProblemField[];
 };
 
+type TextNote = {
+  fieldId: string;
+  sectionTitle: string;
+  label: string;
+  value: string;
+};
+
 type TruckCheckWithCompletion = TruckCheckListItem & {
   requiredCompleted: number;
   requiredTotal: number;
   problemCount: number;
   problemTotal: number;
   problemSections: ProblemSection[];
+  textNotes: TextNote[];
 };
 
 function getFieldId(sectionId: string, fieldLabel: string): string {
@@ -83,6 +91,7 @@ async function addCompletionProgress({
           problemCount: 0,
           problemTotal: 0,
           problemSections: [],
+          textNotes: [],
         };
       }
 
@@ -100,6 +109,7 @@ async function addCompletionProgress({
             problemCount: 0,
             problemTotal: 0,
             problemSections: [],
+            textNotes: [],
           };
         }
       }
@@ -136,6 +146,22 @@ async function addCompletionProgress({
         }
       }
 
+      const textNotes: TextNote[] = [];
+      for (const section of schema.sections) {
+        for (const field of section.fields) {
+          if (field.type !== "text") continue;
+          const fieldId = getFieldId(section.id, field.label);
+          const value = check.data[fieldId];
+          if (typeof value !== "string" || value.trim().length === 0) continue;
+          textNotes.push({
+            fieldId,
+            sectionTitle: section.title,
+            label: field.label,
+            value: value.trim(),
+          });
+        }
+      }
+
       const requiredCompleted = requiredFieldIds.filter((fieldId) =>
         isFieldFilled(check.data[fieldId]),
       ).length;
@@ -152,6 +178,7 @@ async function addCompletionProgress({
         problemCount,
         problemTotal: checkboxFieldIds.length,
         problemSections,
+        textNotes,
       };
     }),
   );
@@ -564,6 +591,25 @@ export default function TruckCheck() {
                     </div>
                   </div>
                 ))}
+                {selectedCheck.textNotes.length > 0 && (
+                  <div className="card bg-base-200">
+                    <div className="card-body py-4">
+                      <h4 className="card-title text-base">Notes</h4>
+                      <dl className="mt-2 space-y-3">
+                        {selectedCheck.textNotes.map((note) => (
+                          <div key={note.fieldId}>
+                            <dt className="text-xs font-semibold opacity-60">
+                              {note.sectionTitle} · {note.label}
+                            </dt>
+                            <dd className="text-sm whitespace-pre-wrap">
+                              {note.value}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
