@@ -25,4 +25,5 @@
   "typescript.preferences.autoImportSpecifierExcludeRegexes": [
     "^(node:)?os$"
   ],
+  "js/ts.tsdk.path": "node_modules\\typescript\\lib",
 }
