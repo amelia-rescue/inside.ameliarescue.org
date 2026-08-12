@@ -149,7 +149,6 @@ export default function TruckCheckDynamic() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     isLocked ? "disconnected" : "connecting",
   );
-  const canEdit = !isLocked && connectionStatus === "connected";
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
   const [contributors, setContributors] = useState<ConnectedUser[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, any>>(
@@ -172,8 +171,10 @@ export default function TruckCheckDynamic() {
   const [photoUploadStatus, setPhotoUploadStatus] = useState<
     Record<string, { isUploading: boolean; error?: string }>
   >({});
+  const [pendingUpdateCount, setPendingUpdateCount] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const pendingFieldUpdatesRef = useRef<Map<string, any>>(new Map());
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const connectingToastIdRef = useRef<number | null>(null);
@@ -189,37 +190,57 @@ export default function TruckCheckDynamic() {
     throw new Error("websocket url not defined correctly");
   }
 
-  const sendMessage = useCallback((message: Record<string, any>) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message));
-    }
-  }, []);
-
-  const handleFieldChange = useCallback(
+  // Field updates are queued while the socket is down and replayed on rejoin.
+  // Taking a photo backgrounds the browser, which drops the connection, so
+  // without this the upload finishes and its field update is thrown away.
+  const sendFieldUpdate = useCallback(
     (fieldId: string, value: any) => {
-      if (!canEdit) {
-        showToast({
-          message:
-            "Truck check changes are disabled until your connection is restored.",
-          type: "alert-warning",
-        });
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            action: "update-field",
+            truckCheckId: truckCheck.id,
+            fieldId,
+            value,
+          }),
+        );
         return;
       }
 
-      setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
-      sendMessage({
-        action: "update-field",
-        truckCheckId: truckCheck.id,
-        fieldId,
-        value,
-      });
+      // Keyed by field so a field edited repeatedly while offline only replays
+      // its latest value, matching the server's last-write-wins per field.
+      pendingFieldUpdatesRef.current.set(fieldId, value);
+      setPendingUpdateCount(pendingFieldUpdatesRef.current.size);
     },
-    [canEdit, sendMessage, truckCheck.id],
+    [truckCheck.id],
+  );
+
+  const flushPendingFieldUpdates = useCallback(() => {
+    const pending = pendingFieldUpdatesRef.current;
+    if (pending.size === 0) return;
+
+    const entries = Array.from(pending.entries());
+    pending.clear();
+    setPendingUpdateCount(0);
+
+    for (const [fieldId, value] of entries) {
+      sendFieldUpdate(fieldId, value);
+    }
+  }, [sendFieldUpdate]);
+
+  const handleFieldChange = useCallback(
+    (fieldId: string, value: any) => {
+      if (isLocked) return;
+
+      setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
+      sendFieldUpdate(fieldId, value);
+    },
+    [isLocked, sendFieldUpdate],
   );
 
   const handlePhotoUpload = useCallback(
     async (fieldId: string, files: FileList | null, maxPhotos?: number) => {
-      if (!files || files.length === 0 || !canEdit) {
+      if (!files || files.length === 0 || isLocked) {
         return;
       }
 
@@ -342,7 +363,7 @@ export default function TruckCheckDynamic() {
         }));
       }
     },
-    [canEdit, fieldValues, handleFieldChange, truckCheck.id],
+    [isLocked, fieldValues, handleFieldChange, truckCheck.id],
   );
 
   const connectWebSocket = useCallback(() => {
@@ -371,9 +392,15 @@ export default function TruckCheckDynamic() {
 
           switch (data.type) {
             case "truck-check-joined":
-              setFieldValues((prev) => ({ ...prev, ...data.truckCheckData }));
+              // Queued edits win over the server snapshot, which predates them.
+              setFieldValues((prev) => ({
+                ...prev,
+                ...data.truckCheckData,
+                ...Object.fromEntries(pendingFieldUpdatesRef.current),
+              }));
               setConnectedUsers(data.connectedUsers || []);
               setContributors(data.contributors || []);
+              flushPendingFieldUpdates();
               break;
 
             case "user-joined":
@@ -512,7 +539,7 @@ export default function TruckCheckDynamic() {
       console.error("Error creating WebSocket:", error);
       setConnectionStatus("error");
     }
-  }, [wsUrl, accessToken, truckCheck.id]);
+  }, [wsUrl, accessToken, truckCheck.id, flushPendingFieldUpdates]);
 
   useEffect(() => {
     completionSoundRef.current = new Audio(
@@ -739,7 +766,7 @@ export default function TruckCheckDynamic() {
     const fieldId = getFieldId(sectionId, field.label);
     const value = fieldValues[fieldId];
     const isRemoteUpdate = lastUpdate?.fieldId === fieldId;
-    const fieldDisabled = !canEdit;
+    const fieldDisabled = isLocked;
     const fieldContainerClass = `form-control rounded-lg border border-base-300 p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`;
 
     switch (field.type) {
@@ -1213,7 +1240,11 @@ export default function TruckCheckDynamic() {
       {connectionStatus !== "connected" && !truckCheck.locked && (
         <div className="alert alert-warning mb-6">
           <HiOutlineExclamationTriangle className="h-6 w-6 shrink-0" />
-          <span>Editing will be disabled until connection is restored.</span>
+          <span>
+            {pendingUpdateCount > 0
+              ? `${pendingUpdateCount} ${pendingUpdateCount === 1 ? "change" : "changes"} waiting to sync. Keep this page open until you reconnect.`
+              : "You can keep working. Changes will sync when you reconnect."}
+          </span>
         </div>
       )}
 
