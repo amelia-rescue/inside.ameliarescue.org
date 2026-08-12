@@ -7,6 +7,7 @@ import {
   TruckCheckStore,
 } from "~/lib/truck-check/truck-check-store";
 import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
+import { compressImage } from "~/lib/truck-check/image-compression";
 import { dismissToast, showToast } from "~/components/toaster";
 import {
   HiOutlineUsers,
@@ -16,6 +17,8 @@ import {
   HiOutlineSignal,
   HiOutlineSignalSlash,
   HiOutlineChevronLeft,
+  HiOutlineCamera,
+  HiOutlinePhoto,
 } from "react-icons/hi2";
 import { DateDisplay } from "~/components/date-display";
 import confetti from "canvas-confetti";
@@ -224,6 +227,20 @@ export default function TruckCheckDynamic() {
       const selectedFiles = Array.from(files);
       const maxAllowed = typeof maxPhotos === "number" ? maxPhotos : Infinity;
 
+      const nonImageFile = selectedFiles.find(
+        (file) => file.type !== "" && !file.type.startsWith("image/"),
+      );
+      if (nonImageFile) {
+        setPhotoUploadStatus((prev) => ({
+          ...prev,
+          [fieldId]: {
+            isUploading: false,
+            error: `"${nonImageFile.name}" is not an image. Choose a photo instead.`,
+          },
+        }));
+        return;
+      }
+
       if (currentUrls.length >= maxAllowed) {
         setPhotoUploadStatus((prev) => ({
           ...prev,
@@ -257,7 +274,9 @@ export default function TruckCheckDynamic() {
       try {
         const uploadedUrls: string[] = [];
 
-        for (const file of filesToUpload) {
+        for (const selectedFile of filesToUpload) {
+          const file = await compressImage(selectedFile);
+
           const uploadUrlFormData = new FormData();
           uploadUrlFormData.append("truck_check_id", truckCheck.id);
           uploadUrlFormData.append("field_id", fieldId);
@@ -959,29 +978,56 @@ export default function TruckCheckDynamic() {
                 ))}
               </div>
             )}
-            <div>
-              <input
-                id={fieldId}
-                type="file"
-                accept="image/*"
-                multiple
-                className="file-input file-input-bordered w-full"
-                disabled={photoInputDisabled}
-                onChange={(e) => {
-                  void handlePhotoUpload(
-                    fieldId,
-                    e.target.files,
-                    field.maxPhotos,
-                  );
-                  e.currentTarget.value = "";
-                }}
-              />
+            {/*
+              Chrome on Android 14+ routes a bare `image/*` filter to the Android
+              photo picker, which has no camera option, so the two sources are
+              split into separate inputs instead.
+              https://issues.chromium.org/issues/40937303
+            */}
+            <div id={fieldId} className="flex gap-2">
+              <label
+                className={`btn btn-outline flex-1 ${photoInputDisabled ? "btn-disabled" : ""}`}
+              >
+                <HiOutlineCamera className="h-5 w-5" />
+                Take Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  disabled={photoInputDisabled}
+                  onChange={(e) => {
+                    void handlePhotoUpload(
+                      fieldId,
+                      e.target.files,
+                      field.maxPhotos,
+                    );
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </label>
+              <label
+                className={`btn btn-outline flex-1 ${photoInputDisabled ? "btn-disabled" : ""}`}
+              >
+                <HiOutlinePhoto className="h-5 w-5" />
+                Choose Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  disabled={photoInputDisabled}
+                  onChange={(e) => {
+                    void handlePhotoUpload(
+                      fieldId,
+                      e.target.files,
+                      field.maxPhotos,
+                    );
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </label>
             </div>
-            <label className="label">
-              <span className="label-text-alt opacity-60">
-                Take a photo with your camera or choose one from your device.
-              </span>
-            </label>
             {isUploadingPhotos && (
               <label className="label">
                 <span className="label-text-alt text-info">
