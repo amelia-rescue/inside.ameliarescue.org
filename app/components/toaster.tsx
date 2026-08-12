@@ -1,16 +1,17 @@
+import { useEffect, useState } from "react";
+
 interface ToastOptions {
   message: string;
   type: "alert-info" | "alert-success" | "alert-error" | "alert-warning";
+  isLoading?: boolean;
 }
-
-import { useEffect, useState } from "react";
 
 interface Toast extends ToastOptions {
   id: number;
 }
 
 type ToastInput = ToastOptions & {
-  duration?: number;
+  duration?: number | null;
 };
 
 let nextToastId = 1;
@@ -28,6 +29,10 @@ function removeToast(id: number) {
   emitToasts();
 }
 
+export function dismissToast(id: number) {
+  removeToast(id);
+}
+
 export function showToast({ duration = 10000, ...toast }: ToastInput) {
   if (typeof window === "undefined") {
     return;
@@ -41,9 +46,13 @@ export function showToast({ duration = 10000, ...toast }: ToastInput) {
   activeToasts = [...activeToasts, nextToast];
   emitToasts();
 
-  window.setTimeout(() => {
-    removeToast(nextToast.id);
-  }, duration);
+  if (duration !== null) {
+    window.setTimeout(() => {
+      removeToast(nextToast.id);
+    }, duration);
+  }
+
+  return nextToast.id;
 }
 
 export function Toaster() {
@@ -51,6 +60,7 @@ export function Toaster() {
 
   useEffect(() => {
     listeners.add(setToasts);
+    setToasts(activeToasts);
 
     return () => {
       listeners.delete(setToasts);
@@ -59,15 +69,21 @@ export function Toaster() {
 
   return (
     <div className="toast toast-top toast-center z-1000">
-      {toasts.map(({ id, message, type }) => (
-        <div key={id} className={`alert ${type} relative`}>
+      {toasts.map(({ id, message, type, isLoading }) => (
+        <div
+          key={id}
+          className={`alert ${type} relative flex items-center gap-2`}
+        >
+          {isLoading && <span className="loading loading-spinner loading-xs" />}
           <span>{message}</span>{" "}
-          <button
-            className="btn btn-sm btn-circle btn-ghost absolute right-1"
-            onClick={() => removeToast(id)}
-          >
-            ✕
-          </button>
+          {!isLoading && (
+            <button
+              className="btn btn-sm btn-circle btn-ghost absolute right-1"
+              onClick={() => removeToast(id)}
+            >
+              ✕
+            </button>
+          )}
         </div>
       ))}
     </div>

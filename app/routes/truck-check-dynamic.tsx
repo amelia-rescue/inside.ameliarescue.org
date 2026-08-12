@@ -7,7 +7,7 @@ import {
   TruckCheckStore,
 } from "~/lib/truck-check/truck-check-store";
 import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
-import { showToast } from "~/components/toaster";
+import { dismissToast, showToast } from "~/components/toaster";
 import {
   HiOutlineUsers,
   HiOutlineExclamationTriangle,
@@ -173,7 +173,7 @@ export default function TruckCheckDynamic() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hasShownDisconnectedToastRef = useRef(false);
+  const connectingToastIdRef = useRef<number | null>(null);
   const hasEverConnectedRef = useRef(false);
   const handledCompletionEventsRef = useRef(new Set<string>());
   const completionSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -531,32 +531,36 @@ export default function TruckCheckDynamic() {
     if (isLocked) return;
 
     if (connectionStatus === "connected") {
-      if (hasShownDisconnectedToastRef.current) {
-        showToast({
-          message: "Connection restored. Truck check editing is enabled again.",
-          type: "alert-success",
-          duration: 5000,
-        });
+      if (connectingToastIdRef.current !== null) {
+        dismissToast(connectingToastIdRef.current);
+        connectingToastIdRef.current = null;
       }
-
-      hasShownDisconnectedToastRef.current = false;
       return;
     }
 
-    if (
-      (connectionStatus === "disconnected" || connectionStatus === "error") &&
-      !hasShownDisconnectedToastRef.current &&
-      hasEverConnectedRef.current
-    ) {
-      hasShownDisconnectedToastRef.current = true;
-      showToast({
-        message:
-          "Connection lost. Truck check editing is disabled until you reconnect.",
-        type: "alert-warning",
-        duration: 15000,
+    if (connectingToastIdRef.current === null) {
+      const id = showToast({
+        message: hasEverConnectedRef.current
+          ? "Connection lost. Reconnecting..."
+          : "Connecting...",
+        type: hasEverConnectedRef.current ? "alert-warning" : "alert-info",
+        isLoading: true,
+        duration: null,
       });
+      if (typeof id === "number") {
+        connectingToastIdRef.current = id;
+      }
     }
   }, [connectionStatus, isLocked]);
+
+  useEffect(() => {
+    return () => {
+      if (connectingToastIdRef.current !== null) {
+        dismissToast(connectingToastIdRef.current);
+        connectingToastIdRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!pendingJumpTarget) return;
@@ -908,6 +912,8 @@ export default function TruckCheckDynamic() {
         const photoFieldStatus = photoUploadStatus[fieldId];
         const isUploadingPhotos = photoFieldStatus?.isUploading === true;
         const canUploadMorePhotos = !photoMax || photoUrls.length < photoMax;
+        const photoInputDisabled =
+          fieldDisabled || isUploadingPhotos || !canUploadMorePhotos;
 
         return (
           <div key={fieldId} className={fieldContainerClass}>
@@ -958,11 +964,9 @@ export default function TruckCheckDynamic() {
                 id={fieldId}
                 type="file"
                 accept="image/*"
-                capture="environment"
+                multiple
                 className="file-input file-input-bordered w-full"
-                disabled={
-                  fieldDisabled || isUploadingPhotos || !canUploadMorePhotos
-                }
+                disabled={photoInputDisabled}
                 onChange={(e) => {
                   void handlePhotoUpload(
                     fieldId,
@@ -975,7 +979,7 @@ export default function TruckCheckDynamic() {
             </div>
             <label className="label">
               <span className="label-text-alt opacity-60">
-                Take a photo with your camera.
+                Take a photo with your camera or choose one from your device.
               </span>
             </label>
             {isUploadingPhotos && (
@@ -1163,9 +1167,7 @@ export default function TruckCheckDynamic() {
       {connectionStatus !== "connected" && !truckCheck.locked && (
         <div className="alert alert-warning mb-6">
           <HiOutlineExclamationTriangle className="h-6 w-6 shrink-0" />
-          <span>
-            Real-time sync is not available. Changes may not be saved.
-          </span>
+          <span>Editing will be disabled until connection is restored.</span>
         </div>
       )}
 
