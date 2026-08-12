@@ -155,6 +155,48 @@ describe("user store test", () => {
     expect(user.first_name).toBe("Updated");
   });
 
+  it("should only list users subscribed to truck check issue emails", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+
+    const subscriber = await store.createUser({
+      first_name: "Sub",
+      last_name: "Scriber",
+      email: "subscriber@example.com",
+      website_role: "admin",
+      membership_roles: [],
+      truck_check_issue_emails: true,
+    });
+    await store.createUser({
+      first_name: "Opted",
+      last_name: "Out",
+      email: "opted-out@example.com",
+      website_role: "admin",
+      membership_roles: [],
+      truck_check_issue_emails: false,
+    });
+    await store.createUser({
+      first_name: "No",
+      last_name: "Flag",
+      email: "no-flag@example.com",
+      website_role: "user",
+      membership_roles: [],
+    });
+    const deletedSubscriber = await store.createUser({
+      first_name: "Deleted",
+      last_name: "Subscriber",
+      email: "deleted@example.com",
+      website_role: "admin",
+      membership_roles: [],
+      truck_check_issue_emails: true,
+    });
+    await store.softDelete(deletedSubscriber.user_id);
+
+    const subscribers = await store.listTruckCheckIssueSubscribers();
+    expect(subscribers.map((user) => user.user_id)).toEqual([
+      subscriber.user_id,
+    ]);
+  });
+
   it("should set a temporary password for an existing user", async () => {
     const store = UserStore.make({ cognito: mockCognitoClient });
     const { user_id } = await store.createUser({

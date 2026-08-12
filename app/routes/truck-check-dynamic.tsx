@@ -21,6 +21,7 @@ import {
   HiOutlinePhoto,
 } from "react-icons/hi2";
 import { DateDisplay } from "~/components/date-display";
+import { getFieldId, getPhotoUrls } from "~/lib/truck-check/issues";
 import confetti from "canvas-confetti";
 
 export function meta({}: Route.MetaArgs) {
@@ -99,18 +100,6 @@ interface ConnectedUser {
 }
 
 type TriStateCheckboxValue = true | "not-present" | null;
-
-function getPhotoUrls(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (photoUrl): photoUrl is string =>
-      typeof photoUrl === "string" && photoUrl.trim().length > 0,
-  );
-}
-
-function getFieldId(sectionId: string, fieldLabel: string): string {
-  return `${sectionId}-${fieldLabel.replace(/\s+/g, "-").toLowerCase()}`;
-}
 
 function normalizeTriStateCheckboxValue(value: any): TriStateCheckboxValue {
   if (value === true) {

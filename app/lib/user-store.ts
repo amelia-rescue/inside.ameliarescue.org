@@ -35,6 +35,7 @@ export const userSchema = type({
   "profile_picture_url?": "string",
   "last_login_at?": "string",
   "note?": "string",
+  "truck_check_issue_emails?": "boolean",
 });
 userSchema.onUndeclaredKey("delete");
 
@@ -226,6 +227,22 @@ export class UserStore {
     );
     const response = await UserStore.client.send(command);
     return response.Items as unknown as DocumentUser[];
+  }
+
+  /**
+   * Lists users who have opted in to truck check issue emails.
+   */
+  public async listTruckCheckIssueSubscribers(): Promise<DocumentUser[]> {
+    const command = new ScanCommand({
+      TableName: this.tableName,
+      FilterExpression:
+        "attribute_not_exists(deleted_at) AND truck_check_issue_emails = :subscribed",
+      ExpressionAttributeValues: {
+        ":subscribed": true,
+      },
+    });
+    const response = await UserStore.client.send(command);
+    return (response.Items ?? []) as unknown as DocumentUser[];
   }
 
   public async updateUser(

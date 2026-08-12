@@ -103,6 +103,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     last_name: formData.get("last_name"),
     website_role: formData.get("website_role"),
     note: formData.get("note"),
+    truck_check_issue_emails: formData.get("truck_check_issue_emails") === "on",
     membership_roles: membershipRoleEntries,
   };
 
@@ -303,6 +304,26 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                 autoComplete="off"
                 maxLength={100}
               />
+            </div>
+
+            <div className="form-control w-full">
+              <label className="label cursor-pointer items-start justify-start gap-3">
+                <input
+                  type="checkbox"
+                  name="truck_check_issue_emails"
+                  defaultChecked={user.truck_check_issue_emails ?? false}
+                  className="checkbox"
+                />
+                <span className="flex flex-col gap-1">
+                  <span className="label-text">
+                    Receive truck check issue emails
+                  </span>
+                  <span className="label-text-alt opacity-70">
+                    Emails this user a report whenever a truck check locks with
+                    missing items or notes.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div className="form-control w-full">

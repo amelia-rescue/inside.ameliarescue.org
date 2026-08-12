@@ -957,7 +957,7 @@ export class CdkStack extends cdk.Stack {
         handler: "handler",
         entry: path.join(__dirname, "../server/truck-check-lock.ts"),
         memorySize: 1024,
-        timeout: cdk.Duration.seconds(60),
+        timeout: cdk.Duration.seconds(300),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup: truckCheckLockLogGroup,
         bundling: {
@@ -972,12 +972,28 @@ export class CdkStack extends cdk.Stack {
           NODE_OPTIONS: "--enable-source-maps",
           NODE_ENV: "production",
           TRUCK_CHECKS_TABLE_NAME: truckChecksTable.tableName,
+          TRUCK_CHECK_SCHEMAS_TABLE_NAME: truckCheckSchemasTable.tableName,
+          USERS_TABLE_NAME: usersTable.tableName,
+          EMAIL_EVENTS_TABLE_NAME: emailEventsTable.tableName,
+          FROM_EMAIL: `noreply@${appDomainName}`,
+          APP_URL: `https://${appDomainName}`,
         },
       },
     );
 
-    // Grant truck check lock Lambda permissions to access DynamoDB table
+    // Grant truck check lock Lambda permissions to access DynamoDB tables
     truckChecksTable.grantReadWriteData(truckCheckLockFunction);
+    truckCheckSchemasTable.grantReadData(truckCheckLockFunction);
+    usersTable.grantReadData(truckCheckLockFunction);
+    emailEventsTable.grantReadWriteData(truckCheckLockFunction);
+
+    // Grant SES send email permissions for truck check issue notifications
+    truckCheckLockFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["ses:SendEmail", "ses:SendRawEmail"],
+        resources: ["*"],
+      }),
+    );
 
     // Create EventBridge rule to trigger truck check lock Lambda every hour
     const truckCheckLockCronRule = new events.Rule(this, "TruckCheckLockRule", {

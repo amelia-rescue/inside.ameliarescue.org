@@ -9,28 +9,17 @@ import {
   type TruckCheckSchema,
 } from "~/lib/truck-check/truck-check-schema-store";
 import { DateDisplay } from "~/components/date-display";
+import {
+  extractIssues,
+  getFieldId,
+  type ProblemSection,
+  type TextNote,
+} from "~/lib/truck-check/issues";
 
 type TruckCheckListItem = Awaited<
   ReturnType<TruckCheckStore["listTruckChecks"]>
 >["truckChecks"][number];
 type Truck = Awaited<ReturnType<TruckCheckSchemaStore["listTrucks"]>>[number];
-
-type ProblemField = {
-  fieldId: string;
-  label: string;
-};
-
-type ProblemSection = {
-  sectionTitle: string;
-  fields: ProblemField[];
-};
-
-type TextNote = {
-  fieldId: string;
-  sectionTitle: string;
-  label: string;
-  value: string;
-};
 
 type TruckCheckWithCompletion = TruckCheckListItem & {
   requiredCompleted: number;
@@ -40,10 +29,6 @@ type TruckCheckWithCompletion = TruckCheckListItem & {
   problemSections: ProblemSection[];
   textNotes: TextNote[];
 };
-
-function getFieldId(sectionId: string, fieldLabel: string): string {
-  return `${sectionId}-${fieldLabel.replace(/\s+/g, "-").toLowerCase()}`;
-}
 
 function isFieldFilled(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -128,48 +113,14 @@ async function addCompletionProgress({
         ),
       );
 
-      const problemSections: ProblemSection[] = [];
-      for (const section of schema.sections) {
-        const problemFields: ProblemField[] = [];
-        for (const field of section.fields) {
-          if (field.type !== "checkbox") continue;
-          const fieldId = getFieldId(section.id, field.label);
-          if (check.data[fieldId] === "not-present") {
-            problemFields.push({ fieldId, label: field.label });
-          }
-        }
-        if (problemFields.length > 0) {
-          problemSections.push({
-            sectionTitle: section.title,
-            fields: problemFields,
-          });
-        }
-      }
-
-      const textNotes: TextNote[] = [];
-      for (const section of schema.sections) {
-        for (const field of section.fields) {
-          if (field.type !== "text") continue;
-          const fieldId = getFieldId(section.id, field.label);
-          const value = check.data[fieldId];
-          if (typeof value !== "string" || value.trim().length === 0) continue;
-          textNotes.push({
-            fieldId,
-            sectionTitle: section.title,
-            label: field.label,
-            value: value.trim(),
-          });
-        }
-      }
+      const { problemSections, textNotes, problemCount } = extractIssues({
+        data: check.data,
+        schema,
+      });
 
       const requiredCompleted = requiredFieldIds.filter((fieldId) =>
         isFieldFilled(check.data[fieldId]),
       ).length;
-
-      const problemCount = problemSections.reduce(
-        (sum, section) => sum + section.fields.length,
-        0,
-      );
 
       return {
         ...check,
