@@ -307,18 +307,16 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
             </div>
 
             <div className="form-control w-full">
-              <label className="label cursor-pointer items-start justify-start gap-3">
+              <label className="flex w-full cursor-pointer items-start gap-3">
                 <input
                   type="checkbox"
                   name="truck_check_issue_emails"
                   defaultChecked={user.truck_check_issue_emails ?? false}
-                  className="checkbox"
+                  className="checkbox mt-0.5 shrink-0"
                 />
-                <span className="flex flex-col gap-1">
-                  <span className="label-text">
-                    Receive truck check issue emails
-                  </span>
-                  <span className="label-text-alt opacity-70">
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span>Receive truck check issue emails</span>
+                  <span className="text-xs opacity-70">
                     Emails this user a report whenever a truck check locks with
                     missing items or notes.
                   </span>
