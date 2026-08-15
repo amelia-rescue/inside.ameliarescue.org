@@ -1,8 +1,11 @@
 import { data } from "react-router";
 import type { Route } from "./+types/documents.get-upload-url";
 import { S3Helper } from "~/lib/s3-helper";
+import { requireAdmin } from "~/lib/authorize.server";
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
+  requireAdmin(context);
+
   const formData = await request.formData();
   const documentName = formData.get("document_name") as string;
   const fileName = formData.get("file_name") as string;

@@ -1,8 +1,15 @@
 import { data } from "react-router";
 import type { Route } from "./+types/profile-picture.get-upload-url";
 import { S3Helper } from "~/lib/s3-helper";
+import { requireSelfOrAdmin } from "~/lib/authorize.server";
 
-export async function action({ request }: Route.ActionArgs) {
+const ALLOWED_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const userId = formData.get("user_id") as string;
   const fileName = formData.get("file_name") as string;
@@ -13,17 +20,18 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Validate content type
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-  if (!allowedTypes.includes(contentType)) {
+  const fileExtension = ALLOWED_EXTENSIONS[contentType];
+  if (!fileExtension) {
     return data(
       { error: "Invalid file type. Only JPG, PNG, and WebP are allowed." },
       { status: 400 },
     );
   }
 
+  requireSelfOrAdmin(context, userId);
+
   try {
     const s3Helper = S3Helper.make();
-    const fileExtension = fileName.split(".").pop();
     const key = `files/profile-pictures/${userId}/profile.${fileExtension}`;
 
     const uploadUrl = await s3Helper.getPresignedUploadUrl(key, contentType);

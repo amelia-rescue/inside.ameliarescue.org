@@ -4,14 +4,9 @@ import { CertificationStore } from "~/lib/certifications/certification-store";
 import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
 import dayjs from "dayjs";
 import { log } from "~/lib/logger";
-import { appContext } from "~/context";
+import { requireSelfOrAdmin } from "~/lib/authorize.server";
 
 export async function action({ request, context }: Route.ActionArgs) {
-  const ctx = context.get(appContext);
-  if (!ctx) {
-    throw new Error("Context not found");
-  }
-
   const formData = await request.formData();
   const certificationId = formData.get("certification_id") as string;
   const userId = formData.get("user_id") as string;
@@ -25,6 +20,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!certificationId || !userId || !certificationTypeName || !fileUrl) {
     return data({ error: "Missing required fields" }, { status: 400 });
   }
+
+  const ctx = requireSelfOrAdmin(context, userId);
 
   try {
     const typeStore = CertificationTypeStore.make();
