@@ -15,7 +15,7 @@ const schema: TruckCheckSchema = {
       fields: [
         { type: "checkbox", label: "Defib pads", required: true },
         { type: "checkbox", label: "Spare paper", required: true },
-        { type: "text", label: "Notes" },
+        { type: "text", label: "Notes", reportableIssue: true },
       ],
     },
     {
@@ -24,6 +24,7 @@ const schema: TruckCheckSchema = {
       fields: [
         { type: "checkbox", label: "Cell phone", required: true },
         { type: "text", label: "Comments" },
+        { type: "text", label: "Signature", reportableIssue: false },
         { type: "number", label: "Mileage" },
         { type: "photo", label: "Damage photos" },
       ],
@@ -83,7 +84,7 @@ describe("extractIssues", () => {
 
   it("collects non-empty trimmed text notes and skips blank ones", () => {
     const issues = extractIssues({
-      data: { "zoll-notes": "  low stock  ", "cab-comments": "   " },
+      data: { "zoll-notes": "  low stock  " },
       schema,
     });
 
@@ -95,6 +96,48 @@ describe("extractIssues", () => {
         value: "low stock",
       },
     ]);
+    expect(hasIssues(issues)).toBe(true);
+  });
+
+  it("skips a reportable text field that is blank or whitespace only", () => {
+    const issues = extractIssues({ data: { "zoll-notes": "   " }, schema });
+    expect(issues.textNotes).toEqual([]);
+    expect(hasIssues(issues)).toBe(false);
+  });
+
+  it("ignores filled text fields that are not marked reportableIssue", () => {
+    const issues = extractIssues({
+      data: { "cab-comments": "looked fine", "cab-signature": "J. Doe" },
+      schema,
+    });
+
+    expect(issues.textNotes).toEqual([]);
+    expect(issues.problemCount).toBe(0);
+    expect(hasIssues(issues)).toBe(false);
+  });
+
+  it("counts reportable text notes as problems alongside missing checkboxes", () => {
+    const issues = extractIssues({
+      data: {
+        "zoll-defib-pads": "not-present",
+        "zoll-notes": "cracked screen",
+        "cab-comments": "ignored",
+      },
+      schema,
+    });
+
+    expect(issues.problemCount).toBe(2);
+    expect(issues.textNotes).toHaveLength(1);
+  });
+
+  it("reports a check whose only issue is a reportable note", () => {
+    const issues = extractIssues({
+      data: { "zoll-notes": "cracked screen" },
+      schema,
+    });
+
+    expect(issues.problemCount).toBe(1);
+    expect(issues.problemSections).toEqual([]);
     expect(hasIssues(issues)).toBe(true);
   });
 

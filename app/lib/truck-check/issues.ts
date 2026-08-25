@@ -65,6 +65,7 @@ export function extractIssues({
       }
 
       if (field.type === "text") {
+        if (!field.reportableIssue) continue;
         const value = data[fieldId];
         if (typeof value === "string" && value.trim().length > 0) {
           textNotes.push({
@@ -98,10 +99,9 @@ export function extractIssues({
     }
   }
 
-  const problemCount = problemSections.reduce(
-    (sum, section) => sum + section.fields.length,
-    0,
-  );
+  const problemCount =
+    problemSections.reduce((sum, section) => sum + section.fields.length, 0) +
+    textNotes.length;
 
   return { problemSections, textNotes, photos, problemCount };
 }
@@ -111,5 +111,5 @@ export function extractIssues({
  * attached to whatever missing items or notes were reported.
  */
 export function hasIssues(issues: TruckCheckIssues): boolean {
-  return issues.problemCount > 0 || issues.textNotes.length > 0;
+  return issues.problemCount > 0;
 }

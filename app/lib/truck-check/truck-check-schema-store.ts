@@ -42,6 +42,7 @@ export interface TextField extends BaseField {
   type: "text";
   placeholder?: string;
   maxLength?: number;
+  reportableIssue?: boolean;
 }
 
 export interface NumberField extends BaseField {

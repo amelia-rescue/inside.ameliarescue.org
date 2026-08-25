@@ -516,6 +516,18 @@ function validateSectionsJson(json: string): {
           error: `Section "${section.id}", field "${field.label}": "type" must be one of ${VALID_FIELD_TYPES.join(", ")}`,
         };
       }
+      if (field.reportableIssue !== undefined) {
+        if (field.type !== "text") {
+          return {
+            error: `Section "${section.id}", field "${field.label}": "reportableIssue" is only valid on text fields`,
+          };
+        }
+        if (typeof field.reportableIssue !== "boolean") {
+          return {
+            error: `Section "${section.id}", field "${field.label}": "reportableIssue" must be true or false`,
+          };
+        }
+      }
       if (field.type === "select") {
         if (!Array.isArray(field.options) || field.options.length === 0) {
           return {
@@ -968,7 +980,13 @@ export default function ManageTruckChecks({
                   </li>
                   <li>
                     <code>text</code>: free-text notes, with optional{" "}
-                    <code>placeholder</code> and <code>maxLength</code>.
+                    <code>placeholder</code>, <code>maxLength</code>, and{" "}
+                    <code>reportableIssue</code>. Set{" "}
+                    <code>reportableIssue</code> to <code>true</code> to report
+                    the field as a problem whenever it is filled in &mdash; it
+                    will show up in the truck check list and in the issue
+                    notification emails. Defaults to <code>false</code>, so
+                    fields like a signature or a date stay quiet.
                   </li>
                   <li>
                     <code>number</code>: numeric entry, with optional{" "}

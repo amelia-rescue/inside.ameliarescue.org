@@ -105,9 +105,10 @@ async function addCompletionProgress({
           .map((field) => getFieldId(section.id, field.label)),
       );
 
-      const checkboxFieldIds = schema.sections.flatMap((section) =>
+      const reportableFieldIds = schema.sections.flatMap((section) =>
         section.fields.flatMap((field) =>
-          field.type === "checkbox"
+          field.type === "checkbox" ||
+          (field.type === "text" && field.reportableIssue)
             ? [getFieldId(section.id, field.label)]
             : [],
         ),
@@ -127,7 +128,7 @@ async function addCompletionProgress({
         requiredCompleted,
         requiredTotal: requiredFieldIds.length,
         problemCount,
-        problemTotal: checkboxFieldIds.length,
+        problemTotal: reportableFieldIds.length,
         problemSections,
         textNotes,
       };

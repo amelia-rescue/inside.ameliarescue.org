@@ -1181,7 +1181,8 @@
           "type": "text",
           "label": "Comments",
           "required": false,
-          "maxLength": 1000
+          "maxLength": 1000,
+          "reportableIssue": true
         }
       ]
     }
