@@ -12,6 +12,9 @@ import {
   AdminDeleteUserCommand,
   AdminSetUserPasswordCommand,
   CognitoIdentityProviderClient,
+  ListUsersCommand,
+  type UserStatusType,
+  type UserType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { randomBytes } from "crypto";
 import { type } from "arktype";
@@ -34,6 +37,7 @@ export const userSchema = type({
   "phone?": "string",
   "profile_picture_url?": "string",
   "last_login_at?": "string",
+  "temporary_password_expires_at?": "string",
   "note?": "string",
   "truck_check_issue_emails?": "boolean",
 });
@@ -41,10 +45,14 @@ userSchema.onUndeclaredKey("delete");
 
 export type User = typeof userSchema.infer;
 
-interface DocumentUser extends User {
+export interface DocumentUser extends User {
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+}
+
+export interface UserWithAccountStatus extends DocumentUser {
+  cognito_status: UserStatusType | null;
 }
 
 export class UserNotFound extends Error {
@@ -140,6 +148,8 @@ export class UserStore {
 
   public async createUser(user: Omit<User, "user_id">): Promise<DocumentUser> {
     const temporary_password = this.generatePassword();
+    const now = new Date();
+    const temporaryPasswordExpiresAt = this.getTemporaryPasswordExpiration(now);
 
     const cognitoResponse = await UserStore.cognito.send(
       new AdminCreateUserCommand({
@@ -175,8 +185,9 @@ export class UserStore {
     const documentUser: DocumentUser = {
       ...user,
       user_id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      temporary_password_expires_at: temporaryPasswordExpiresAt,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
     };
 
     const command = new PutCommand({
@@ -190,9 +201,11 @@ export class UserStore {
   public async setTemporaryPassword(user_id: string): Promise<{
     user: DocumentUser;
     temporaryPassword: string;
+    temporaryPasswordExpiresAt: string;
   }> {
     const user = await this.getUser(user_id);
     const temporaryPassword = this.generatePassword();
+    const temporaryPasswordExpiresAt = this.getTemporaryPasswordExpiration();
 
     await UserStore.cognito.send(
       new AdminSetUserPasswordCommand({
@@ -203,9 +216,18 @@ export class UserStore {
       }),
     );
 
+    await this.updateUser({
+      user_id,
+      temporary_password_expires_at: temporaryPasswordExpiresAt,
+    });
+
     return {
-      user,
+      user: {
+        ...user,
+        temporary_password_expires_at: temporaryPasswordExpiresAt,
+      },
       temporaryPassword,
+      temporaryPasswordExpiresAt,
     };
   }
 
@@ -227,6 +249,51 @@ export class UserStore {
     );
     const response = await UserStore.client.send(command);
     return response.Items as unknown as DocumentUser[];
+  }
+
+  public async listUsersWithAccountStatus(
+    includeDeleted = false,
+  ): Promise<UserWithAccountStatus[]> {
+    const [users, cognitoUsers] = await Promise.all([
+      this.listUsers(includeDeleted),
+      this.listCognitoUsers(),
+    ]);
+    const statusesByEmail = new Map<string, UserStatusType>();
+    for (const cognitoUser of cognitoUsers) {
+      const email = this.getCognitoUserEmail(cognitoUser);
+      if (email) {
+        statusesByEmail.set(
+          email,
+          cognitoUser.UserStatus ?? ("UNKNOWN" as UserStatusType),
+        );
+      }
+    }
+
+    return users.map((user) => ({
+      ...user,
+      cognito_status: statusesByEmail.get(user.email.toLowerCase()) ?? null,
+    }));
+  }
+
+  public async getUserWithAccountStatus(
+    user_id: string,
+  ): Promise<UserWithAccountStatus> {
+    const user = await this.getUser(user_id);
+    const escapedEmail = user.email.replace(/([\\"])/g, "\\$1");
+    const cognitoUsers = await this.listCognitoUsers(
+      `email = "${escapedEmail}"`,
+    );
+    const cognitoUser = cognitoUsers.find(
+      (candidate) =>
+        this.getCognitoUserEmail(candidate) === user.email.toLowerCase(),
+    );
+
+    return {
+      ...user,
+      cognito_status:
+        cognitoUser?.UserStatus ??
+        (cognitoUser ? ("UNKNOWN" as UserStatusType) : null),
+    };
   }
 
   /**
@@ -314,6 +381,49 @@ export class UserStore {
       },
     });
     await UserStore.client.send(command);
+  }
+
+  private async listCognitoUsers(filter?: string): Promise<UserType[]> {
+    const users: UserType[] = [];
+    let paginationToken: string | undefined;
+
+    do {
+      const response = await UserStore.cognito.send(
+        new ListUsersCommand({
+          UserPoolId: this.cognitoUserPoolId,
+          Filter: filter,
+          Limit: 60,
+          PaginationToken: paginationToken,
+        }),
+      );
+      users.push(...(response.Users ?? []));
+      paginationToken = response.PaginationToken;
+    } while (paginationToken);
+
+    return users;
+  }
+
+  private getCognitoUserEmail(user: UserType): string | undefined {
+    return user.Attributes?.find(
+      (attribute) => attribute.Name === "email",
+    )?.Value?.toLowerCase();
+  }
+
+  private getTemporaryPasswordExpiration(now = new Date()): string {
+    const validityDays = Number(
+      process.env.TEMPORARY_PASSWORD_VALIDITY_DAYS ?? "60",
+    );
+    if (
+      !Number.isInteger(validityDays) ||
+      validityDays < 1 ||
+      validityDays > 365
+    ) {
+      throw new Error("TEMPORARY_PASSWORD_VALIDITY_DAYS must be from 1 to 365");
+    }
+
+    return new Date(
+      now.getTime() + validityDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
   }
 
   private generatePassword(): string {

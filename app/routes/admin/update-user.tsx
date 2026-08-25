@@ -1,7 +1,11 @@
 import { data, Link, useFetcher, redirect, useRevalidator } from "react-router";
 import type { Route } from "./+types/update-user";
 import { appContext } from "~/context";
-import { userSchema, UserStore } from "~/lib/user-store";
+import {
+  userSchema,
+  UserStore,
+  type UserWithAccountStatus,
+} from "~/lib/user-store";
 import {
   CertificationTypeStore,
   type CertificationType,
@@ -14,6 +18,7 @@ import { CertificationUpload } from "~/components/upload-certification";
 import { RoleStore } from "~/lib/role-store";
 import { TrackStore } from "~/lib/track-store";
 import { showToast } from "~/components/toaster";
+import { DateDisplay } from "~/components/date-display";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -38,7 +43,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   }
 
   const store = UserStore.make();
-  const user = await store.getUser(params.user_id);
+  const user = await store.getUserWithAccountStatus(params.user_id);
 
   const tableData = await getTableData(user.user_id);
 
@@ -216,6 +221,7 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
       <div className="card bg-base-100 shadow-lg">
         <div className="card-body">
           <h2 className="card-title mb-4">Update User Information</h2>
+          <AccountStatus user={user} />
 
           {fetcher.data && "error" in fetcher.data && (
             <div className="alert alert-error mb-4">
@@ -494,6 +500,63 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function AccountStatus({ user }: { user: UserWithAccountStatus }) {
+  let label = user.cognito_status ?? "Cognito account missing";
+  let detail: React.ReactNode = "No matching sign-in account";
+  let badgeClass = "badge-error";
+
+  if (user.cognito_status === "CONFIRMED") {
+    label = "Active";
+    detail = "The user has established a permanent password.";
+    badgeClass = "badge-success";
+  } else if (user.cognito_status === "FORCE_CHANGE_PASSWORD") {
+    badgeClass = "badge-warning";
+    if (!user.temporary_password_expires_at) {
+      label = "Password change required";
+      detail =
+        "The temporary password expiry is unknown. Send a new temporary password to establish a fresh 60-day window.";
+    } else {
+      const expired =
+        Date.parse(user.temporary_password_expires_at) <= Date.now();
+      label = expired
+        ? "Temporary password expired"
+        : "Password change required";
+      badgeClass = expired ? "badge-error" : "badge-warning";
+      detail = (
+        <>
+          Temporary password {expired ? "expired" : "expires"}{" "}
+          <DateDisplay
+            value={user.temporary_password_expires_at}
+            format="shortDateTime"
+          />
+          {expired && ". Send a new temporary password to restore access."}
+        </>
+      );
+    }
+  } else if (user.cognito_status === "RESET_REQUIRED") {
+    label = "Password reset required";
+    detail = "The user must complete Cognito account recovery.";
+    badgeClass = "badge-warning";
+  } else if (user.cognito_status === "UNKNOWN") {
+    label = "Status unknown";
+    detail = "Cognito did not report an account state.";
+    badgeClass = "badge-neutral";
+  } else if (user.cognito_status) {
+    detail = "Current Cognito account state.";
+    badgeClass = "badge-neutral";
+  }
+
+  return (
+    <div className="border-base-300 mb-6 rounded-lg border p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="font-medium">Account access</span>
+        <span className={`badge ${badgeClass}`}>{label}</span>
+      </div>
+      <p className="text-base-content/70 text-sm">{detail}</p>
     </div>
   );
 }

@@ -27,7 +27,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const passwordExpiryDays = 30;
+const passwordExpiryDays = 60;
 
 export interface CdkStackProps extends cdk.StackProps {
   appDomainName: string;
@@ -602,6 +602,7 @@ export class CdkStack extends cdk.Stack {
           COGNITO_CLIENT_ID: userPoolClientV2.userPoolClientId,
           COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPoolV2.userPoolId}`,
           COGNITO_DOMAIN: authDomainName,
+          TEMPORARY_PASSWORD_VALIDITY_DAYS: passwordExpiryDays.toString(),
           SESSION_SECRET_ARN: sessionSecret.secretArn,
           APP_URL: `https://${appDomainName}`,
           FILE_CDN_URL: `https://${appDomainName}`,
@@ -654,6 +655,7 @@ export class CdkStack extends cdk.Stack {
         "cognito-idp:AdminUpdateUserAttributes",
         "cognito-idp:AdminGetUser",
         "cognito-idp:AdminDeleteUser",
+        "cognito-idp:ListUsers",
       );
     }
 
@@ -1043,6 +1045,7 @@ export class CdkStack extends cdk.Stack {
           COGNITO_CLIENT_ID: userPoolClientV2.userPoolClientId,
           COGNITO_ISSUER: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${userPoolV2.userPoolId}`,
           COGNITO_DOMAIN: authDomainName,
+          TEMPORARY_PASSWORD_VALIDITY_DAYS: passwordExpiryDays.toString(),
           SESSION_SECRET_ARN: sessionSecret.secretArn,
           APP_URL: `https://${appDomainName}`,
           FILE_CDN_URL: `https://${appDomainName}`,

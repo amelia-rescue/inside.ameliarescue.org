@@ -36,9 +36,11 @@ export class EmailService {
   async sendTemporaryPasswordEmail(params: {
     user: User;
     temporaryPassword: string;
+    temporaryPasswordExpiresAt: string;
   }): Promise<void> {
-    const { user, temporaryPassword } = params;
+    const { user, temporaryPassword, temporaryPasswordExpiresAt } = params;
     const userName = `${user.first_name} ${user.last_name}`;
+    const expiration = `${temporaryPasswordExpiresAt.slice(0, 10)} ${temporaryPasswordExpiresAt.slice(11, 16)} UTC`;
     const appUrl = process.env.APP_URL || "https://inside.ameliarescue.org";
     const subject = "Your temporary password for inside.ameliarescue.org";
     const htmlBody = `
@@ -49,7 +51,7 @@ export class EmailService {
           <p>An administrator reset your inside.ameliarescue.org password.</p>
           <p><strong>Username:</strong> ${user.email}</p>
           <p><strong>Temporary password:</strong> ${temporaryPassword}</p>
-          <p>Please <a href="${appUrl}/auth/login?login_hint=${encodeURIComponent(user.email)}">sign in here</a> and change your password when prompted. This temporary password will expire in 30 days.</p>
+          <p>Please <a href="${appUrl}/auth/login?login_hint=${encodeURIComponent(user.email)}">sign in here</a> and change your password when prompted. This temporary password expires on ${expiration}.</p>
           <p>Thank you,<br/>https://inside.ameliarescue.org</p>
         </body>
       </html>
@@ -63,7 +65,7 @@ Username: ${user.email}
 Temporary password: ${temporaryPassword}
 
 Please sign in here and change your password when prompted: ${appUrl}/auth/login?login_hint=${encodeURIComponent(user.email)}
-This temporary password will expire in 30 days.
+This temporary password expires on ${expiration}.
 
 Thank you,
 https://inside.ameliarescue.org

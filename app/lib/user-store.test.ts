@@ -90,11 +90,16 @@ describe("user store test", () => {
       user_id: expect.any(String),
       created_at: expect.any(String),
       updated_at: expect.any(String),
+      temporary_password_expires_at: expect.any(String),
       first_name: "Test",
       last_name: "User",
       email: "test@example.com",
       website_role: "admin",
     });
+    expect(
+      Date.parse(user.temporary_password_expires_at!) -
+        Date.parse(user.created_at),
+    ).toBe(60 * 24 * 60 * 60 * 1000);
   });
 
   it("should be able to create and get a user 2", async () => {
@@ -133,6 +138,116 @@ describe("user store test", () => {
 
     const users = await store.listUsers();
     expect(users.length).toBe(10);
+  });
+
+  it("should merge paginated Cognito statuses with application users", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+    const activeUser = await store.createUser({
+      first_name: "Active",
+      last_name: "User",
+      email: "active@example.com",
+      website_role: "user",
+      membership_roles: [],
+    });
+    const unknownUser = await store.createUser({
+      first_name: "Unknown",
+      last_name: "User",
+      email: "unknown@example.com",
+      website_role: "user",
+      membership_roles: [],
+    });
+    const missingUser = await store.createUser({
+      first_name: "Missing",
+      last_name: "User",
+      email: "missing@example.com",
+      website_role: "user",
+      membership_roles: [],
+    });
+
+    cognitoSendSpy.mockClear();
+    cognitoSendSpy.mockImplementation(async (command: { input: any }) =>
+      command.input.PaginationToken
+        ? {
+            Users: [
+              {
+                Attributes: [{ Name: "email", Value: "UNKNOWN@example.com" }],
+              },
+            ],
+          }
+        : {
+            Users: [
+              {
+                UserStatus: "CONFIRMED",
+                Attributes: [{ Name: "email", Value: "ACTIVE@example.com" }],
+              },
+            ],
+            PaginationToken: "next-page",
+          },
+    );
+
+    const users = await store.listUsersWithAccountStatus();
+    const statuses = new Map(
+      users.map((user) => [user.user_id, user.cognito_status]),
+    );
+
+    expect(statuses.get(activeUser.user_id)).toBe("CONFIRMED");
+    expect(statuses.get(unknownUser.user_id)).toBe("UNKNOWN");
+    expect(statuses.get(missingUser.user_id)).toBeNull();
+    expect(cognitoSendSpy).toHaveBeenCalledTimes(2);
+    expect(cognitoSendSpy.mock.calls[0][0].input).toMatchObject({
+      Limit: 60,
+      UserPoolId: "inside-amelia-rescue-users",
+    });
+    expect(cognitoSendSpy.mock.calls[1][0].input.PaginationToken).toBe(
+      "next-page",
+    );
+  });
+
+  it("should look up one user's Cognito status by exact email", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+    const user = await store.createUser({
+      first_name: "Pending",
+      last_name: "User",
+      email: "pending@example.com",
+      website_role: "user",
+      membership_roles: [],
+    });
+
+    cognitoSendSpy.mockResolvedValue({
+      Users: [
+        {
+          UserStatus: "FORCE_CHANGE_PASSWORD",
+          Attributes: [{ Name: "email", Value: "pending@example.com" }],
+        },
+      ],
+    });
+
+    const result = await store.getUserWithAccountStatus(user.user_id);
+
+    expect(result.cognito_status).toBe("FORCE_CHANGE_PASSWORD");
+    expect(cognitoSendSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({
+          Filter: 'email = "pending@example.com"',
+        }),
+      }),
+    );
+  });
+
+  it("should return a missing Cognito status for an unmatched user", async () => {
+    const store = UserStore.make({ cognito: mockCognitoClient });
+    const user = await store.createUser({
+      first_name: "Missing",
+      last_name: "User",
+      email: "missing@example.com",
+      website_role: "user",
+      membership_roles: [],
+    });
+    cognitoSendSpy.mockResolvedValue({ Users: [] });
+
+    const result = await store.getUserWithAccountStatus(user.user_id);
+
+    expect(result.cognito_status).toBeNull();
   });
 
   it("should be able to update users", async () => {
@@ -215,6 +330,12 @@ describe("user store test", () => {
 
     expect(result.user.user_id).toBe(user_id);
     expect(result.temporaryPassword).toHaveLength(10);
+    expect(result.temporaryPasswordExpiresAt).toBe(
+      result.user.temporary_password_expires_at,
+    );
+    expect((await store.getUser(user_id)).temporary_password_expires_at).toBe(
+      result.temporaryPasswordExpiresAt,
+    );
     expect(cognitoSendSpy).toHaveBeenCalledTimes(1);
     expect(cognitoSendSpy).toHaveBeenCalledWith(
       expect.objectContaining({

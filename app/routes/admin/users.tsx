@@ -22,14 +22,80 @@ import { appContext } from "~/context";
 import { EmailService } from "~/lib/email-service";
 import { UserStore } from "~/lib/user-store";
 import { showToast } from "~/components/toaster";
+import { DateDisplay } from "~/components/date-display";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type AdminUser = Awaited<ReturnType<typeof loader>>["users"][number];
 
 const columnHelper = createColumnHelper<AdminUser>();
 
+function getAccountState(user: AdminUser) {
+  if (user.cognito_status === null) {
+    return {
+      label: "Cognito account missing",
+      detail: "No matching sign-in account",
+      badgeClass: "badge-error",
+    };
+  }
+
+  if (user.cognito_status === "CONFIRMED") {
+    return {
+      label: "Active",
+      detail: "Password established",
+      badgeClass: "badge-success",
+    };
+  }
+
+  if (user.cognito_status === "FORCE_CHANGE_PASSWORD") {
+    if (!user.temporary_password_expires_at) {
+      return {
+        label: "Password change required",
+        detail: "Temporary password expiry unknown",
+        badgeClass: "badge-warning",
+      };
+    }
+
+    if (Date.parse(user.temporary_password_expires_at) <= Date.now()) {
+      return {
+        label: "Temporary password expired",
+        detail: "Send a new temporary password",
+        badgeClass: "badge-error",
+      };
+    }
+
+    return {
+      label: "Password change required",
+      detail: "Temporary password pending",
+      badgeClass: "badge-warning",
+    };
+  }
+
+  if (user.cognito_status === "RESET_REQUIRED") {
+    return {
+      label: "Password reset required",
+      detail: "User must complete account recovery",
+      badgeClass: "badge-warning",
+    };
+  }
+
+  if (user.cognito_status === "UNKNOWN") {
+    return {
+      label: "Status unknown",
+      detail: "Cognito did not report an account state",
+      badgeClass: "badge-neutral",
+    };
+  }
+
+  return {
+    label: user.cognito_status,
+    detail: "Cognito account state",
+    badgeClass: "badge-neutral",
+  };
+}
+
 const fuzzyGlobalFilter: FilterFn<AdminUser> = (row, _columnId, value) => {
   const user = row.original;
+  const accountState = getAccountState(user);
   const haystack = [
     user.first_name,
     user.last_name,
@@ -37,6 +103,8 @@ const fuzzyGlobalFilter: FilterFn<AdminUser> = (row, _columnId, value) => {
     user.user_id,
     user.website_role,
     user.note ?? "",
+    accountState.label,
+    accountState.detail,
   ]
     .join(" ")
     .toLowerCase();
@@ -62,7 +130,7 @@ export async function loader({ context }: Route.LoaderArgs) {
   }
 
   const userStore = UserStore.make();
-  const users = (await userStore.listUsers()).sort((a, b) => {
+  const users = (await userStore.listUsersWithAccountStatus()).sort((a, b) => {
     const firstNameComparison = a.first_name.localeCompare(b.first_name);
     if (firstNameComparison !== 0) {
       return firstNameComparison;
@@ -112,11 +180,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     const emailService = EmailService.make();
 
     try {
-      const { user, temporaryPassword } =
+      const { user, temporaryPassword, temporaryPasswordExpiresAt } =
         await userStore.setTemporaryPassword(userId);
       await emailService.sendTemporaryPasswordEmail({
         user,
         temporaryPassword,
+        temporaryPasswordExpiresAt,
       });
 
       return data({
@@ -293,6 +362,38 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
           );
         },
       }),
+      columnHelper.accessor((row) => getAccountState(row).label, {
+        id: "account_status",
+        header: "Account Status",
+        cell: (info) => {
+          const user = info.row.original;
+          const state = getAccountState(user);
+          const showExpiration =
+            user.cognito_status === "FORCE_CHANGE_PASSWORD" &&
+            user.temporary_password_expires_at;
+
+          return (
+            <div className="flex max-w-64 flex-col items-start gap-1">
+              <span className={`badge ${state.badgeClass}`}>{state.label}</span>
+              <span className="text-base-content/70 text-xs">
+                {showExpiration ? (
+                  <>
+                    {state.label === "Temporary password expired"
+                      ? "Expired "
+                      : "Expires "}
+                    <DateDisplay
+                      value={user.temporary_password_expires_at}
+                      format="shortDateTime"
+                    />
+                  </>
+                ) : (
+                  state.detail
+                )}
+              </span>
+            </div>
+          );
+        },
+      }),
       columnHelper.accessor("website_role", {
         id: "website_role",
         header: "Website Role",
@@ -327,38 +428,54 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
         cell: (info) => {
           const user = info.row.original;
           return (
-            <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
+            <div className="dropdown dropdown-end block text-right">
               <button
                 type="button"
-                className="btn btn-sm btn-ghost text-warning whitespace-nowrap"
+                tabIndex={0}
+                className="btn btn-primary btn-sm whitespace-nowrap"
                 disabled={fetcher.state !== "idle"}
-                onClick={() =>
-                  openTempPasswordModal(
-                    user.user_id,
-                    `${user.first_name} ${user.last_name}`,
-                    user.email,
-                  )
-                }
               >
-                Set Temporary Password
+                Actions
               </button>
-              <Link
-                to={`/admin/update-user/${user.user_id}`}
-                className="btn btn-sm btn-ghost whitespace-nowrap"
+              <ul
+                tabIndex={0}
+                className="menu dropdown-content bg-base-100 rounded-box z-20 w-64 p-2 text-left shadow-lg"
               >
-                Edit
-              </Link>
-              <button
-                onClick={() =>
-                  openDeleteModal(
-                    user.user_id,
-                    `${user.first_name} ${user.last_name}`,
-                  )
-                }
-                className="btn btn-sm btn-error btn-ghost whitespace-nowrap"
-              >
-                Delete
-              </button>
+                <li>
+                  <button
+                    type="button"
+                    className="text-warning"
+                    disabled={fetcher.state !== "idle"}
+                    onClick={() =>
+                      openTempPasswordModal(
+                        user.user_id,
+                        `${user.first_name} ${user.last_name}`,
+                        user.email,
+                      )
+                    }
+                  >
+                    Send New Temporary Password
+                  </button>
+                </li>
+                <li>
+                  <Link to={`/admin/update-user/${user.user_id}`}>Edit</Link>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="text-error"
+                    disabled={fetcher.state !== "idle"}
+                    onClick={() =>
+                      openDeleteModal(
+                        user.user_id,
+                        `${user.first_name} ${user.last_name}`,
+                      )
+                    }
+                  >
+                    Delete
+                  </button>
+                </li>
+              </ul>
             </div>
           );
         },
@@ -517,16 +634,15 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
 
       <dialog id="temp_password_modal" className="modal">
         <div className="modal-box">
-          <h3 className="text-lg font-bold">
-            Confirm Temporary Password Reset
-          </h3>
+          <h3 className="text-lg font-bold">Confirm New Temporary Password</h3>
           <p className="py-4">
-            Are you sure you want to set a temporary password for{" "}
+            Send a new temporary password to{" "}
             <strong>{tempPasswordUserName}</strong>?
           </p>
           <p className="pb-4 text-sm opacity-70">
-            A new temporary password will be emailed to {tempPasswordUserEmail},
-            and the user will be required to change it on next sign-in.
+            This invalidates any current password, starts a new 60-day window,
+            and emails the new password and exact deadline to{" "}
+            {tempPasswordUserEmail}. The user must change it on next sign-in.
           </p>
           <div className="modal-action">
             <button onClick={closeTempPasswordModal} className="btn btn-ghost">
@@ -548,7 +664,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                 className="btn btn-outline text-warning"
                 disabled={fetcher.state !== "idle"}
               >
-                Set Temporary Password
+                Send New Temporary Password
               </button>
             </fetcher.Form>
           </div>
