@@ -12,6 +12,7 @@ import { DateDisplay } from "~/components/date-display";
 import {
   extractIssues,
   getFieldId,
+  type PhotoAttachment,
   type ProblemSection,
   type TextNote,
 } from "~/lib/truck-check/issues";
@@ -28,7 +29,12 @@ type TruckCheckWithCompletion = TruckCheckListItem & {
   problemTotal: number;
   problemSections: ProblemSection[];
   textNotes: TextNote[];
+  photos: PhotoAttachment[];
 };
+
+function photoCount(photos: PhotoAttachment[]): number {
+  return photos.reduce((sum, photo) => sum + photo.urls.length, 0);
+}
 
 function isFieldFilled(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -77,6 +83,7 @@ async function addCompletionProgress({
           problemTotal: 0,
           problemSections: [],
           textNotes: [],
+          photos: [],
         };
       }
 
@@ -95,6 +102,7 @@ async function addCompletionProgress({
             problemTotal: 0,
             problemSections: [],
             textNotes: [],
+            photos: [],
           };
         }
       }
@@ -114,10 +122,11 @@ async function addCompletionProgress({
         ),
       );
 
-      const { problemSections, textNotes, problemCount } = extractIssues({
-        data: check.data,
-        schema,
-      });
+      const { problemSections, textNotes, photos, problemCount } =
+        extractIssues({
+          data: check.data,
+          schema,
+        });
 
       const requiredCompleted = requiredFieldIds.filter((fieldId) =>
         isFieldFilled(check.data[fieldId]),
@@ -131,6 +140,7 @@ async function addCompletionProgress({
         problemTotal: reportableFieldIds.length,
         problemSections,
         textNotes,
+        photos,
       };
     }),
   );
@@ -559,6 +569,42 @@ export default function TruckCheck() {
                           </div>
                         ))}
                       </dl>
+                    </div>
+                  </div>
+                )}
+                {selectedCheck.photos.length > 0 && (
+                  <div className="card bg-base-200">
+                    <div className="card-body py-4">
+                      <h4 className="card-title text-base">
+                        Photos ({photoCount(selectedCheck.photos)})
+                      </h4>
+                      <div className="mt-2 space-y-3">
+                        {selectedCheck.photos.map((photo) => (
+                          <div key={photo.fieldId}>
+                            <p className="text-xs font-semibold opacity-60">
+                              {photo.sectionTitle} · {photo.label}
+                            </p>
+                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                              {photo.urls.map((photoUrl, index) => (
+                                <a
+                                  key={`${photoUrl}-${index}`}
+                                  href={photoUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Open full size"
+                                >
+                                  <img
+                                    src={photoUrl}
+                                    alt={`${photo.label} ${index + 1}`}
+                                    loading="lazy"
+                                    className="border-base-300 h-24 w-full rounded border object-cover transition-opacity hover:opacity-80"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
