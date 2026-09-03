@@ -42,6 +42,11 @@ export class CdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: CdkStackProps) {
     super(scope, id, props);
 
+    cdk.Annotations.of(this).acknowledgeWarning(
+      "@aws-cdk/aws-cloudfront-origins:listBucketSecurityRisk",
+      "S3 origins with AccessLevel.LIST are only attached to path-specific behaviors, never the default behavior; LIST is used so missing objects return 404 instead of 403.",
+    );
+
     const {
       appDomainName,
       authDomainName,
@@ -341,7 +346,7 @@ export class CdkStack extends cdk.Stack {
       },
     );
 
-    managedLoginBrandingV2.addDependency(
+    managedLoginBrandingV2.addResourceDependency(
       userPoolV2Domain.node.defaultChild as cognito.CfnUserPoolDomain,
     );
 
@@ -349,7 +354,7 @@ export class CdkStack extends cdk.Stack {
       tableName: "aes_users",
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -364,7 +369,7 @@ export class CdkStack extends cdk.Stack {
       partitionKey: { name: "user_id", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "session_id", type: dynamodb.AttributeType.STRING },
       timeToLiveAttribute: "expires_at",
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -378,7 +383,7 @@ export class CdkStack extends cdk.Stack {
           name: "name",
           type: dynamodb.AttributeType.STRING,
         },
-        pointInTimeRecovery: true,
+        pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -393,7 +398,7 @@ export class CdkStack extends cdk.Stack {
           name: "certification_id",
           type: dynamodb.AttributeType.STRING,
         },
-        pointInTimeRecovery: true,
+        pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -411,7 +416,7 @@ export class CdkStack extends cdk.Stack {
         name: "name",
         type: dynamodb.AttributeType.STRING,
       },
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -422,7 +427,7 @@ export class CdkStack extends cdk.Stack {
         name: "name",
         type: dynamodb.AttributeType.STRING,
       },
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -436,7 +441,7 @@ export class CdkStack extends cdk.Stack {
           name: "reminder_id",
           type: dynamodb.AttributeType.STRING,
         },
-        pointInTimeRecovery: true,
+        pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -460,7 +465,7 @@ export class CdkStack extends cdk.Stack {
           name: "snapshot_date",
           type: dynamodb.AttributeType.STRING,
         },
-        pointInTimeRecovery: true,
+        pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -472,7 +477,7 @@ export class CdkStack extends cdk.Stack {
         name: "message_id",
         type: dynamodb.AttributeType.STRING,
       },
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -499,7 +504,7 @@ export class CdkStack extends cdk.Stack {
           type: dynamodb.AttributeType.STRING,
         },
         timeToLiveAttribute: "ttl",
-        pointInTimeRecovery: true,
+        pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -511,7 +516,7 @@ export class CdkStack extends cdk.Stack {
         name: "id",
         type: dynamodb.AttributeType.STRING,
       },
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -541,7 +546,7 @@ export class CdkStack extends cdk.Stack {
           name: "range_key",
           type: dynamodb.AttributeType.STRING,
         },
-        pointInTimeRecovery: true,
+        pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
@@ -594,6 +599,9 @@ export class CdkStack extends cdk.Stack {
           sourceMap: true,
           keepNames: true,
           target: "es2022",
+          esbuildArgs: {
+            "--log-override:ignored-bare-import": "silent",
+          },
         },
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
@@ -620,6 +628,13 @@ export class CdkStack extends cdk.Stack {
           TRUCK_CHECK_SCHEMAS_TABLE_NAME: truckCheckSchemasTable.tableName,
         },
       },
+    );
+
+    // Must come after the NodejsFunction above: CDK attaches this warning to the stack itself,
+    // and acknowledgements only match ancestors or already-emitted warnings.
+    cdk.Annotations.of(this).acknowledgeWarning(
+      "@aws-cdk/aws-lambda-nodejs:sdkV2NotInRuntime",
+      "@react-router/architect has conditional require('aws-sdk/...') branches that never execute on Node 18+; it only needs to be marked external so esbuild can resolve the bundle.",
     );
 
     usersTable.grantReadWriteData(lambdaFunction);
@@ -684,7 +699,7 @@ export class CdkStack extends cdk.Stack {
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup: certificationReminderLogGroup,
         bundling: {
-          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          externalModules: ["@aws-sdk/*"],
           minify: true,
           sourceMap: true,
           keepNames: true,
@@ -764,7 +779,7 @@ export class CdkStack extends cdk.Stack {
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup: sesStatusLogGroup,
         bundling: {
-          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          externalModules: ["@aws-sdk/*"],
           minify: true,
           sourceMap: true,
           keepNames: true,
@@ -810,7 +825,7 @@ export class CdkStack extends cdk.Stack {
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup: certificationSnapshotLogGroup,
         bundling: {
-          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          externalModules: ["@aws-sdk/*"],
           minify: true,
           sourceMap: true,
           keepNames: true,
@@ -893,7 +908,7 @@ export class CdkStack extends cdk.Stack {
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup: trainingStatusSnapshotLogGroup,
         bundling: {
-          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          externalModules: ["@aws-sdk/*"],
           minify: true,
           sourceMap: true,
           keepNames: true,
@@ -963,7 +978,7 @@ export class CdkStack extends cdk.Stack {
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup: truckCheckLockLogGroup,
         bundling: {
-          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          externalModules: ["@aws-sdk/*"],
           minify: true,
           sourceMap: true,
           keepNames: true,
@@ -1031,7 +1046,7 @@ export class CdkStack extends cdk.Stack {
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         logGroup: websocketLogGroup,
         bundling: {
-          externalModules: ["@aws-sdk/*", "aws-sdk"],
+          externalModules: ["@aws-sdk/*"],
           minify: true,
           sourceMap: true,
           keepNames: true,

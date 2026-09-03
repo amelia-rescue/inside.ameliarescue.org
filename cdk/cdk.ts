@@ -29,4 +29,4 @@ const appStack = new CdkStack(app, "InsideAmeliaRescueStack", {
   alarmEmail,
 });
 
-appStack.addDependency(dnsStack);
+appStack.addStackDependency(dnsStack);
