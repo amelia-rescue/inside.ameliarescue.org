@@ -1273,12 +1273,7 @@ export class CdkStack extends cdk.Stack {
       defaultBehavior: {
         origin: new origins.HttpOrigin(
           cdk.Fn.select(2, cdk.Fn.split("/", httpApi.apiEndpoint)),
-          {
-            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
-            customHeaders: {
-              "X-Forwarded-Host": appDomainName,
-            },
-          },
+          { protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY },
         ),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
