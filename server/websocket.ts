@@ -431,6 +431,7 @@ async function handleJoinTruckCheck({
     message: {
       type: "truck-check-joined",
       truckCheckData: truckCheck.data || {},
+      locked: truckCheck.locked === true,
       connectedUsers,
       contributors: contributorNames,
     },
@@ -481,6 +482,22 @@ async function handleUpdateField({
   const truckCheckStore = TruckCheckStore.make();
   const truckCheckSchemaStore = TruckCheckSchemaStore.make();
   const previousCheck = await truckCheckStore.getTruckCheck(truckCheckId);
+
+  // Locked checks are view-only, whether locked by their creator or by the
+  // hourly lock task, so the sender is told to switch to view-only instead.
+  if (previousCheck.locked) {
+    await sendToConnection({
+      apiGatewayClient,
+      connectionId,
+      message: {
+        type: "truck-check-locked",
+        truckCheckId,
+      },
+    });
+
+    return { statusCode: 200, body: "Truck check is locked" };
+  }
+
   const previousCompletion = await calculateCompletion({
     check: previousCheck,
     trucks: [],
@@ -517,11 +534,10 @@ async function handleUpdateField({
         last_name: userResult.last_name,
       };
     } catch {}
-    const updatedCheck = await truckCheckStore.updateTruckCheck({
+    const updatedCheck = await truckCheckStore.addContributor({
       id: truckCheckId,
-      contributors: {
-        [userId]: contributor,
-      },
+      userId,
+      contributor,
     });
     updatedContributorNames = Object.entries(updatedCheck.contributors).map(
       ([contributorUserId, contributor]) => ({

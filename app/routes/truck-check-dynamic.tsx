@@ -1,12 +1,20 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { appContext } from "~/context";
 import type { Route } from "./+types/truck-check-dynamic";
-import { Form, redirect, useLoaderData } from "react-router";
+import {
+  Form,
+  redirect,
+  useLoaderData,
+  useNavigation,
+  useRevalidator,
+} from "react-router";
 import {
   truckCheckSchema,
   TruckCheckStore,
 } from "~/lib/truck-check/truck-check-store";
 import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
+import { notifyTruckCheckIssues } from "~/lib/truck-check/issue-notifications";
+import { log } from "~/lib/logger";
 import { compressImage } from "~/lib/truck-check/image-compression";
 import { dismissToast, showToast } from "~/components/toaster";
 import {
@@ -37,7 +45,7 @@ export async function action({ context, params, request }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  if (intent !== "delete") {
+  if (intent !== "delete" && intent !== "lock") {
     throw new Error("Invalid intent");
   }
 
@@ -45,11 +53,30 @@ export async function action({ context, params, request }: Route.ActionArgs) {
   const truckCheck = await truckCheckStore.getTruckCheck(params.id);
 
   if (truckCheck.locked) {
-    throw new Error("Locked truck checks cannot be deleted");
+    throw new Error("Locked truck checks cannot be modified");
   }
 
   if (truckCheck.created_by !== ctx.user.user_id) {
-    throw new Error("Only the creator can delete this truck check");
+    throw new Error(`Only the creator can ${intent} this truck check`);
+  }
+
+  if (intent === "lock") {
+    const lockedCheck = await truckCheckStore.lockTruckCheck({
+      id: truckCheck.id,
+      userId: ctx.user.user_id,
+    });
+
+    try {
+      await notifyTruckCheckIssues({ checks: [lockedCheck] });
+    } catch (error) {
+      // Notification failures must never fail the lock
+      log.error("Failed to send truck check issue notifications", {
+        checkId: lockedCheck.id,
+        error: String(error),
+      });
+    }
+
+    return redirect(`/truck-checks/${truckCheck.id}`);
   }
 
   await truckCheckStore.deleteTruckCheck(truckCheck.id);
@@ -131,9 +158,17 @@ export default function TruckCheckDynamic() {
   const { user, accessToken, truckCheck, truck, schema, previousContributors } =
     useLoaderData<typeof loader>();
 
-  const isLocked = truckCheck.locked;
-  const canDeleteTruckCheck =
-    !isLocked && truckCheck.created_by === user.user_id;
+  const navigation = useNavigation();
+  const revalidator = useRevalidator();
+
+  // Set when the server tells us the check was locked while we had it open,
+  // so the page goes read-only before the revalidated loader data arrives.
+  const [remotelyLocked, setRemotelyLocked] = useState(false);
+  const isLocked = truckCheck.locked || remotelyLocked;
+  const isCreator = truckCheck.created_by === user.user_id;
+  const canDeleteTruckCheck = !isLocked && isCreator;
+  const canLockTruckCheck = !isLocked && isCreator;
+  const isLocking = navigation.formData?.get("intent") === "lock";
 
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
     isLocked ? "disconnected" : "connecting",
@@ -168,6 +203,9 @@ export default function TruckCheckDynamic() {
   const lastUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const connectingToastIdRef = useRef<number | null>(null);
   const hasEverConnectedRef = useRef(false);
+  const stopReconnectRef = useRef(false);
+  const lockNoticeShownRef = useRef(false);
+  const lockModalRef = useRef<HTMLDialogElement>(null);
   const handledCompletionEventsRef = useRef(new Set<string>());
   const completionSoundRef = useRef<HTMLAudioElement | null>(null);
 
@@ -216,6 +254,23 @@ export default function TruckCheckDynamic() {
       sendFieldUpdate(fieldId, value);
     }
   }, [sendFieldUpdate]);
+
+  // The server rejects edits as soon as a check is locked. Queued edits are
+  // dropped because they can never be accepted anymore.
+  const handleRemoteLock = useCallback(() => {
+    if (lockNoticeShownRef.current) return;
+    lockNoticeShownRef.current = true;
+
+    pendingFieldUpdatesRef.current.clear();
+    setPendingUpdateCount(0);
+    setRemotelyLocked(true);
+    showToast({
+      message: "This truck check was locked and is now view-only.",
+      type: "alert-warning",
+      duration: 8000,
+    });
+    void revalidator.revalidate();
+  }, [revalidator]);
 
   const handleFieldChange = useCallback(
     (fieldId: string, value: any) => {
@@ -381,15 +436,26 @@ export default function TruckCheckDynamic() {
 
           switch (data.type) {
             case "truck-check-joined":
-              // Queued edits win over the server snapshot, which predates them.
               setFieldValues((prev) => ({
                 ...prev,
                 ...data.truckCheckData,
-                ...Object.fromEntries(pendingFieldUpdatesRef.current),
+                // Queued edits win over the server snapshot, which predates
+                // them, unless the check was locked while we were away.
+                ...(data.locked
+                  ? {}
+                  : Object.fromEntries(pendingFieldUpdatesRef.current)),
               }));
               setConnectedUsers(data.connectedUsers || []);
               setContributors(data.contributors || []);
+              if (data.locked) {
+                handleRemoteLock();
+                break;
+              }
               flushPendingFieldUpdates();
+              break;
+
+            case "truck-check-locked":
+              handleRemoteLock();
               break;
 
             case "user-joined":
@@ -519,6 +585,7 @@ export default function TruckCheckDynamic() {
       ws.onclose = () => {
         console.log("WebSocket disconnected");
         setConnectionStatus("disconnected");
+        if (stopReconnectRef.current) return;
         reconnectTimeoutRef.current = setTimeout(() => {
           console.log("Attempting to reconnect...");
           connectWebSocket();
@@ -528,7 +595,25 @@ export default function TruckCheckDynamic() {
       console.error("Error creating WebSocket:", error);
       setConnectionStatus("error");
     }
-  }, [wsUrl, accessToken, truckCheck.id, flushPendingFieldUpdates]);
+  }, [
+    wsUrl,
+    accessToken,
+    truckCheck.id,
+    flushPendingFieldUpdates,
+    handleRemoteLock,
+  ]);
+
+  // Once locked there is nothing left to sync, so drop the socket for good
+  useEffect(() => {
+    if (!isLocked) return;
+
+    stopReconnectRef.current = true;
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    wsRef.current?.close();
+  }, [isLocked]);
 
   useEffect(() => {
     completionSoundRef.current = new Audio(
@@ -563,9 +648,7 @@ export default function TruckCheckDynamic() {
   }, []);
 
   useEffect(() => {
-    if (isLocked) return;
-
-    if (connectionStatus === "connected") {
+    if (connectionStatus === "connected" || isLocked) {
       if (connectingToastIdRef.current !== null) {
         dismissToast(connectingToastIdRef.current);
         connectingToastIdRef.current = null;
@@ -1158,25 +1241,39 @@ export default function TruckCheckDynamic() {
               )}
             </div>
 
-            {canDeleteTruckCheck && (
-              <Form method="post" className="sm:self-start">
-                <input type="hidden" name="intent" value="delete" />
-                <button
-                  type="submit"
-                  className="btn btn-error btn-outline btn-sm w-full sm:w-auto"
-                  onClick={(event) => {
-                    if (
-                      !window.confirm(
-                        "Delete this truck check? This action cannot be undone.",
-                      )
-                    ) {
-                      event.preventDefault();
-                    }
-                  }}
-                >
-                  Delete Truck Check
-                </button>
-              </Form>
+            {(canLockTruckCheck || canDeleteTruckCheck) && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:self-start">
+                {canLockTruckCheck && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-outline btn-sm w-full sm:w-auto"
+                    onClick={() => lockModalRef.current?.showModal()}
+                  >
+                    <HiOutlineLockClosed className="h-4 w-4" />
+                    Lock Truck Check
+                  </button>
+                )}
+                {canDeleteTruckCheck && (
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="delete" />
+                    <button
+                      type="submit"
+                      className="btn btn-error btn-outline btn-sm w-full sm:w-auto"
+                      onClick={(event) => {
+                        if (
+                          !window.confirm(
+                            "Delete this truck check? This action cannot be undone.",
+                          )
+                        ) {
+                          event.preventDefault();
+                        }
+                      }}
+                    >
+                      Delete Truck Check
+                    </button>
+                  </Form>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -1187,8 +1284,9 @@ export default function TruckCheckDynamic() {
         <div className="alert mb-6">
           <HiOutlineLockClosed className="h-6 w-6 shrink-0" />
           <span>
-            This truck check is locked and is view-only. Truck checks are
-            automatically locked 24 hours after creation.
+            This truck check is locked and is view-only. Checks are locked by
+            their creator when finished, or automatically 24 hours after
+            creation.
           </span>
         </div>
       )}
@@ -1358,6 +1456,62 @@ export default function TruckCheckDynamic() {
           );
         })}
       </div>
+
+      {/* Lock Confirmation Modal - unmounts once locked so it cannot linger */}
+      {canLockTruckCheck && (
+        <dialog ref={lockModalRef} className="modal">
+          <div className="modal-box">
+            <h3 className="flex items-center gap-2 text-lg font-bold">
+              <HiOutlineLockClosed className="h-5 w-5" />
+              Lock this truck check?
+            </h3>
+            <p className="py-3">
+              Locking makes this check view-only for everyone, including you. It
+              cannot be unlocked or deleted afterwards, and any reported issues
+              are emailed to subscribers right away.
+            </p>
+            {requiredTotal - filledRequiredCount > 0 && (
+              <div className="alert alert-warning">
+                <HiOutlineExclamationTriangle className="h-5 w-5 shrink-0" />
+                <span>
+                  {requiredTotal - filledRequiredCount} of {requiredTotal}{" "}
+                  required{" "}
+                  {requiredTotal - filledRequiredCount === 1
+                    ? "field is"
+                    : "fields are"}{" "}
+                  still incomplete.
+                </span>
+              </div>
+            )}
+            <div className="modal-action">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={isLocking}
+                onClick={() => lockModalRef.current?.close()}
+              >
+                Cancel
+              </button>
+              <Form method="post">
+                <input type="hidden" name="intent" value="lock" />
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isLocking}
+                >
+                  {isLocking && (
+                    <span className="loading loading-spinner loading-sm" />
+                  )}
+                  {isLocking ? "Locking..." : "Lock check"}
+                </button>
+              </Form>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button>close</button>
+          </form>
+        </dialog>
+      )}
 
       {/* Sticky Action Bar */}
       <div className="bg-base-100/80 fixed right-0 bottom-0 left-0 z-10 border-t backdrop-blur-sm">

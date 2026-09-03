@@ -47,6 +47,33 @@ export class TruckCheckAlreadyExists extends Error {
   }
 }
 
+export class TruckCheckLockNotPermitted extends Error {
+  constructor(id: string) {
+    super(`Truck check cannot be locked: ${id}`);
+  }
+}
+
+function isConditionalCheckFailed(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "ConditionalCheckFailedException"
+  );
+}
+
+function isInvalidDocumentPath(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "ValidationException" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.includes("document path")
+  );
+}
+
 export class TruckCheckStore {
   private static client: DynamoDBDocumentClient;
   private readonly tableName = "aes_truck_checks";
@@ -138,13 +165,114 @@ export class TruckCheckStore {
 
       return response.Attributes as DocumentTruckCheck;
     } catch (error: unknown) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "name" in error &&
-        error.name === "ConditionalCheckFailedException"
-      ) {
+      if (isConditionalCheckFailed(error)) {
         throw new TruckCheckNotFound(id);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Locks a check so it becomes view-only. Conditional so a concurrent field
+   * update can never race the lock away, and so only the creator can lock.
+   */
+  public async lockTruckCheck({
+    id,
+    userId,
+  }: {
+    id: string;
+    userId: string;
+  }): Promise<DocumentTruckCheck> {
+    try {
+      const response = await TruckCheckStore.client.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { id },
+          ConditionExpression:
+            "attribute_exists(id) AND created_by = :userId AND locked = :unlocked",
+          UpdateExpression: "SET locked = :locked, updated_at = :updatedAt",
+          ExpressionAttributeValues: {
+            ":userId": userId,
+            ":unlocked": false,
+            ":locked": true,
+            ":updatedAt": new Date().toISOString(),
+          },
+          ReturnValues: "ALL_NEW",
+        }),
+      );
+
+      return response.Attributes as DocumentTruckCheck;
+    } catch (error: unknown) {
+      if (isConditionalCheckFailed(error)) {
+        // Distinguish a missing check from a check the user may not lock
+        await this.getTruckCheck(id);
+        throw new TruckCheckLockNotPermitted(id);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Adds a single contributor without rewriting the whole item, so it cannot
+   * clobber concurrent changes to other attributes such as `locked`.
+   */
+  public async addContributor({
+    id,
+    userId,
+    contributor,
+  }: {
+    id: string;
+    userId: string;
+    contributor: { first_name: string; last_name: string };
+  }): Promise<DocumentTruckCheck> {
+    try {
+      const response = await TruckCheckStore.client.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { id },
+          ConditionExpression: "attribute_exists(id)",
+          UpdateExpression:
+            "SET list_pk = if_not_exists(list_pk, :list_pk), contributors.#userId = :contributor, updated_at = :updatedAt",
+          ExpressionAttributeNames: {
+            "#userId": userId,
+          },
+          ExpressionAttributeValues: {
+            ":contributor": contributor,
+            ":list_pk": "TRUCK_CHECK",
+            ":updatedAt": new Date().toISOString(),
+          },
+          ReturnValues: "ALL_NEW",
+        }),
+      );
+
+      return response.Attributes as DocumentTruckCheck;
+    } catch (error: unknown) {
+      if (isConditionalCheckFailed(error)) {
+        throw new TruckCheckNotFound(id);
+      }
+
+      // Checks written before contributors existed have no map to update into
+      if (isInvalidDocumentPath(error)) {
+        const response = await TruckCheckStore.client.send(
+          new UpdateCommand({
+            TableName: this.tableName,
+            Key: { id },
+            ConditionExpression:
+              "attribute_exists(id) AND attribute_not_exists(contributors)",
+            UpdateExpression:
+              "SET list_pk = if_not_exists(list_pk, :list_pk), contributors = :contributors, updated_at = :updatedAt",
+            ExpressionAttributeValues: {
+              ":contributors": { [userId]: contributor },
+              ":list_pk": "TRUCK_CHECK",
+              ":updatedAt": new Date().toISOString(),
+            },
+            ReturnValues: "ALL_NEW",
+          }),
+        );
+
+        return response.Attributes as DocumentTruckCheck;
       }
 
       throw error;

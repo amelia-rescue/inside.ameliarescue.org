@@ -8,6 +8,7 @@ import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 import {
   TruckCheckStore,
   TruckCheckNotFound,
+  TruckCheckLockNotPermitted,
   type TruckCheck,
   type DocumentTruckCheck,
 } from "./truck-check-store";
@@ -347,6 +348,109 @@ describe("truck check store test", () => {
     });
 
     expect(unlocked.locked).toBe(false);
+  });
+
+  it("should let the creator lock a truck check", async () => {
+    const store = TruckCheckStore.make();
+
+    const created = await store.createTruckCheck({
+      created_by: "user-456",
+      truck: "Ambulance 1",
+      data: { status: "in_progress" },
+      contributors: contributors("user-456"),
+      locked: false,
+    });
+
+    const locked = await store.lockTruckCheck({
+      id: created.id,
+      userId: "user-456",
+    });
+
+    expect(locked.locked).toBe(true);
+    expect(locked.created_at).toBe(created.created_at);
+    expect(locked.data).toEqual({ status: "in_progress" });
+
+    const retrieved = await store.getTruckCheck(created.id);
+    expect(retrieved.locked).toBe(true);
+  });
+
+  it("should not let a non-creator lock a truck check", async () => {
+    const store = TruckCheckStore.make();
+
+    const created = await store.createTruckCheck({
+      created_by: "user-456",
+      truck: "Ambulance 1",
+      data: {},
+      contributors: contributors("user-456", "user-789"),
+      locked: false,
+    });
+
+    await expect(
+      store.lockTruckCheck({ id: created.id, userId: "user-789" }),
+    ).rejects.toBeInstanceOf(TruckCheckLockNotPermitted);
+
+    const retrieved = await store.getTruckCheck(created.id);
+    expect(retrieved.locked).toBe(false);
+  });
+
+  it("should not lock an already locked truck check", async () => {
+    const store = TruckCheckStore.make();
+
+    const created = await store.createTruckCheck({
+      created_by: "user-456",
+      truck: "Ambulance 1",
+      data: {},
+      contributors: contributors("user-456"),
+      locked: true,
+    });
+
+    await expect(
+      store.lockTruckCheck({ id: created.id, userId: "user-456" }),
+    ).rejects.toBeInstanceOf(TruckCheckLockNotPermitted);
+  });
+
+  it("should throw TruckCheckNotFound when locking a non-existent truck check", async () => {
+    const store = TruckCheckStore.make();
+
+    await expect(
+      store.lockTruckCheck({ id: "nonexistent", userId: "user-456" }),
+    ).rejects.toBeInstanceOf(TruckCheckNotFound);
+  });
+
+  it("should add a contributor without touching the locked status", async () => {
+    const store = TruckCheckStore.make();
+
+    const created = await store.createTruckCheck({
+      created_by: "user-456",
+      truck: "Ambulance 1",
+      data: { oil_level: "full" },
+      contributors: contributors("user-456"),
+      locked: false,
+    });
+
+    await store.lockTruckCheck({ id: created.id, userId: "user-456" });
+
+    const updated = await store.addContributor({
+      id: created.id,
+      userId: "user-789",
+      contributor: { first_name: "user-789", last_name: "Contributor" },
+    });
+
+    expect(updated.contributors).toEqual(contributors("user-456", "user-789"));
+    expect(updated.locked).toBe(true);
+    expect(updated.data).toEqual({ oil_level: "full" });
+  });
+
+  it("should throw TruckCheckNotFound when adding a contributor to a non-existent truck check", async () => {
+    const store = TruckCheckStore.make();
+
+    await expect(
+      store.addContributor({
+        id: "nonexistent",
+        userId: "user-789",
+        contributor: { first_name: "user-789", last_name: "Contributor" },
+      }),
+    ).rejects.toBeInstanceOf(TruckCheckNotFound);
   });
 
   it("should handle empty data objects", async () => {
