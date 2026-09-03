@@ -8,7 +8,6 @@ export default defineConfig({
     globals: true,
     environment: "happy-dom",
     setupFiles: ["./test/setup.ts"],
-    fileParallelism: false,
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

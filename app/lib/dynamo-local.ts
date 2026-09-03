@@ -4,7 +4,7 @@ import {
   DynamoDBClient,
 } from "@aws-sdk/client-dynamodb";
 import dynalite, { type DynaliteServer } from "dynalite";
-import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
+import { DYNALITE_ENDPOINT, DYNALITE_PORT } from "./dynalite-endpont";
 
 export async function setupDynamo() {
   const schemas = [
@@ -112,7 +112,7 @@ export async function _setupDynamo(
   });
 
   await new Promise<DynaliteServer>((resolve, reject) => {
-    dynaliteServer.listen(10420, (err) => {
+    dynaliteServer.listen(DYNALITE_PORT, (err) => {
       if (err) reject(err);
       else resolve(dynaliteServer);
     });
@@ -127,119 +127,124 @@ export async function _setupDynamo(
     },
   });
 
-  for (const schema of schemas) {
-    const attributeDefinitions = [
-      {
-        AttributeName: schema.partitionKey,
-        AttributeType: "S",
-      },
-    ];
-
-    const keySchema = [
-      {
-        AttributeName: schema.partitionKey,
-        KeyType: "HASH",
-      },
-    ];
-
-    if (schema.sortKey) {
-      attributeDefinitions.push({
-        AttributeName: schema.sortKey,
-        AttributeType: "S",
-      });
-      keySchema.push({
-        AttributeName: schema.sortKey,
-        KeyType: "RANGE",
-      });
-    }
-
-    if (schema.gsi) {
-      for (const gsi of schema.gsi) {
-        if (
-          !attributeDefinitions.find(
-            (a) => a.AttributeName === gsi.partitionKey,
-          )
-        ) {
-          attributeDefinitions.push({
-            AttributeName: gsi.partitionKey,
-            AttributeType: "S",
-          });
-        }
-        if (
-          gsi.sortKey &&
-          !attributeDefinitions.find((a) => a.AttributeName === gsi.sortKey)
-        ) {
-          attributeDefinitions.push({
-            AttributeName: gsi.sortKey,
-            AttributeType: "S",
-          });
-        }
-      }
-    }
-
-    const createTableCommand: any = {
-      TableName: schema.tableName,
-      KeySchema: keySchema,
-      AttributeDefinitions: attributeDefinitions,
-      BillingMode: "PAY_PER_REQUEST",
-    };
-
-    if (schema.gsi) {
-      createTableCommand.GlobalSecondaryIndexes = schema.gsi.map((gsi) => ({
-        IndexName: gsi.indexName,
-        KeySchema: [
-          {
-            AttributeName: gsi.partitionKey,
-            KeyType: "HASH",
-          },
-          ...(gsi.sortKey
-            ? [
-                {
-                  AttributeName: gsi.sortKey,
-                  KeyType: "RANGE",
-                },
-              ]
-            : []),
-        ],
-        Projection: {
-          ProjectionType: "ALL",
-        },
-      }));
-    }
-
-    await dynamoDbClient.send(new CreateTableCommand(createTableCommand));
-
-    await Promise.race([
-      // 500 ms timeout to create the table
-      new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Table creation timeout")), 2000);
-      }),
-
-      // poll for table creation every 25ms for 20 attempts (2000ms total)
-      new Promise(async (resolve) => {
-        for (let attempt = 0; attempt < 20; attempt++) {
-          try {
-            const res = await dynamoDbClient.send(
-              new DescribeTableCommand({ TableName: schema.tableName }),
-            );
-            if (
-              res.Table?.TableStatus === "ACTIVE" ||
-              res.Table?.TableStatus == null
-            ) {
-              resolve(undefined);
-              break;
-            }
-          } catch {
-            // ignore until table exists
-          }
-
-          await new Promise((r) => setTimeout(r, 25));
-        }
-      }),
-    ]);
-  }
+  await Promise.all(
+    schemas.map((schema) => createTable(dynamoDbClient, schema)),
+  );
 
   return dynaliteServer;
+}
+
+async function createTable(
+  dynamoDbClient: DynamoDBClient,
+  schema: Parameters<typeof _setupDynamo>[number],
+) {
+  const attributeDefinitions = [
+    {
+      AttributeName: schema.partitionKey,
+      AttributeType: "S",
+    },
+  ];
+
+  const keySchema = [
+    {
+      AttributeName: schema.partitionKey,
+      KeyType: "HASH",
+    },
+  ];
+
+  if (schema.sortKey) {
+    attributeDefinitions.push({
+      AttributeName: schema.sortKey,
+      AttributeType: "S",
+    });
+    keySchema.push({
+      AttributeName: schema.sortKey,
+      KeyType: "RANGE",
+    });
+  }
+
+  if (schema.gsi) {
+    for (const gsi of schema.gsi) {
+      if (
+        !attributeDefinitions.find((a) => a.AttributeName === gsi.partitionKey)
+      ) {
+        attributeDefinitions.push({
+          AttributeName: gsi.partitionKey,
+          AttributeType: "S",
+        });
+      }
+      if (
+        gsi.sortKey &&
+        !attributeDefinitions.find((a) => a.AttributeName === gsi.sortKey)
+      ) {
+        attributeDefinitions.push({
+          AttributeName: gsi.sortKey,
+          AttributeType: "S",
+        });
+      }
+    }
+  }
+
+  const createTableCommand: any = {
+    TableName: schema.tableName,
+    KeySchema: keySchema,
+    AttributeDefinitions: attributeDefinitions,
+    BillingMode: "PAY_PER_REQUEST",
+  };
+
+  if (schema.gsi) {
+    createTableCommand.GlobalSecondaryIndexes = schema.gsi.map((gsi) => ({
+      IndexName: gsi.indexName,
+      KeySchema: [
+        {
+          AttributeName: gsi.partitionKey,
+          KeyType: "HASH",
+        },
+        ...(gsi.sortKey
+          ? [
+              {
+                AttributeName: gsi.sortKey,
+                KeyType: "RANGE",
+              },
+            ]
+          : []),
+      ],
+      Projection: {
+        ProjectionType: "ALL",
+      },
+    }));
+  }
+
+  await dynamoDbClient.send(new CreateTableCommand(createTableCommand));
+
+  await Promise.race([
+    // 500 ms timeout to create the table
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Table creation timeout")), 2000);
+    }),
+
+    // poll for table creation every 25ms for 20 attempts (2000ms total)
+    new Promise(async (resolve) => {
+      for (let attempt = 0; attempt < 20; attempt++) {
+        try {
+          const res = await dynamoDbClient.send(
+            new DescribeTableCommand({ TableName: schema.tableName }),
+          );
+          if (
+            res.Table?.TableStatus === "ACTIVE" ||
+            res.Table?.TableStatus == null
+          ) {
+            resolve(undefined);
+            break;
+          }
+        } catch {
+          // ignore until table exists
+        }
+
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    }),
+  ]);
 }
 
 export async function teardownDynamo(dynaliteServer: DynaliteServer) {
