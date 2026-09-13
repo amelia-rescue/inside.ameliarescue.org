@@ -30,6 +30,8 @@ truckCheckSchema.onUndeclaredKey("delete");
 export type TruckCheck = typeof truckCheckSchema.infer;
 
 export interface DocumentTruckCheck extends TruckCheck {
+  revision?: number;
+  mutation_streams?: Record<string, number>;
   created_at: string;
   updated_at: string;
   list_pk: string;
@@ -44,6 +46,20 @@ export class TruckCheckNotFound extends Error {
 export class TruckCheckAlreadyExists extends Error {
   constructor(id: string) {
     super(`Truck check already exists: ${id}`);
+  }
+}
+
+export class TruckCheckLocked extends Error {
+  constructor() {
+    super("This truck check is locked");
+  }
+}
+
+export class TruckCheckCapacityExceeded extends Error {
+  constructor() {
+    super(
+      "This check has reached its storage limit. Your edit has not been saved.",
+    );
   }
 }
 
@@ -102,6 +118,7 @@ export class TruckCheckStore {
   public async getTruckCheck(id: string): Promise<DocumentTruckCheck> {
     const command = new GetCommand({
       TableName: this.tableName,
+      ConsistentRead: true,
       Key: {
         id,
       },
@@ -118,6 +135,8 @@ export class TruckCheckStore {
   ): Promise<DocumentTruckCheck> {
     const documentTruckCheck: DocumentTruckCheck = {
       ...truckCheck,
+      revision: 0,
+      mutation_streams: {},
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -131,6 +150,94 @@ export class TruckCheckStore {
     });
     await TruckCheckStore.client.send(command);
     return documentTruckCheck;
+  }
+
+  public async applyFieldMutation(params: {
+    id: string;
+    fieldId: string;
+    value: unknown;
+    userId: string;
+    clientId: string;
+    sequence: number;
+    legacy?: boolean;
+    contributor: { first_name: string; last_name: string };
+  }): Promise<{
+    check: DocumentTruckCheck;
+    previous: DocumentTruckCheck;
+    duplicate: boolean;
+  }> {
+    const stream = JSON.stringify([params.userId, params.clientId]);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const previous = await this.getTruckCheck(params.id);
+      if (
+        !params.legacy &&
+        (previous.mutation_streams?.[stream] ?? 0) >= params.sequence
+      ) {
+        return { check: previous, previous, duplicate: true };
+      }
+      if (previous.locked) throw new TruckCheckLocked();
+      const streams = {
+        ...previous.mutation_streams,
+        ...(params.legacy ? {} : { [stream]: params.sequence }),
+      };
+      const contributors = {
+        ...previous.contributors,
+        [params.userId]: params.contributor,
+      };
+      const revision = previous.revision ?? 0;
+      if (
+        Object.keys(streams).length > 1000 ||
+        Buffer.byteLength(
+          JSON.stringify({
+            ...previous,
+            data: { ...previous.data, [params.fieldId]: params.value },
+            contributors,
+            mutation_streams: streams,
+          }),
+        ) > 300_000
+      ) {
+        throw new TruckCheckCapacityExceeded();
+      }
+      try {
+        const result = await TruckCheckStore.client.send(
+          new UpdateCommand({
+            TableName: this.tableName,
+            Key: { id: params.id },
+            ConditionExpression: `attribute_exists(id) AND locked = :false AND ${previous.revision === undefined ? "attribute_not_exists(revision)" : "revision = :previousRevision"}`,
+            UpdateExpression:
+              "SET #data.#field = :value, contributors = :contributors, mutation_streams = :streams, revision = :revision, updated_at = :now, list_pk = if_not_exists(list_pk, :list)",
+            ExpressionAttributeNames: {
+              "#data": "data",
+              "#field": params.fieldId,
+            },
+            ExpressionAttributeValues: {
+              ":false": false,
+              ":value": params.value,
+              ":contributors": contributors,
+              ":streams": streams,
+              ":revision": revision + 1,
+              ":now": new Date().toISOString(),
+              ":list": "TRUCK_CHECK",
+              ...(previous.revision === undefined
+                ? {}
+                : { ":previousRevision": revision }),
+            },
+            ReturnValues: "ALL_NEW",
+          }),
+        );
+        return {
+          check: result.Attributes as DocumentTruckCheck,
+          previous,
+          duplicate: false,
+        };
+      } catch (error) {
+        if (!isConditionalCheckFailed(error)) throw error;
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.random() * Math.min(100, 5 * 2 ** attempt)),
+        );
+      }
+    }
+    throw new Error("Check is busy; retry this mutation");
   }
 
   public async updateTruckCheckField({
@@ -147,15 +254,17 @@ export class TruckCheckStore {
         new UpdateCommand({
           TableName: this.tableName,
           Key: { id },
-          ConditionExpression: "attribute_exists(id)",
+          ConditionExpression: "attribute_exists(id) AND locked = :unlocked",
           UpdateExpression:
-            "SET list_pk = if_not_exists(list_pk, :list_pk), #data.#fieldId = :value, updated_at = :updatedAt",
+            "SET list_pk = if_not_exists(list_pk, :list_pk), #data.#fieldId = :value, updated_at = :updatedAt ADD revision :one",
           ExpressionAttributeNames: {
             "#data": "data",
             "#fieldId": fieldId,
           },
           ExpressionAttributeValues: {
             ":value": value,
+            ":unlocked": false,
+            ":one": 1,
             ":updatedAt": new Date().toISOString(),
             ":list_pk": "TRUCK_CHECK",
           },
@@ -166,7 +275,8 @@ export class TruckCheckStore {
       return response.Attributes as DocumentTruckCheck;
     } catch (error: unknown) {
       if (isConditionalCheckFailed(error)) {
-        throw new TruckCheckNotFound(id);
+        await this.getTruckCheck(id);
+        throw new TruckCheckLocked();
       }
 
       throw error;
@@ -191,9 +301,11 @@ export class TruckCheckStore {
           Key: { id },
           ConditionExpression:
             "attribute_exists(id) AND created_by = :userId AND locked = :unlocked",
-          UpdateExpression: "SET locked = :locked, updated_at = :updatedAt",
+          UpdateExpression:
+            "SET locked = :locked, updated_at = :updatedAt ADD revision :one",
           ExpressionAttributeValues: {
             ":userId": userId,
+            ":one": 1,
             ":unlocked": false,
             ":locked": true,
             ":updatedAt": new Date().toISOString(),
@@ -234,12 +346,13 @@ export class TruckCheckStore {
           Key: { id },
           ConditionExpression: "attribute_exists(id)",
           UpdateExpression:
-            "SET list_pk = if_not_exists(list_pk, :list_pk), contributors.#userId = :contributor, updated_at = :updatedAt",
+            "SET list_pk = if_not_exists(list_pk, :list_pk), contributors.#userId = :contributor, updated_at = :updatedAt ADD revision :one",
           ExpressionAttributeNames: {
             "#userId": userId,
           },
           ExpressionAttributeValues: {
             ":contributor": contributor,
+            ":one": 1,
             ":list_pk": "TRUCK_CHECK",
             ":updatedAt": new Date().toISOString(),
           },
@@ -262,9 +375,10 @@ export class TruckCheckStore {
             ConditionExpression:
               "attribute_exists(id) AND attribute_not_exists(contributors)",
             UpdateExpression:
-              "SET list_pk = if_not_exists(list_pk, :list_pk), contributors = :contributors, updated_at = :updatedAt",
+              "SET list_pk = if_not_exists(list_pk, :list_pk), contributors = :contributors, updated_at = :updatedAt ADD revision :one",
             ExpressionAttributeValues: {
               ":contributors": { [userId]: contributor },
+              ":one": 1,
               ":list_pk": "TRUCK_CHECK",
               ":updatedAt": new Date().toISOString(),
             },
@@ -292,6 +406,8 @@ export class TruckCheckStore {
         ...existing.contributors,
         ...(truckCheck.contributors ?? {}),
       },
+      revision: (existing.revision ?? 0) + 1,
+      mutation_streams: existing.mutation_streams ?? {},
       created_at: existing.created_at,
       updated_at: new Date().toISOString(),
       list_pk: existing.list_pk ?? "TRUCK_CHECK",
@@ -300,6 +416,10 @@ export class TruckCheckStore {
     const command = new PutCommand({
       TableName: this.tableName,
       Item: documentTruckCheck,
+      ConditionExpression: `attribute_exists(id) AND ${existing.revision === undefined ? "attribute_not_exists(revision)" : "revision = :revision"}`,
+      ...(existing.revision === undefined
+        ? {}
+        : { ExpressionAttributeValues: { ":revision": existing.revision } }),
     });
     await TruckCheckStore.client.send(command);
     return documentTruckCheck;
@@ -313,6 +433,8 @@ export class TruckCheckStore {
       Key: {
         id,
       },
+      ConditionExpression: "attribute_exists(id) AND locked = :unlocked",
+      ExpressionAttributeValues: { ":unlocked": false },
     });
     await TruckCheckStore.client.send(command);
   }

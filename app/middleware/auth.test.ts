@@ -36,6 +36,36 @@ vi.mock("~/lib/user-store", () => ({
 }));
 
 describe("authMiddleware", () => {
+  it("returns JSON 401 for sync requests while preserving page login redirects", async () => {
+    const { requireUser } = await import("~/lib/session.server");
+    const redirect = new Response(null, {
+      status: 302,
+      headers: { Location: "/auth/login" },
+    });
+    vi.mocked(requireUser).mockRejectedValueOnce(redirect);
+    const next = vi.fn();
+    const response = await authMiddleware(
+      {
+        request: new Request(
+          "https://example.test/api/truck-checks/check/sync",
+        ),
+        context: {},
+      } as any,
+      next,
+    );
+    expect(response!.status).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+    vi.mocked(requireUser).mockRejectedValueOnce(redirect);
+    await expect(
+      authMiddleware(
+        {
+          request: new Request("https://example.test/truck-checks/check"),
+          context: {},
+        } as any,
+        next,
+      ),
+    ).rejects.toBe(redirect);
+  });
   it("get's the user from the session", async () => {
     const { requireUser } = await import("~/lib/session.server");
     vi.mocked(requireUser).mockResolvedValue({

@@ -17,7 +17,26 @@ export const authMiddleware: Route.MiddlewareFunction = async function (
   if (excludedPaths.includes(new URL(request.url).pathname)) {
     return await next();
   }
-  const { user: sessionUser, sessionHeader } = await requireUser(request);
+  let authentication: Awaited<ReturnType<typeof requireUser>>;
+  try {
+    authentication = await requireUser(request);
+  } catch (error) {
+    if (
+      /^\/api\/truck-checks\/[^/]+\/sync$/.test(
+        new URL(request.url).pathname,
+      ) &&
+      error instanceof Response &&
+      error.status >= 300 &&
+      error.status < 400
+    ) {
+      return Response.json(
+        { code: "unauthorized", error: "Sign in to resume saving." },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+    throw error;
+  }
+  const { user: sessionUser, sessionHeader } = authentication;
   const userStore = UserStore.make();
   const user = await userStore.getUser(sessionUser.user_id);
   const preferences = await getPreferences(request);

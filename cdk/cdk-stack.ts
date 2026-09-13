@@ -1146,6 +1146,30 @@ export class CdkStack extends cdk.Stack {
       }),
     );
 
+    lambdaFunction.addEnvironment(
+      "WEBSOCKET_MANAGEMENT_ENDPOINT",
+      `https://${webSocketApi.apiId}.execute-api.${cdk.Stack.of(this).region}.amazonaws.com/${webSocketStage.stageName}`,
+    );
+    lambdaFunction.addEnvironment(
+      "WEBSOCKET_CONNECTIONS_TABLE_NAME",
+      websocketConnectionsTable.tableName,
+    );
+    websocketConnectionsTable.grantReadData(lambdaFunction);
+    lambdaFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["dynamodb:DeleteItem"],
+        resources: [websocketConnectionsTable.tableArn],
+      }),
+    );
+    lambdaFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["execute-api:ManageConnections"],
+        resources: [
+          `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${webSocketApi.apiId}/${webSocketStage.stageName}/POST/@connections/*`,
+        ],
+      }),
+    );
+
     // Create API Gateway HTTP API
     // Note: No CORS configuration needed since CloudFront sits in front
     const httpApi = new apigatewayv2.HttpApi(this, "HttpApi", {

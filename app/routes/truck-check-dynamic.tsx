@@ -7,16 +7,15 @@ import {
   useLoaderData,
   useNavigation,
   useRevalidator,
+  useSubmit,
 } from "react-router";
-import {
-  truckCheckSchema,
-  TruckCheckStore,
-} from "~/lib/truck-check/truck-check-store";
+import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
 import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
 import { notifyTruckCheckIssues } from "~/lib/truck-check/issue-notifications";
 import { log } from "~/lib/logger";
 import { compressImage } from "~/lib/truck-check/image-compression";
-import { dismissToast, showToast } from "~/components/toaster";
+import { showToast } from "~/components/toaster";
+import { useTruckCheckSync } from "~/lib/truck-check/use-truck-check-sync";
 import {
   HiOutlineUsers,
   HiOutlineExclamationTriangle,
@@ -103,16 +102,18 @@ export async function loader({ context, params }: Route.LoaderArgs) {
       : await truckCheckSchemaStore.getSchema(truck.schemaId);
 
   const previousContributors = truckCheck.locked
-    ? Object.entries(truckCheck.contributors).map(([userId, contributor]) => ({
-        userId,
-        userName: `${contributor.first_name} ${contributor.last_name}`.trim(),
-      }))
+    ? Object.entries(truckCheck.contributors || {}).map(
+        ([userId, contributor]) => ({
+          userId,
+          userName: `${contributor.first_name} ${contributor.last_name}`.trim(),
+        }),
+      )
     : [];
 
+  const { mutation_streams, ...publicTruckCheck } = truckCheck;
   return {
     user: ctx.user,
-    accessToken: ctx.user.accessToken,
-    truckCheck,
+    truckCheck: publicTruckCheck,
     truck,
     schema,
     previousContributors,
@@ -155,29 +156,59 @@ function getNextTriStateCheckboxValue(value: any): TriStateCheckboxValue {
 }
 
 export default function TruckCheckDynamic() {
-  const { user, accessToken, truckCheck, truck, schema, previousContributors } =
-    useLoaderData<typeof loader>();
+  const loaded = useLoaderData<typeof loader>();
+  return (
+    <TruckCheckDynamicView
+      key={`${loaded.user.user_id}:${loaded.truckCheck.id}`}
+      {...loaded}
+    />
+  );
+}
 
+function TruckCheckDynamicView({
+  user,
+  truckCheck,
+  truck,
+  schema,
+  previousContributors,
+}: Awaited<ReturnType<typeof loader>>) {
   const navigation = useNavigation();
   const revalidator = useRevalidator();
+  const submit = useSubmit();
+  const wsUrl =
+    import.meta.env?.VITE_WEBSOCKET_URL ||
+    "wss://svzzsce7u8.execute-api.us-east-2.amazonaws.com/prod";
+  const sync = useTruckCheckSync({
+    initial: {
+      id: truckCheck.id,
+      userId: user.user_id,
+      revision: truckCheck.revision ?? 0,
+      data: truckCheck.data || {},
+      contributors: truckCheck.contributors || {},
+      locked: truckCheck.locked,
+    },
+    wsUrl,
+    onEvent: handleRealtimeEvent,
+  });
 
   // Set when the server tells us the check was locked while we had it open,
   // so the page goes read-only before the revalidated loader data arrives.
-  const [remotelyLocked, setRemotelyLocked] = useState(false);
-  const isLocked = truckCheck.locked || remotelyLocked;
+  const remotelyLocked = sync.snapshot.locked;
+  const isLocked = truckCheck.locked || remotelyLocked || sync.missing;
   const isCreator = truckCheck.created_by === user.user_id;
   const canDeleteTruckCheck = !isLocked && isCreator;
   const canLockTruckCheck = !isLocked && isCreator;
-  const isLocking = navigation.formData?.get("intent") === "lock";
-
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(
-    isLocked ? "disconnected" : "connecting",
-  );
+  const isLocking =
+    navigation.formData?.get("intent") === "lock" || sync.preparing;
+  const connectionStatus: ConnectionStatus = sync.live;
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
-  const [contributors, setContributors] = useState<ConnectedUser[]>([]);
-  const [fieldValues, setFieldValues] = useState<Record<string, any>>(
-    truckCheck.data || {},
+  const contributors = Object.entries(sync.snapshot.contributors).map(
+    ([userId, name]) => ({
+      userId,
+      userName: `${name.first_name} ${name.last_name}`.trim(),
+    }),
   );
+  const fieldValues = sync.values as Record<string, any>;
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     () =>
       Object.fromEntries(
@@ -195,96 +226,62 @@ export default function TruckCheckDynamic() {
   const [photoUploadStatus, setPhotoUploadStatus] = useState<
     Record<string, { isUploading: boolean; error?: string }>
   >({});
-  const [pendingUpdateCount, setPendingUpdateCount] = useState(0);
-
-  const wsRef = useRef<WebSocket | null>(null);
-  const pendingFieldUpdatesRef = useRef<Map<string, any>>(new Map());
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdateCount = sync.pending.length;
   const lastUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const connectingToastIdRef = useRef<number | null>(null);
-  const hasEverConnectedRef = useRef(false);
-  const stopReconnectRef = useRef(false);
   const lockNoticeShownRef = useRef(false);
   const lockModalRef = useRef<HTMLDialogElement>(null);
   const handledCompletionEventsRef = useRef(new Set<string>());
   const completionSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  const wsUrl =
-    import.meta.env?.VITE_WEBSOCKET_URL ||
-    "wss://svzzsce7u8.execute-api.us-east-2.amazonaws.com/prod";
-
-  if (typeof wsUrl !== "string") {
-    throw new Error("websocket url not defined correctly");
-  }
-
   // Field updates are queued while the socket is down and replayed on rejoin.
   // Taking a photo backgrounds the browser, which drops the connection, so
   // without this the upload finishes and its field update is thrown away.
-  const sendFieldUpdate = useCallback(
-    (fieldId: string, value: any) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            action: "update-field",
-            truckCheckId: truckCheck.id,
-            fieldId,
-            value,
-          }),
-        );
-        return;
-      }
+  const handleFieldChange = sync.edit;
 
-      // Keyed by field so a field edited repeatedly while offline only replays
-      // its latest value, matching the server's last-write-wins per field.
-      pendingFieldUpdatesRef.current.set(fieldId, value);
-      setPendingUpdateCount(pendingFieldUpdatesRef.current.size);
-    },
-    [truckCheck.id],
-  );
-
-  const flushPendingFieldUpdates = useCallback(() => {
-    const pending = pendingFieldUpdatesRef.current;
-    if (pending.size === 0) return;
-
-    const entries = Array.from(pending.entries());
-    pending.clear();
-    setPendingUpdateCount(0);
-
-    for (const [fieldId, value] of entries) {
-      sendFieldUpdate(fieldId, value);
-    }
-  }, [sendFieldUpdate]);
+  // Keyed by field so a field edited repeatedly while offline only replays
+  // its latest value, matching the server's last-write-wins per field.
+  const pendingFields = new Set(sync.pending.map((change) => change.fieldId));
 
   // The server rejects edits as soon as a check is locked. Queued edits are
   // dropped because they can never be accepted anymore.
-  const handleRemoteLock = useCallback(() => {
-    if (lockNoticeShownRef.current) return;
-    lockNoticeShownRef.current = true;
-
-    pendingFieldUpdatesRef.current.clear();
-    setPendingUpdateCount(0);
-    setRemotelyLocked(true);
-    showToast({
-      message: "This truck check was locked and is now view-only.",
-      type: "alert-warning",
-      duration: 8000,
-    });
-    void revalidator.revalidate();
-  }, [revalidator]);
-
-  const handleFieldChange = useCallback(
-    (fieldId: string, value: any) => {
-      if (isLocked) return;
-
-      setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
-      sendFieldUpdate(fieldId, value);
-    },
-    [isLocked, sendFieldUpdate],
+  const rejectedChanges = sync.pending.filter(
+    (change) => isLocked || change.rejected,
   );
+  const uploadingPhotos = Object.values(photoUploadStatus).some(
+    (status) => status.isUploading,
+  );
+  useEffect(() => {
+    if (!uploadingPhotos && !(sync.storageError && pendingUpdateCount > 0))
+      return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [uploadingPhotos, sync.storageError, pendingUpdateCount]);
+  const needsAttention =
+    !!sync.storageError ||
+    sync.authRequired ||
+    sync.missing ||
+    rejectedChanges.length > 0;
+  const saveStatus = needsAttention
+    ? "Needs attention"
+    : !sync.ready
+      ? "Restoring changes..."
+      : uploadingPhotos
+        ? "Uploading photos..."
+        : pendingUpdateCount > 0
+          ? sync.reachable
+            ? `Saving ${pendingUpdateCount} changes...`
+            : `Offline — ${pendingUpdateCount} ${pendingUpdateCount === 1 ? "change" : "changes"} saved on this device`
+          : sync.reachable
+            ? "Saved"
+            : "Offline — checking for updates";
 
   const handlePhotoUpload = useCallback(
     async (fieldId: string, files: FileList | null, maxPhotos?: number) => {
-      if (!files || files.length === 0 || isLocked) {
+      if (!files || files.length === 0 || isLocked || isLocking) {
         return;
       }
 
@@ -337,8 +334,6 @@ export default function TruckCheckDynamic() {
       }));
 
       try {
-        const uploadedUrls: string[] = [];
-
         for (const selectedFile of filesToUpload) {
           const file = await compressImage(selectedFile);
 
@@ -380,11 +375,8 @@ export default function TruckCheckDynamic() {
             throw new Error(`Failed to upload ${file.name}`);
           }
 
-          uploadedUrls.push(fileUrl);
+          sync.addPhoto(fieldId, fileUrl, maxPhotos);
         }
-
-        const updatedUrls = [...currentUrls, ...uploadedUrls];
-        handleFieldChange(fieldId, updatedUrls);
 
         setPhotoUploadStatus((prev) => ({
           ...prev,
@@ -407,213 +399,122 @@ export default function TruckCheckDynamic() {
         }));
       }
     },
-    [isLocked, fieldValues, handleFieldChange, truckCheck.id],
+    [isLocked, isLocking, fieldValues, sync.addPhoto, truckCheck.id],
   );
 
-  const connectWebSocket = useCallback(() => {
-    const url = new URL(wsUrl);
-    url.searchParams.set("access_token", accessToken);
-
-    try {
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log("WebSocket connected");
-        setConnectionStatus("connected");
-        hasEverConnectedRef.current = true;
-        ws.send(
-          JSON.stringify({
-            action: "join-truck-check",
-            truckCheckId: truckCheck.id,
-          }),
-        );
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          switch (data.type) {
-            case "truck-check-joined":
-              setFieldValues((prev) => ({
-                ...prev,
-                ...data.truckCheckData,
-                // Queued edits win over the server snapshot, which predates
-                // them, unless the check was locked while we were away.
-                ...(data.locked
-                  ? {}
-                  : Object.fromEntries(pendingFieldUpdatesRef.current)),
-              }));
-              setConnectedUsers(data.connectedUsers || []);
-              setContributors(data.contributors || []);
-              if (data.locked) {
-                handleRemoteLock();
-                break;
-              }
-              flushPendingFieldUpdates();
-              break;
-
-            case "truck-check-locked":
-              handleRemoteLock();
-              break;
-
-            case "user-joined":
-              setConnectedUsers(data.connectedUsers || []);
-              setContributors(data.contributors || []);
-              if (data.userId !== user.user_id) {
-                showToast({
-                  message: `${data.userName || "Someone"} joined.`,
-                  type: "alert-info",
-                  duration: 5000,
-                });
-              }
-              break;
-
-            case "user-left":
-              setConnectedUsers(data.connectedUsers || []);
-              break;
-
-            case "contributors-updated":
-              setContributors(data.contributors || []);
-              break;
-
-            case "truck-check-completed": {
-              const eventId =
-                typeof data.eventId === "string" ? data.eventId : null;
-              if (eventId && handledCompletionEventsRef.current.has(eventId)) {
-                break;
-              }
-              if (eventId) {
-                handledCompletionEventsRef.current.add(eventId);
-                if (handledCompletionEventsRef.current.size > 20) {
-                  const oldestEventId = handledCompletionEventsRef.current
-                    .values()
-                    .next().value;
-                  if (oldestEventId) {
-                    handledCompletionEventsRef.current.delete(oldestEventId);
-                  }
-                }
-              }
-
-              const prefersReducedMotion = window.matchMedia(
-                "(prefers-reduced-motion: reduce)",
-              ).matches;
-              if (!prefersReducedMotion) {
-                const colors = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626"];
-                const duration = 15 * 1000;
-                const animationEnd = Date.now() + duration;
-                const defaults = {
-                  startVelocity: 30,
-                  spread: 360,
-                  ticks: 60,
-                  zIndex: 0,
-                  colors,
-                };
-                const randomInRange = (min: number, max: number) =>
-                  Math.random() * (max - min) + min;
-                const interval = setInterval(() => {
-                  const timeLeft = animationEnd - Date.now();
-                  if (timeLeft <= 0) {
-                    clearInterval(interval);
-                    return;
-                  }
-                  const particleCount = 50 * (timeLeft / duration);
-                  confetti({
-                    ...defaults,
-                    particleCount,
-                    origin: {
-                      x: randomInRange(0.1, 0.3),
-                      y: Math.random() - 0.2,
-                    },
-                  });
-                  confetti({
-                    ...defaults,
-                    particleCount,
-                    origin: {
-                      x: randomInRange(0.7, 0.9),
-                      y: Math.random() - 0.2,
-                    },
-                  });
-                }, 250);
-              }
-              if (completionSoundRef.current) {
-                completionSoundRef.current.currentTime = 0;
-                void completionSoundRef.current.play().catch(() => {});
-              }
-              showToast({
-                message: `${data.completedByName || "Someone"} completed the truck check!`,
-                type: "alert-success",
-                duration: 6000,
-              });
-              break;
-            }
-
-            case "field-update":
-              setFieldValues((prev) => {
-                if (data.fieldId) {
-                  return {
-                    ...prev,
-                    [data.fieldId]: data.value,
-                  };
-                }
-
-                return prev;
-              });
-              setLastUpdate({
-                fieldId: data.fieldId,
-                userName: data.updatedByName,
-              });
-              if (lastUpdateTimeoutRef.current) {
-                clearTimeout(lastUpdateTimeoutRef.current);
-              }
-              lastUpdateTimeoutRef.current = setTimeout(() => {
-                setLastUpdate(null);
-              }, 3000);
-              break;
-          }
-        } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
+  function handleRealtimeEvent(data: any) {
+    // Queued edits win over the server snapshot, which predates
+    // them, unless the check was locked while we were away.
+    switch (data.type) {
+      case "truck-check-joined":
+      case "user-joined":
+      case "user-left":
+        setConnectedUsers(data.connectedUsers || []);
+        break;
+      case "truck-check-completed": {
+        const eventId = typeof data.eventId === "string" ? data.eventId : null;
+        if (eventId && handledCompletionEventsRef.current.has(eventId)) {
+          break;
         }
-      };
+        if (eventId) {
+          handledCompletionEventsRef.current.add(eventId);
+          if (handledCompletionEventsRef.current.size > 20) {
+            const oldestEventId = handledCompletionEventsRef.current
+              .values()
+              .next().value;
+            if (oldestEventId) {
+              handledCompletionEventsRef.current.delete(oldestEventId);
+            }
+          }
+        }
 
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setConnectionStatus("error");
-      };
+        const prefersReducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        if (!prefersReducedMotion) {
+          const colors = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626"];
+          const duration = 15 * 1000;
+          const animationEnd = Date.now() + duration;
+          const defaults = {
+            startVelocity: 30,
+            spread: 360,
+            ticks: 60,
+            zIndex: 0,
+            colors,
+          };
+          const randomInRange = (min: number, max: number) =>
+            Math.random() * (max - min) + min;
+          const interval = setInterval(() => {
+            const timeLeft = animationEnd - Date.now();
+            if (timeLeft <= 0) {
+              clearInterval(interval);
+              return;
+            }
+            const particleCount = 50 * (timeLeft / duration);
+            confetti({
+              ...defaults,
+              particleCount,
+              origin: {
+                x: randomInRange(0.1, 0.3),
+                y: Math.random() - 0.2,
+              },
+            });
+            confetti({
+              ...defaults,
+              particleCount,
+              origin: {
+                x: randomInRange(0.7, 0.9),
+                y: Math.random() - 0.2,
+              },
+            });
+          }, 250);
+        }
+        if (completionSoundRef.current) {
+          completionSoundRef.current.currentTime = 0;
+          void completionSoundRef.current.play().catch(() => {});
+        }
+        showToast({
+          message: `${data.completedByName || "Someone"} completed the truck check!`,
+          type: "alert-success",
+          duration: 6000,
+        });
+        break;
+      }
 
-      ws.onclose = () => {
-        console.log("WebSocket disconnected");
-        setConnectionStatus("disconnected");
-        if (stopReconnectRef.current) return;
-        reconnectTimeoutRef.current = setTimeout(() => {
-          console.log("Attempting to reconnect...");
-          connectWebSocket();
-        }, 3000);
-      };
-    } catch (error) {
-      console.error("Error creating WebSocket:", error);
-      setConnectionStatus("error");
+      case "field-update":
+        if (
+          data.updatedBy === user.user_id ||
+          (typeof data.revision === "number" &&
+            data.revision < sync.snapshot.revision)
+        )
+          break;
+        setLastUpdate({ fieldId: data.fieldId, userName: data.updatedByName });
+        if (lastUpdateTimeoutRef.current)
+          clearTimeout(lastUpdateTimeoutRef.current);
+        lastUpdateTimeoutRef.current = setTimeout(
+          () => setLastUpdate(null),
+          3000,
+        );
+        break;
     }
-  }, [
-    wsUrl,
-    accessToken,
-    truckCheck.id,
-    flushPendingFieldUpdates,
-    handleRemoteLock,
-  ]);
+  }
 
   // Once locked there is nothing left to sync, so drop the socket for good
   useEffect(() => {
-    if (!isLocked) return;
-
-    stopReconnectRef.current = true;
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    if (
+      sync.snapshot.locked &&
+      !truckCheck.locked &&
+      !lockNoticeShownRef.current
+    ) {
+      lockNoticeShownRef.current = true;
+      showToast({
+        message: "This truck check was locked and is now view-only.",
+        type: "alert-warning",
+        duration: 8000,
+      });
+      void revalidator.revalidate();
     }
-    wsRef.current?.close();
-  }, [isLocked]);
+  }, [sync.snapshot.locked, truckCheck.locked, revalidator]);
 
   useEffect(() => {
     completionSoundRef.current = new Audio(
@@ -629,56 +530,17 @@ export default function TruckCheckDynamic() {
     };
   }, []);
 
-  useEffect(() => {
-    if (isLocked) return;
-
-    connectWebSocket();
-
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (lastUpdateTimeoutRef.current) {
+  useEffect(
+    () => () => {
+      if (lastUpdateTimeoutRef.current)
         clearTimeout(lastUpdateTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (connectionStatus === "connected" || isLocked) {
-      if (connectingToastIdRef.current !== null) {
-        dismissToast(connectingToastIdRef.current);
-        connectingToastIdRef.current = null;
-      }
-      return;
-    }
-
-    if (connectingToastIdRef.current === null) {
-      const id = showToast({
-        message: hasEverConnectedRef.current
-          ? "Connection lost. Reconnecting..."
-          : "Connecting...",
-        type: hasEverConnectedRef.current ? "alert-warning" : "alert-info",
-        isLoading: true,
-        duration: null,
-      });
-      if (typeof id === "number") {
-        connectingToastIdRef.current = id;
-      }
-    }
-  }, [connectionStatus, isLocked]);
-
-  useEffect(() => {
-    return () => {
-      if (connectingToastIdRef.current !== null) {
-        dismissToast(connectingToastIdRef.current);
-        connectingToastIdRef.current = null;
-      }
-    };
-  }, []);
+    if (connectionStatus !== "connected") setConnectedUsers([]);
+  }, [connectionStatus]);
 
   useEffect(() => {
     if (!pendingJumpTarget) return;
@@ -708,7 +570,7 @@ export default function TruckCheckDynamic() {
   const statusConfig = {
     connected: {
       color: "bg-green-500",
-      text: "Connected",
+      text: "Live updates connected",
       pulse: false,
     },
     connecting: {
@@ -718,7 +580,7 @@ export default function TruckCheckDynamic() {
     },
     disconnected: {
       color: "bg-orange-500",
-      text: "Reconnecting...",
+      text: "Live updates reconnecting",
       pulse: true,
     },
     error: {
@@ -838,8 +700,18 @@ export default function TruckCheckDynamic() {
     const fieldId = getFieldId(sectionId, field.label);
     const value = fieldValues[fieldId];
     const isRemoteUpdate = lastUpdate?.fieldId === fieldId;
-    const fieldDisabled = isLocked;
-    const fieldContainerClass = `form-control rounded-lg border border-base-300 p-2 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`;
+    const fieldDisabled = isLocked || !sync.ready || isLocking;
+    const fieldContainerClass = `form-control relative rounded-lg border border-base-300 p-2 pr-6 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`;
+    const isPending = pendingFields.has(fieldId) && !isLocked;
+    const pendingIndicator = (
+      <span
+        role="img"
+        aria-label={`${field.label}: Pending save`}
+        aria-hidden={!isPending}
+        title={isPending ? "Pending save" : undefined}
+        className={`bg-warning absolute top-3 right-2 h-1.5 w-1.5 rounded-full transition-opacity duration-200 motion-reduce:transition-none ${isPending ? "opacity-70" : "opacity-0"}`}
+      />
+    );
 
     switch (field.type) {
       case "checkbox": {
@@ -866,6 +738,7 @@ export default function TruckCheckDynamic() {
 
         return (
           <div key={fieldId} className={fieldContainerClass}>
+            {pendingIndicator}
             <div className="label justify-start gap-3">
               <button
                 id={fieldId}
@@ -908,6 +781,7 @@ export default function TruckCheckDynamic() {
       case "text":
         return (
           <div key={fieldId} className={fieldContainerClass}>
+            {pendingIndicator}
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -942,6 +816,7 @@ export default function TruckCheckDynamic() {
       case "number":
         return (
           <div key={fieldId} className={fieldContainerClass}>
+            {pendingIndicator}
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -988,6 +863,7 @@ export default function TruckCheckDynamic() {
       case "select":
         return (
           <div key={fieldId} className={fieldContainerClass}>
+            {pendingIndicator}
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -1035,6 +911,7 @@ export default function TruckCheckDynamic() {
 
         return (
           <div key={fieldId} className={fieldContainerClass}>
+            {pendingIndicator}
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -1216,9 +1093,7 @@ export default function TruckCheckDynamic() {
                   className={`flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                     connectionStatus === "connected"
                       ? "bg-success/10 text-success"
-                      : connectionStatus === "error"
-                        ? "bg-error/10 text-error"
-                        : "bg-warning/10 text-warning"
+                      : "bg-warning/10 text-warning"
                   }`}
                 >
                   <span className="relative flex h-3 w-3">
@@ -1324,14 +1199,70 @@ export default function TruckCheckDynamic() {
         </div>
       )}
 
-      {connectionStatus !== "connected" && !truckCheck.locked && (
+      {(needsAttention || (!sync.reachable && !isLocked)) && (
         <div className="alert alert-warning mb-6">
           <HiOutlineExclamationTriangle className="h-6 w-6 shrink-0" />
-          <span>
-            {pendingUpdateCount > 0
-              ? `${pendingUpdateCount} ${pendingUpdateCount === 1 ? "change" : "changes"} waiting to sync. Keep this page open until you reconnect.`
-              : "You can keep working. Changes will sync when you reconnect."}
-          </span>
+          <div>
+            <p>
+              {sync.storageError ||
+                sync.error ||
+                "You can keep working. Changes will save automatically when connectivity returns."}
+            </p>
+            {sync.authRequired && (
+              <a
+                className="link"
+                href={`/auth/login?redirectTo=${encodeURIComponent(`/truck-checks/${truckCheck.id}`)}`}
+              >
+                Sign in to resume saving
+              </a>
+            )}
+            {!sync.missing && (
+              <button
+                type="button"
+                className="btn btn-sm ml-2"
+                onClick={sync.retry}
+              >
+                Retry sync
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {rejectedChanges.length > 0 && (
+        <div className="border-warning mb-6 rounded border p-4">
+          <h2 className="font-semibold">Unsaved changes on this device</h2>
+          <p className="text-sm">
+            These changes are not in the saved check. Review or copy them before
+            dismissing.
+          </p>
+          <ul className="space-y-2">
+            {rejectedChanges.map((change) => (
+              <li
+                key={`${change.clientId}:${change.sequence}`}
+                className="text-sm break-words"
+              >
+                <strong>{change.fieldId}</strong>:{" "}
+                <span className="select-text">
+                  {JSON.stringify(change.value)}
+                </span>
+                {change.rejected && <p>{change.rejected}</p>}
+                <button
+                  type="button"
+                  className="btn btn-xs ml-2"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Dismiss this unsaved change from this device?",
+                      )
+                    )
+                      sync.dismiss(change);
+                  }}
+                >
+                  Dismiss
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -1470,6 +1401,17 @@ export default function TruckCheckDynamic() {
               cannot be unlocked or deleted afterwards, and any reported issues
               are emailed to subscribers right away.
             </p>
+            <p className="mb-3 text-sm">
+              This device must finish saving before locking. Another
+              disconnected phone may still have unsent changes; confirm everyone
+              is finished first.
+            </p>
+            {uploadingPhotos && (
+              <p className="text-warning">
+                Waiting for photo uploads to finish.
+              </p>
+            )}
+            {sync.error && <p className="text-warning">{sync.error}</p>}
             {requiredTotal - filledRequiredCount > 0 && (
               <div className="alert alert-warning">
                 <HiOutlineExclamationTriangle className="h-5 w-5 shrink-0" />
@@ -1492,12 +1434,20 @@ export default function TruckCheckDynamic() {
               >
                 Cancel
               </button>
-              <Form method="post">
+              <Form
+                method="post"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  const form = event.currentTarget;
+                  if (!uploadingPhotos && (await sync.prepareLock()))
+                    void submit(form, { method: "post" });
+                }}
+              >
                 <input type="hidden" name="intent" value="lock" />
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={isLocking}
+                  disabled={isLocking || uploadingPhotos || !sync.ready}
                 >
                   {isLocking && (
                     <span className="loading loading-spinner loading-sm" />
@@ -1515,6 +1465,15 @@ export default function TruckCheckDynamic() {
 
       {/* Sticky Action Bar */}
       <div className="bg-base-100/80 fixed right-0 bottom-0 left-0 z-10 border-t backdrop-blur-sm">
+        {(!isLocked || pendingUpdateCount > 0) && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`px-4 pt-2 text-center text-xs ${needsAttention || pendingUpdateCount > 0 ? "text-warning" : "text-success"}`}
+          >
+            {saveStatus}
+          </div>
+        )}
         <div className="container mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
           {isLocked ? (
             <>

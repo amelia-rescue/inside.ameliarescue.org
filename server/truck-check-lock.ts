@@ -26,17 +26,20 @@ export const handler: ScheduledHandler = async (event) => {
   }
 
   try {
-    const result = await docClient.send(
-      new ScanCommand({
-        TableName: tableName,
-        FilterExpression: "locked = :unlocked",
-        ExpressionAttributeValues: {
-          ":unlocked": false,
-        },
-      }),
-    );
-
-    const truckChecks = result.Items || [];
+    const truckChecks: Record<string, any>[] = [];
+    let key: Record<string, any> | undefined;
+    do {
+      const result = await docClient.send(
+        new ScanCommand({
+          TableName: tableName,
+          FilterExpression: "locked = :unlocked",
+          ExpressionAttributeValues: { ":unlocked": false },
+          ExclusiveStartKey: key,
+        }),
+      );
+      truckChecks.push(...(result.Items || []));
+      key = result.LastEvaluatedKey;
+    } while (key);
     const now = Date.now();
     const lockedChecks: NotifiableTruckCheck[] = [];
 
@@ -45,22 +48,38 @@ export const handler: ScheduledHandler = async (event) => {
       const age = now - createdAt;
 
       if (age > LOCK_AGE_MS) {
-        await docClient.send(
-          new UpdateCommand({
-            TableName: tableName,
-            Key: { id: check.id },
-            UpdateExpression: "SET locked = :locked, updated_at = :now",
-            ExpressionAttributeValues: {
-              ":locked": true,
-              ":now": new Date().toISOString(),
-            },
-          }),
-        );
+        const locked = await docClient
+          .send(
+            new UpdateCommand({
+              TableName: tableName,
+              Key: { id: check.id },
+              ConditionExpression:
+                "attribute_exists(id) AND locked = :unlocked",
+              UpdateExpression:
+                "SET locked = :locked, updated_at = :now ADD revision :one",
+              ExpressionAttributeValues: {
+                ":locked": true,
+                ":unlocked": false,
+                ":one": 1,
+                ":now": new Date().toISOString(),
+              },
+              ReturnValues: "ALL_NEW",
+            }),
+          )
+          .catch((error: unknown) => {
+            if (
+              error instanceof Error &&
+              error.name === "ConditionalCheckFailedException"
+            )
+              return null;
+            throw error;
+          });
+        if (!locked?.Attributes) continue;
 
         log.info(
           `Locked truck check ${check.id} (created ${check.created_at})`,
         );
-        lockedChecks.push(check as NotifiableTruckCheck);
+        lockedChecks.push(locked.Attributes as NotifiableTruckCheck);
       }
     }
 

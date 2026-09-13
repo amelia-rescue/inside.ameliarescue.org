@@ -33,6 +33,159 @@ describe("truck check store test", () => {
     await teardownDynamo(dynamo);
   });
 
+  it("merges concurrent mutations and does not reapply a retry after another user edits", async () => {
+    const store = TruckCheckStore.make();
+    const check = await store.createTruckCheck({
+      created_by: "a",
+      truck: "Medic",
+      data: {},
+      contributors: {},
+      locked: false,
+    });
+    const mutation = (
+      userId: string,
+      fieldId: string,
+      value: unknown,
+      sequence = 1,
+    ) => ({
+      id: check.id,
+      userId,
+      fieldId,
+      value,
+      clientId: `${userId}-client`,
+      sequence,
+      contributor: { first_name: userId, last_name: "Test" },
+    });
+    await Promise.all([
+      store.applyFieldMutation(mutation("a", "oxygen", true)),
+      store.applyFieldMutation(mutation("b", "fuel", "full")),
+      store.applyFieldMutation(mutation("c", "tires", true)),
+    ]);
+    const saved = await store.getTruckCheck(check.id);
+    expect(saved.data).toEqual({ oxygen: true, fuel: "full", tires: true });
+    expect(saved.revision).toBe(3);
+    expect(Object.keys(saved.contributors).sort()).toEqual(["a", "b", "c"]);
+    await store.applyFieldMutation(mutation("b", "oxygen", "not-present", 2));
+    const retry = await store.applyFieldMutation(mutation("a", "oxygen", true));
+    expect(retry.duplicate).toBe(true);
+    expect(retry.check.data.oxygen).toBe("not-present");
+    expect(retry.check.revision).toBe(4);
+    await store.lockTruckCheck({ id: check.id, userId: "a" });
+    expect(
+      (await store.applyFieldMutation(mutation("a", "oxygen", true))).duplicate,
+    ).toBe(true);
+    await expect(
+      store.applyFieldMutation(mutation("a", "oxygen", null, 2)),
+    ).rejects.toThrow("locked");
+    await expect(
+      store.updateTruckCheckField({
+        id: check.id,
+        fieldId: "fuel",
+        value: "empty",
+      }),
+    ).rejects.toThrow("locked");
+  });
+
+  it("initializes legacy mutation metadata and rejects mutations on missing checks", async () => {
+    const store = TruckCheckStore.make();
+    const client = DynamoDBDocumentClient.from(
+      new DynamoDBClient({
+        endpoint: DYNALITE_ENDPOINT,
+        region: "local",
+        credentials: { accessKeyId: "local", secretAccessKey: "local" },
+      }),
+    );
+    await client.send(
+      new PutCommand({
+        TableName: "aes_truck_checks",
+        Item: {
+          id: "legacy",
+          created_by: "a",
+          truck: "Medic",
+          data: {},
+          locked: false,
+        },
+      }),
+    );
+    const mutation = {
+      id: "legacy",
+      userId: "a",
+      clientId: "client",
+      sequence: 1,
+      fieldId: "oxygen",
+      value: true,
+      contributor: { first_name: "A", last_name: "Test" },
+    };
+    const result = await store.applyFieldMutation(mutation);
+    expect(result.check.revision).toBe(1);
+    expect(result.check.contributors.a.first_name).toBe("A");
+    await expect(
+      store.applyFieldMutation({ ...mutation, id: "missing" }),
+    ).rejects.toBeInstanceOf(TruckCheckNotFound);
+  });
+
+  it("deduplicates simultaneous delivery and atomically orders a write against a lock", async () => {
+    const store = TruckCheckStore.make();
+    const check = await store.createTruckCheck({
+      created_by: "a",
+      truck: "Medic",
+      data: {},
+      contributors: {},
+      locked: false,
+    });
+    const mutation = {
+      id: check.id,
+      userId: "a",
+      clientId: "client",
+      sequence: 1,
+      fieldId: "oxygen",
+      value: true,
+      contributor: { first_name: "A", last_name: "Test" },
+    };
+    const duplicates = await Promise.all([
+      store.applyFieldMutation(mutation),
+      store.applyFieldMutation(mutation),
+    ]);
+    expect(duplicates.filter((result) => result.duplicate)).toHaveLength(1);
+    expect((await store.getTruckCheck(check.id)).revision).toBe(1);
+    const [write, lock] = await Promise.allSettled([
+      store.applyFieldMutation({ ...mutation, sequence: 2, fieldId: "tires" }),
+      store.lockTruckCheck({ id: check.id, userId: "a" }),
+    ]);
+    expect(lock.status).toBe("fulfilled");
+    const locked = await store.getTruckCheck(check.id);
+    expect(locked.locked).toBe(true);
+    expect(locked.data.tires).toBe(
+      write.status === "fulfilled" ? true : undefined,
+    );
+    expect(locked.revision).toBe(write.status === "fulfilled" ? 3 : 2);
+    await expect(store.deleteTruckCheck(check.id)).rejects.toThrow();
+    expect((await store.getTruckCheck(check.id)).locked).toBe(true);
+  });
+
+  it("rejects excessive record growth without modifying the check", async () => {
+    const store = TruckCheckStore.make();
+    const check = await store.createTruckCheck({
+      created_by: "a",
+      truck: "Medic",
+      data: {},
+      contributors: {},
+      locked: false,
+    });
+    await expect(
+      store.applyFieldMutation({
+        id: check.id,
+        userId: "a",
+        clientId: "client",
+        sequence: 1,
+        fieldId: "notes",
+        value: "x".repeat(310000),
+        contributor: { first_name: "A", last_name: "Test" },
+      }),
+    ).rejects.toThrow("storage limit");
+    expect((await store.getTruckCheck(check.id)).data).toEqual({});
+  });
+
   it("should be able to create and get a truck check", async () => {
     const store = TruckCheckStore.make();
 
