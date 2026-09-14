@@ -63,7 +63,7 @@ export class CdkStack extends cdk.Stack {
       this,
       "OperationalAlarmsTopic",
       {
-        topicName: "inside-amelia-rescue-operational-alarms",
+        topicName: "inside-amelia-rescue-operational-alarms-v2",
         displayName: "inside.ameliarescue.org operational alarms",
       },
     );
