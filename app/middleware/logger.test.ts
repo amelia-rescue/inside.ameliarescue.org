@@ -70,4 +70,111 @@ describe("requestLogger", () => {
       expect.objectContaining({ status: 500 }),
     );
   });
+
+  it("logs form body params and leaves the body readable for handlers", async () => {
+    const formRequest = new Request("https://example.test/profile", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "name=Sam&phone=555-1234",
+    });
+    const response = new Response(null, { status: 200 });
+
+    await requestLogger(
+      { request: formRequest, context } as any,
+      vi.fn(async () => {
+        expect(await formRequest.text()).toBe("name=Sam&phone=555-1234");
+        return response;
+      }),
+    );
+
+    expect(log.info).toHaveBeenCalledWith(
+      "request_log",
+      expect.objectContaining({
+        status: 200,
+        body: { name: "Sam", phone: "555-1234" },
+      }),
+    );
+  });
+
+  it("logs redacted JSON body params", async () => {
+    const jsonRequest = new Request("https://example.test/api", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        user_id: "user-1",
+        password: "hunter2",
+        nested: { access_token: "abc123", keep: "me" },
+      }),
+    });
+    const response = new Response(null, { status: 500 });
+
+    await requestLogger(
+      { request: jsonRequest, context } as any,
+      vi.fn(async () => response),
+    );
+
+    expect(log.error).toHaveBeenCalledWith(
+      "request_log",
+      expect.objectContaining({
+        status: 500,
+        body: {
+          user_id: "user-1",
+          password: "[redacted]",
+          nested: { access_token: "[redacted]", keep: "me" },
+        },
+      }),
+    );
+  });
+
+  it("logs multipart file fields as metadata only", async () => {
+    const formData = new FormData();
+    formData.append("intent", "upload");
+    formData.append(
+      "attachment",
+      new File(["file-bytes"], "photo.png", { type: "image/png" }),
+    );
+    const multipartRequest = new Request("https://example.test/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const response = new Response(null, { status: 200 });
+
+    await requestLogger(
+      { request: multipartRequest, context } as any,
+      vi.fn(async () => response),
+    );
+
+    expect(log.info).toHaveBeenCalledWith(
+      "request_log",
+      expect.objectContaining({
+        body: {
+          intent: "upload",
+          attachment: {
+            name: "photo.png",
+            type: "image/png",
+            size: 10,
+          },
+        },
+      }),
+    );
+  });
+
+  it("still logs the request when the body cannot be parsed", async () => {
+    const malformedRequest = new Request("https://example.test/api", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    });
+    const response = new Response(null, { status: 200 });
+
+    await requestLogger(
+      { request: malformedRequest, context } as any,
+      vi.fn(async () => response),
+    );
+
+    expect(log.info).toHaveBeenCalledWith(
+      "request_log",
+      expect.objectContaining({ status: 200, path: "/api" }),
+    );
+  });
 });
