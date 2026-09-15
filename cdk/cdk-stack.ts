@@ -1178,6 +1178,36 @@ export class CdkStack extends cdk.Stack {
       description: "API Gateway for React Router Lambda",
     });
 
+    const httpApiAccessLogGroup = new logs.LogGroup(this, "HttpApiAccessLogs", {
+      logGroupName: "/aws/apigateway/inside-amelia-rescue-api/access-logs",
+      retention: logs.RetentionDays.ONE_YEAR,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const httpApiDefaultStage = httpApi.defaultStage?.node
+      .defaultChild as apigatewayv2.CfnStage;
+    httpApiDefaultStage.accessLogSettings = {
+      destinationArn: httpApiAccessLogGroup.logGroupArn,
+      format: JSON.stringify({
+        requestId: "$context.requestId",
+        extendedRequestId: "$context.extendedRequestId",
+        ip: "$context.identity.sourceIp",
+        requestTime: "$context.requestTime",
+        httpMethod: "$context.httpMethod",
+        routeKey: "$context.routeKey",
+        path: "$context.path",
+        protocol: "$context.protocol",
+        status: "$context.status",
+        responseLength: "$context.responseLength",
+        integrationStatus: "$context.integration.integrationStatus",
+        integrationStatusCode: "$context.integration.status",
+        integrationLatency: "$context.integration.latency",
+        integrationError: "$context.integration.error",
+        errorMessage: "$context.error.message",
+        errorResponseType: "$context.error.responseType",
+      }),
+    };
+
     // Create Lambda integration
     const lambdaIntegration =
       new apigatewayv2Integrations.HttpLambdaIntegration(
