@@ -3,6 +3,7 @@ import {
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
 import { instrumentAwsSdkClient } from "./aws-xray.server";
+import { log } from "./logger";
 
 const client = instrumentAwsSdkClient(new SecretsManagerClient({}));
 
@@ -49,10 +50,10 @@ export async function getSessionSecret(): Promise<string> {
 
     return cachedSessionSecret;
   } catch (error) {
-    console.error(
-      "Failed to retrieve session secret from Secrets Manager:",
-      error,
-    );
+    log.error("Failed to retrieve session secret from Secrets Manager", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     throw error;
   }
 }

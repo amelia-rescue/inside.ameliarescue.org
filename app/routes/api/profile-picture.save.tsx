@@ -2,6 +2,7 @@ import { data } from "react-router";
 import type { Route } from "./+types/profile-picture.save";
 import { UserStore } from "~/lib/user-store";
 import { requireSelfOrAdmin } from "~/lib/authorize.server";
+import { log } from "~/lib/logger";
 
 export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
@@ -23,7 +24,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     return data({ success: true });
   } catch (error) {
-    console.error("Error saving profile picture:", error);
+    log.error("Error saving profile picture", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return data({ error: "Failed to save profile picture" }, { status: 500 });
   }
 }

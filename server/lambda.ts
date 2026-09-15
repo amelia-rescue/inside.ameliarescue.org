@@ -4,6 +4,7 @@ import type {
   Context,
 } from "aws-lambda";
 import { createRequestHandler } from "@react-router/architect";
+import { getXrayTraceId, runWithLogContext } from "~/lib/logger-context.server";
 // @ts-expect-error - Build artifact generated at build time
 import * as build from "../build/server/index.js";
 
@@ -26,13 +27,23 @@ export const handler = async (
   event: APIGatewayProxyEventV2,
   context: Context,
 ): Promise<APIGatewayProxyResultV2> =>
-  (await requestHandler(
-    publicHost
-      ? {
-          ...event,
-          requestContext: { ...event.requestContext, domainName: publicHost },
-        }
-      : event,
-    context,
-    () => {},
-  )) as APIGatewayProxyResultV2;
+  runWithLogContext(
+    {
+      requestId: context.awsRequestId,
+      xrayTraceId: getXrayTraceId(),
+    },
+    async () =>
+      (await requestHandler(
+        publicHost
+          ? {
+              ...event,
+              requestContext: {
+                ...event.requestContext,
+                domainName: publicHost,
+              },
+            }
+          : event,
+        context,
+        () => {},
+      )) as APIGatewayProxyResultV2,
+  );

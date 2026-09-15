@@ -2,6 +2,7 @@ import { data } from "react-router";
 import type { Route } from "./+types/certifications.get-upload-url";
 import { S3Helper } from "~/lib/s3-helper";
 import { requireSelfOrAdmin } from "~/lib/authorize.server";
+import { log } from "~/lib/logger";
 
 // Matches the accept list on the upload form. The extension is derived from the
 // content type so a client cannot smuggle an arbitrary one into the key.
@@ -49,7 +50,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       certificationId,
     });
   } catch (error) {
-    console.error("Error generating pre-signed URL:", error);
+    log.error("Error generating pre-signed URL", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return data({ error: "Failed to generate upload URL" }, { status: 500 });
   }
 }

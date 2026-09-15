@@ -12,7 +12,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // Handle OAuth errors
   if (error) {
-    console.error("OAuth error:", error);
+    log.error("OAuth error", { error });
     return redirect("/auth/login?error=" + encodeURIComponent(error));
   }
 
@@ -78,7 +78,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       redirectTo,
     );
   } catch (error) {
-    console.error("Auth callback error:", error);
+    log.error("Auth callback error", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return redirect("/auth/login?error=authentication_failed");
   }
 }

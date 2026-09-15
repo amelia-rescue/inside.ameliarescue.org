@@ -1,6 +1,7 @@
 import { data, type ActionFunctionArgs } from "react-router";
 import { S3Helper } from "~/lib/s3-helper";
 import { requireAdmin } from "~/lib/authorize.server";
+import { log } from "~/lib/logger";
 
 export async function action({ request, context }: ActionFunctionArgs) {
   requireAdmin(context);
@@ -23,7 +24,10 @@ export async function action({ request, context }: ActionFunctionArgs) {
     await s3.deleteObject(key);
     return data({ success: true });
   } catch (error) {
-    console.error("Error deleting document:", error);
+    log.error("Error deleting document", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return data({ error: "Failed to delete document" }, { status: 500 });
   }
 }

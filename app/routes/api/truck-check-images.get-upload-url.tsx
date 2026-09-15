@@ -1,5 +1,6 @@
 import { data } from "react-router";
 import type { Route } from "./+types/truck-check-images.get-upload-url";
+import { log } from "~/lib/logger";
 import { S3Helper } from "~/lib/s3-helper";
 
 const ALLOWED_IMAGE_TYPES = [
@@ -73,7 +74,10 @@ export async function action({ request }: Route.ActionArgs) {
       key,
     });
   } catch (error) {
-    console.error("Error generating truck-check image upload URL:", error);
+    log.error("Error generating truck-check image upload URL", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return data({ error: "Failed to generate upload URL" }, { status: 500 });
   }
 }

@@ -12,6 +12,7 @@ import {
   listWebAuthnCredentials,
   deleteWebAuthnCredential,
 } from "~/lib/auth.server";
+import { log } from "~/lib/logger";
 import { requireUser } from "~/lib/session.server";
 import { DateDisplay } from "~/components/date-display";
 
@@ -34,7 +35,10 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     const result = await listWebAuthnCredentials(sessionUser.accessToken);
     passkeys = result.Credentials;
   } catch (error) {
-    console.error("Failed to fetch passkeys:", error);
+    log.error("Failed to fetch passkeys", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
   }
 
   return { user: ctx.user, passkeys };
@@ -50,7 +54,10 @@ export async function action({ request }: Route.ActionArgs) {
     try {
       await deleteWebAuthnCredential(sessionUser.accessToken, credentialId);
     } catch (error) {
-      console.error("Failed to delete passkey:", error);
+      log.error("Failed to delete passkey", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw new Error("Failed to delete passkey");
     }
   }
