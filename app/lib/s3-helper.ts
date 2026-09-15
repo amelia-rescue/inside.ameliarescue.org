@@ -7,6 +7,7 @@ import {
   ListObjectVersionsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { instrumentAwsSdkClient } from "./aws-xray.server";
 
 export class S3Helper {
   private client: S3Client;
@@ -20,7 +21,7 @@ export class S3Helper {
   }
 
   static make(): S3Helper {
-    const client = new S3Client({});
+    const client = instrumentAwsSdkClient(new S3Client({}));
     const bucketName = process.env.FILE_UPLOADS_BUCKET_NAME!;
     const cloudFrontDomain = process.env.FILE_CDN_URL!;
     return new S3Helper(client, bucketName, cloudFrontDomain);

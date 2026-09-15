@@ -7,6 +7,7 @@ import {
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
+import { instrumentAwsSdkClient } from "./aws-xray.server";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
 export const SessionSchema = type({
@@ -53,7 +54,9 @@ export class SessionStore {
             }
           : {},
       );
-      SessionStore.client = DynamoDBDocumentClient.from(dynamoDbClient);
+      SessionStore.client = instrumentAwsSdkClient(
+        DynamoDBDocumentClient.from(dynamoDbClient),
+      );
     }
     return new SessionStore();
   }

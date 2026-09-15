@@ -5,6 +5,7 @@ import {
   GetCommand,
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { instrumentAwsSdkClient } from "../aws-xray.server";
 import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 
 export interface CertificationSnapshot {
@@ -69,8 +70,9 @@ export class CertificationSnapshotStore {
             }
           : {},
       );
-      CertificationSnapshotStore.client =
-        DynamoDBDocumentClient.from(dynamoDbClient);
+      CertificationSnapshotStore.client = instrumentAwsSdkClient(
+        DynamoDBDocumentClient.from(dynamoDbClient),
+      );
     }
     return new CertificationSnapshotStore();
   }

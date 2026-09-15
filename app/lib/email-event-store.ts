@@ -7,6 +7,7 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
+import { instrumentAwsSdkClient } from "./aws-xray.server";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
 export interface EmailEventHistory {
@@ -74,11 +75,13 @@ export class EmailEventStore {
             }
           : {},
       );
-      EmailEventStore.client = DynamoDBDocumentClient.from(dynamoDbClient, {
-        marshallOptions: {
-          removeUndefinedValues: true,
-        },
-      });
+      EmailEventStore.client = instrumentAwsSdkClient(
+        DynamoDBDocumentClient.from(dynamoDbClient, {
+          marshallOptions: {
+            removeUndefinedValues: true,
+          },
+        }),
+      );
     }
 
     return new EmailEventStore();

@@ -18,6 +18,7 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { randomBytes } from "crypto";
 import { type } from "arktype";
+import { instrumentAwsSdkClient } from "./aws-xray.server";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 import { log } from "./logger";
 
@@ -92,11 +93,14 @@ export class UserStore {
             }
           : {},
       );
-      UserStore.client = DynamoDBDocumentClient.from(dynamoDbClient);
+      UserStore.client = instrumentAwsSdkClient(
+        DynamoDBDocumentClient.from(dynamoDbClient),
+      );
     }
     if (!UserStore.cognito) {
       UserStore.cognito =
-        params?.cognito ?? new CognitoIdentityProviderClient();
+        params?.cognito ??
+        instrumentAwsSdkClient(new CognitoIdentityProviderClient());
     }
     return new UserStore();
   }

@@ -1,4 +1,5 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { instrumentAwsSdkClient } from "./aws-xray.server";
 import { EmailEventStore } from "./email-event-store";
 import type { User } from "./user-store";
 import { log } from "./logger";
@@ -22,7 +23,7 @@ export class EmailService {
   private readonly fromEmail: string;
 
   constructor(fromEmail: string) {
-    this.client = new SESClient({});
+    this.client = instrumentAwsSdkClient(new SESClient({}));
     this.emailEventStore = EmailEventStore.make();
     this.fromEmail = fromEmail;
   }

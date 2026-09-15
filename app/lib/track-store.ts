@@ -7,6 +7,7 @@ import {
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
+import { instrumentAwsSdkClient } from "./aws-xray.server";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
 export const trackSchema = type({
@@ -55,7 +56,9 @@ export class TrackStore {
             }
           : {},
       );
-      TrackStore.client = DynamoDBDocumentClient.from(dynamoDbClient);
+      TrackStore.client = instrumentAwsSdkClient(
+        DynamoDBDocumentClient.from(dynamoDbClient),
+      );
     }
     return new TrackStore();
   }

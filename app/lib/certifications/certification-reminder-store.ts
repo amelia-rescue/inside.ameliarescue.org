@@ -8,6 +8,7 @@ import {
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
+import { instrumentAwsSdkClient } from "../aws-xray.server";
 import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 
 export const certificationReminderSchema = type({
@@ -64,7 +65,9 @@ export class CertificationReminderStore {
           }
         : {},
     );
-    const docClient = DynamoDBDocumentClient.from(client);
+    const docClient = instrumentAwsSdkClient(
+      DynamoDBDocumentClient.from(client),
+    );
     const tableName =
       process.env.CERTIFICATION_REMINDERS_TABLE_NAME ||
       "aes_certification_reminders";

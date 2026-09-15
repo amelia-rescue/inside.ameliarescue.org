@@ -8,6 +8,7 @@ import {
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
+import { instrumentAwsSdkClient } from "../aws-xray.server";
 import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 
 export const certificationSchema = type({
@@ -65,7 +66,9 @@ export class CertificationStore {
           }
         : {},
     );
-    const docClient = DynamoDBDocumentClient.from(client);
+    const docClient = instrumentAwsSdkClient(
+      DynamoDBDocumentClient.from(client),
+    );
     const tableName =
       process.env.USER_CERTIFICATIONS_TABLE_NAME || "aes_user_certifications";
     return new CertificationStore(docClient, tableName);

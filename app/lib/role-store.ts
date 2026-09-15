@@ -7,6 +7,7 @@ import {
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
+import { instrumentAwsSdkClient } from "./aws-xray.server";
 import { DYNALITE_ENDPOINT } from "./dynalite-endpont";
 
 export const roleSchema = type({
@@ -55,7 +56,9 @@ export class RoleStore {
             }
           : {},
       );
-      RoleStore.client = DynamoDBDocumentClient.from(dynamoDbClient);
+      RoleStore.client = instrumentAwsSdkClient(
+        DynamoDBDocumentClient.from(dynamoDbClient),
+      );
     }
     return new RoleStore();
   }

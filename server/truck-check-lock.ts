@@ -5,6 +5,7 @@ import {
   ScanCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { instrumentAwsSdkClient } from "~/lib/aws-xray.server";
 import { log } from "~/lib/logger";
 import {
   notifyTruckCheckIssues,
@@ -12,7 +13,9 @@ import {
 } from "~/lib/truck-check/issue-notifications";
 
 const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+const docClient = instrumentAwsSdkClient(
+  DynamoDBDocumentClient.from(dynamoClient),
+);
 
 const LOCK_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 

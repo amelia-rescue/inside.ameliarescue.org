@@ -2,8 +2,9 @@ import {
   SecretsManagerClient,
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
+import { instrumentAwsSdkClient } from "./aws-xray.server";
 
-const client = new SecretsManagerClient({});
+const client = instrumentAwsSdkClient(new SecretsManagerClient({}));
 
 let cachedSessionSecret: string | null = null;
 

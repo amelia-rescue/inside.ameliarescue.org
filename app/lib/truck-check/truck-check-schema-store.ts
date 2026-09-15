@@ -27,11 +27,7 @@ interface BaseField {
 }
 
 export type SchemaField =
-  | CheckboxField
-  | TextField
-  | NumberField
-  | SelectField
-  | PhotoField;
+  CheckboxField | TextField | NumberField | SelectField | PhotoField;
 
 export interface CheckboxField extends BaseField {
   type: "checkbox";
@@ -73,6 +69,7 @@ import {
   QueryCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { instrumentAwsSdkClient } from "../aws-xray.server";
 import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 
 export class TruckNotFound extends Error {
@@ -119,8 +116,9 @@ export class TruckCheckSchemaStore {
             }
           : {},
       );
-      TruckCheckSchemaStore.client =
-        DynamoDBDocumentClient.from(dynamoDbClient);
+      TruckCheckSchemaStore.client = instrumentAwsSdkClient(
+        DynamoDBDocumentClient.from(dynamoDbClient),
+      );
     }
     return new TruckCheckSchemaStore();
   }

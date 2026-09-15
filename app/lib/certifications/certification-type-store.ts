@@ -6,6 +6,7 @@ import {
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { type } from "arktype";
+import { instrumentAwsSdkClient } from "../aws-xray.server";
 import { DYNALITE_ENDPOINT } from "../dynalite-endpont";
 
 export const certificationTypeSchema = type({
@@ -53,8 +54,9 @@ export class CertificationTypeStore {
             }
           : {},
       );
-      CertificationTypeStore.client =
-        DynamoDBDocumentClient.from(dynamoDbClient);
+      CertificationTypeStore.client = instrumentAwsSdkClient(
+        DynamoDBDocumentClient.from(dynamoDbClient),
+      );
     }
     return new CertificationTypeStore();
   }

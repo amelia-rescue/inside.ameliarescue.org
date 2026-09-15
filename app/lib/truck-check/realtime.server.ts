@@ -8,9 +8,12 @@ import {
   ScanCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { instrumentAwsSdkClient } from "~/lib/aws-xray.server";
 import { log } from "~/lib/logger";
 
-const documentClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const documentClient = instrumentAwsSdkClient(
+  DynamoDBDocumentClient.from(new DynamoDBClient({})),
+);
 
 export async function getConnections(
   connectionsTableName: string,
@@ -127,7 +130,9 @@ export async function publishCheckEvent(
   const connectionsTableName = process.env.WEBSOCKET_CONNECTIONS_TABLE_NAME;
   if (!endpoint || !connectionsTableName) return;
   await broadcastToTruckCheck({
-    apiGatewayClient: new ApiGatewayManagementApiClient({ endpoint }),
+    apiGatewayClient: instrumentAwsSdkClient(
+      new ApiGatewayManagementApiClient({ endpoint }),
+    ),
     connectionsTableName,
     truckCheckId,
     message,

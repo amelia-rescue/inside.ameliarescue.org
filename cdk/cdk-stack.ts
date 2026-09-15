@@ -591,6 +591,7 @@ export class CdkStack extends cdk.Stack {
         timeout: cdk.Duration.seconds(15),
         architecture: cdk.aws_lambda.Architecture.ARM_64,
         insightsVersion: lambdaInsightsVersion,
+        tracing: lambda.Tracing.ACTIVE,
         logGroup,
         bundling: {
           // so react-router/architect wants aws-sdk v2? so stupid

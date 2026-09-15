@@ -7,6 +7,7 @@ import {
   UpdateCommand,
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { instrumentAwsSdkClient } from "~/lib/aws-xray.server";
 import { log } from "~/lib/logger";
 import {
   TruckCheckStore,
@@ -23,7 +24,9 @@ import {
   sendToConnection,
 } from "~/lib/truck-check/realtime.server";
 
-const docClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const docClient = instrumentAwsSdkClient(
+  DynamoDBDocumentClient.from(new DynamoDBClient({})),
+);
 
 export const handler = async (
   event: ApiGatewayWebSocketEvent & { body?: string },
@@ -32,9 +35,11 @@ export const handler = async (
   const tableName = process.env.WEBSOCKET_CONNECTIONS_TABLE_NAME;
   const started = Date.now();
   if (!tableName) return { statusCode: 500, body: "Configuration error" };
-  const apiGatewayClient = new ApiGatewayManagementApiClient({
-    endpoint: `https://${domainName}/${stage}`,
-  });
+  const apiGatewayClient = instrumentAwsSdkClient(
+    new ApiGatewayManagementApiClient({
+      endpoint: `https://${domainName}/${stage}`,
+    }),
+  );
   const send = (message: Record<string, unknown>) =>
     sendToConnection({ apiGatewayClient, connectionId, message });
   const broadcast = (
