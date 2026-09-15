@@ -22,6 +22,7 @@ import { CertificationUpload } from "~/components/upload-certification";
 import { ProfilePictureUpload } from "~/components/profile-picture-upload";
 import { CertificationReminderStore } from "~/lib/certifications/certification-reminder-store";
 import { DateDisplay } from "~/components/date-display";
+import { showToast } from "~/components/toaster";
 
 async function getCertificationData(user_id: string) {
   const certificationTypeStore = CertificationTypeStore.make();
@@ -116,6 +117,21 @@ export async function action({ request, context }: Route.ActionArgs) {
     throw new Error("No user found");
   }
   const formData = await request.formData();
+  const store = UserStore.make();
+
+  if (formData.get("intent") === "update-notification-preferences") {
+    try {
+      await store.updateUser({
+        user_id: ctx.user.user_id,
+        truck_check_issue_emails:
+          formData.get("truck_check_issue_emails") === "on",
+      });
+      return { success: true };
+    } catch {
+      return { errors: "Failed to update notification preferences" };
+    }
+  }
+
   const contactUpdateSchema = type({
     phone: /^[\d\s\-\(\)\+]{1,20}$/,
   });
@@ -126,7 +142,6 @@ export async function action({ request, context }: Route.ActionArgs) {
     };
   }
 
-  const store = UserStore.make();
   await store.updateUser({
     user_id: ctx.user.user_id,
     phone: contact.phone,
@@ -143,8 +158,12 @@ export default function Profile() {
   const certModalRef = useRef<HTMLDialogElement>(null);
   const profilePicModalRef = useRef<HTMLDialogElement>(null);
   const contactFetcher = useFetcher<typeof action>();
+  const preferencesFetcher = useFetcher<typeof action>();
   const { success, errors } = contactFetcher.data || {};
   const [phoneValue, setPhoneValue] = useState(user.phone);
+  const [subscribed, setSubscribed] = useState(
+    user.truck_check_issue_emails ?? false,
+  );
   const [selectedCertType, setSelectedCertType] =
     useState<CertificationType | null>(null);
   const [showProfilePicModal, setShowProfilePicModal] = useState(false);
@@ -176,6 +195,29 @@ export default function Profile() {
       ref.current?.close();
     }
   }, [success, errors]);
+
+  useEffect(() => {
+    if (preferencesFetcher.data && "errors" in preferencesFetcher.data) {
+      setSubscribed(user.truck_check_issue_emails ?? false);
+      showToast({
+        message: "Failed to update notification preferences",
+        type: "alert-error",
+      });
+    }
+  }, [preferencesFetcher.data, user.truck_check_issue_emails]);
+
+  const handleTruckCheckEmailsToggle = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const checked = e.target.checked;
+    setSubscribed(checked);
+    const formData = new FormData();
+    formData.set("intent", "update-notification-preferences");
+    if (checked) {
+      formData.set("truck_check_issue_emails", "on");
+    }
+    preferencesFetcher.submit(formData, { method: "post" });
+  };
 
   type CertRow = (typeof certification_data)[number];
 
@@ -409,6 +451,32 @@ export default function Profile() {
                 <dt className="opacity-70">Website Role</dt>
                 <dd className="font-medium">{user.website_role}</dd>
               </dl>
+
+              <div className="divider" />
+
+              <div>
+                <h3 className="mb-3 font-semibold">Email Notifications</h3>
+                <label className="flex w-full cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    name="truck_check_issue_emails"
+                    checked={subscribed}
+                    disabled={preferencesFetcher.state !== "idle"}
+                    onChange={handleTruckCheckEmailsToggle}
+                    className="checkbox mt-0.5 shrink-0"
+                  />
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span>Truck check issue reports</span>
+                    <span className="text-xs opacity-70">
+                      Email me when a truck check locks with missing items or
+                      notes.
+                    </span>
+                  </span>
+                  {preferencesFetcher.state !== "idle" && (
+                    <span className="loading loading-spinner loading-xs" />
+                  )}
+                </label>
+              </div>
             </div>
           </div>
 
@@ -427,6 +495,7 @@ export default function Profile() {
               )}
 
               <contactFetcher.Form method="post" className="space-y-4 py-4">
+                <input type="hidden" name="intent" value="update-contact" />
                 <div className="form-control w-full">
                   <label className="label">
                     <span className="label-text">Phone Number</span>
