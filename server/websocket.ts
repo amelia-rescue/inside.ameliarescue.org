@@ -13,7 +13,7 @@ import {
   TruckCheckStore,
   TruckCheckLocked,
 } from "~/lib/truck-check/truck-check-store";
-import type { ApiGatewayWebSocketEvent } from "types/apigateway";
+import type { ApiGatewayWebSocketEvent } from "../types/apigateway";
 import { getUserInfo } from "~/lib/auth.server";
 import { UserStore } from "~/lib/user-store";
 import { applyCheckMutation } from "~/lib/truck-check/mutations.server";
