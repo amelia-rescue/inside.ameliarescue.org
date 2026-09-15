@@ -455,7 +455,9 @@ export default function Profile() {
               <div className="divider" />
 
               <div>
-                <h3 className="mb-3 font-semibold">Email Notifications</h3>
+                <h3 className="mb-3 font-semibold">
+                  Optional Email Notifications
+                </h3>
                 <label className="flex w-full cursor-pointer items-start gap-3">
                   <input
                     type="checkbox"
