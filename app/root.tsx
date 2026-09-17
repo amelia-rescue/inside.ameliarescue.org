@@ -24,6 +24,7 @@ import { requestLogger } from "./middleware/logger";
 import { appContext } from "./context";
 import { Toaster, showToast } from "./components/toaster";
 import { log } from "./lib/logger";
+import type { RumRuntimeConfig } from "./lib/rum.client";
 
 export const middleware: Route.MiddlewareFunction[] = [
   requestLogger,
@@ -50,6 +51,26 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
+function getRumConfig(
+  request: Request,
+  userId?: string,
+): RumRuntimeConfig | undefined {
+  if (!userId || new URL(request.url).pathname.startsWith("/auth/")) {
+    return undefined;
+  }
+
+  const applicationId = process.env.RUM_APP_MONITOR_ID;
+  const region = process.env.RUM_REGION;
+  const alias = process.env.RUM_ALIAS;
+  const releaseId = process.env.RUM_RELEASE_ID;
+
+  if (!applicationId || !region || !alias || !releaseId) {
+    return undefined;
+  }
+
+  return { applicationId, region, alias, releaseId, userId };
+}
+
 export async function loader({ context, request }: Route.LoaderArgs) {
   const appCtx = context.get(appContext);
   const { getPreferences } = await import("./lib/preferences.server");
@@ -61,6 +82,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     locale: appCtx?.locale || preferences?.locale || "en-US",
     timeZone: appCtx?.timeZone || preferences?.timeZone || "UTC",
     currentYear: new Date().getUTCFullYear(),
+    rum: getRumConfig(request, appCtx?.user.user_id),
   };
 }
 
@@ -144,6 +166,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const submittedPreferencesRef = useRef<string | null>(null);
   const revalidatedPreferencesRef = useRef<string | null>(null);
   const location = useLocation();
+  const rumConfig = loaderData?.rum;
   const theme = loaderData?.theme || "forest";
   const locale = loaderData?.locale || "en-US";
   const timeZone = loaderData?.timeZone || "UTC";
@@ -161,6 +184,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!rumConfig) {
+      return;
+    }
+
+    let active = true;
+    void import("./lib/rum.client").then((client) => {
+      if (!active) {
+        return;
+      }
+      client.initializeRum(rumConfig);
+      client.recordRumPageView(location.pathname);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    location.pathname,
+    rumConfig?.alias,
+    rumConfig?.applicationId,
+    rumConfig?.region,
+    rumConfig?.releaseId,
+    rumConfig?.userId,
+  ]);
 
   useEffect(() => {
     const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -361,9 +410,29 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const loaderData = useRouteLoaderData<typeof loader>("root");
+  const rumConfig = loaderData?.rum;
   let message = "Oops!";
   let details = "An unexpected error occurred.";
   let stack: string | undefined;
+
+  useEffect(() => {
+    if (!(error instanceof Error) || !rumConfig) {
+      return;
+    }
+
+    void import("./lib/rum.client").then((client) => {
+      client.initializeRum(rumConfig);
+      client.recordRumError(error);
+    });
+  }, [
+    error,
+    rumConfig?.alias,
+    rumConfig?.applicationId,
+    rumConfig?.region,
+    rumConfig?.releaseId,
+    rumConfig?.userId,
+  ]);
 
   if (isRouteErrorResponse(error)) {
     message = error.status === 404 ? "404" : "Error";

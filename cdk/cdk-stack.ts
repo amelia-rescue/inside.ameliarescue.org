@@ -12,6 +12,7 @@ import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integra
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cloudwatchActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as rum from "aws-cdk-lib/aws-rum";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -568,6 +569,81 @@ export class CdkStack extends cdk.Stack {
       ],
     });
 
+    const clientBuildPath = path.join(__dirname, "../build/client");
+    const rumReleaseId = cdk.FileSystem.fingerprint(clientBuildPath);
+    const rumAppMonitorName = "inside-amelia-rescue";
+    const rumAlias = appDomainName;
+    const rumAppMonitorArn = cdk.Stack.of(this).formatArn({
+      service: "rum",
+      resource: "appmonitor",
+      resourceName: rumAppMonitorName,
+    });
+
+    const rumSourceMapsBucket = new s3.Bucket(this, "RumSourceMapsBucket", {
+      enforceSSL: true,
+      publicReadAccess: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
+    const rumAppMonitor = new rum.CfnAppMonitor(this, "RumAppMonitor", {
+      name: rumAppMonitorName,
+      domain: appDomainName,
+      platform: "Web",
+      appMonitorConfiguration: {
+        allowCookies: true,
+        enableXRay: true,
+        sessionSampleRate: 1,
+        telemetries: ["errors", "performance", "http"],
+      },
+      customEvents: { status: "ENABLED" },
+      cwLogEnabled: false,
+      deobfuscationConfiguration: {
+        javaScriptSourceMaps: {
+          status: "ENABLED",
+          s3Uri: `s3://${rumSourceMapsBucket.bucketName}`,
+        },
+      },
+      resourcePolicy: {
+        policyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Sid: "AllowPublicRumEventsWithAlias",
+              Effect: "Allow",
+              Principal: "*",
+              Action: "rum:PutRumEvents",
+              Resource: rumAppMonitorArn,
+              Condition: {
+                StringEquals: { "rum:alias": rumAlias },
+              },
+            },
+          ],
+        }),
+      },
+    });
+
+    const rumSourceMapsPolicy = rumSourceMapsBucket.addToResourcePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        principals: [new cdk.aws_iam.ServicePrincipal("rum.amazonaws.com")],
+        actions: ["s3:GetObject", "s3:ListBucket"],
+        resources: [
+          rumSourceMapsBucket.bucketArn,
+          rumSourceMapsBucket.arnForObjects("*"),
+        ],
+        conditions: {
+          StringEquals: {
+            "aws:SourceAccount": cdk.Stack.of(this).account,
+            "aws:SourceArn": rumAppMonitorArn,
+          },
+        },
+      }),
+    );
+    if (rumSourceMapsPolicy.policyDependable) {
+      rumAppMonitor.node.addDependency(rumSourceMapsPolicy.policyDependable);
+    }
+
     // Create CloudWatch log group for Lambda function
     const logGroup = new logs.LogGroup(this, "ReactRouterHandlerLogs", {
       logGroupName: "/aws/lambda/inside-amelia-rescue",
@@ -630,6 +706,11 @@ export class CdkStack extends cdk.Stack {
         },
       },
     );
+
+    lambdaFunction.addEnvironment("RUM_APP_MONITOR_ID", rumAppMonitor.attrId);
+    lambdaFunction.addEnvironment("RUM_REGION", cdk.Stack.of(this).region);
+    lambdaFunction.addEnvironment("RUM_ALIAS", rumAlias);
+    lambdaFunction.addEnvironment("RUM_RELEASE_ID", rumReleaseId);
 
     // Must come after the NodejsFunction above: CDK attaches this warning to the stack itself,
     // and acknowledgements only match ancestors or already-emitted warnings.
@@ -1459,10 +1540,9 @@ export class CdkStack extends cdk.Stack {
       this,
       "DeployStaticAssets",
       {
-        sources: [
-          s3deploy.Source.asset(path.join(__dirname, "../build/client")),
-        ],
+        sources: [s3deploy.Source.asset(clientBuildPath)],
         destinationBucket: staticBucket,
+        exclude: ["*.map"],
         prune: false,
         distribution,
         distributionPaths: [
@@ -1478,7 +1558,21 @@ export class CdkStack extends cdk.Stack {
       },
     );
 
+    const sourceMapsDeployment = new s3deploy.BucketDeployment(
+      this,
+      "DeployRumSourceMaps",
+      {
+        sources: [s3deploy.Source.asset(clientBuildPath)],
+        destinationBucket: rumSourceMapsBucket,
+        destinationKeyPrefix: rumReleaseId,
+        exclude: ["*"],
+        include: ["*.map"],
+        prune: false,
+      },
+    );
+
     lambdaFunction.node.addDependency(staticAssetsDeployment);
+    lambdaFunction.node.addDependency(sourceMapsDeployment);
 
     // Note: APP_URL is determined at runtime from request headers
     // to avoid circular dependency with CloudFront distribution
@@ -1490,6 +1584,14 @@ export class CdkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "DistributionDomainName", {
       value: distribution.domainName,
+    });
+
+    new cdk.CfnOutput(this, "RumAppMonitorId", {
+      value: rumAppMonitor.attrId,
+    });
+
+    new cdk.CfnOutput(this, "RumAppMonitorName", {
+      value: rumAppMonitorName,
     });
 
     new cdk.CfnOutput(this, "UserPoolId", {
