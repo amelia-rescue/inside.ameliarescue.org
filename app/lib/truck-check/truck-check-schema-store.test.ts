@@ -131,6 +131,29 @@ describe("truck check schema store test", () => {
       expect(allTrucks.length).toBe(3);
     });
 
+    it("keeps retired trucks available for historical checks and allows reactivation", async () => {
+      const store = TruckCheckSchemaStore.make();
+      const truck: Truck = {
+        truckId: "truck-1",
+        displayName: "Medic 1",
+        schemaId: "schema-123",
+      };
+      await store.createTruck(truck);
+      await store.updateTruck({ ...truck, retired: true });
+
+      expect(await store.getTruck(truck.truckId)).toEqual({
+        ...truck,
+        retired: true,
+      });
+      expect(await store.listTrucks()).toContainEqual({
+        ...truck,
+        retired: true,
+      });
+
+      await store.updateTruck({ ...truck, retired: false });
+      expect((await store.getTruck(truck.truckId)).retired).toBe(false);
+    });
+
     it("should return an empty array when listing trucks with none", async () => {
       const store = TruckCheckSchemaStore.make();
 

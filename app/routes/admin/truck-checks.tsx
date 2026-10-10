@@ -588,12 +588,24 @@ export async function action({ request, context }: Route.ActionArgs) {
         );
       }
 
-      const truck: Truck = { truckId, displayName, schemaId };
       if (intent === "create-truck") {
-        await store.createTruck(truck);
+        await store.createTruck({ truckId, displayName, schemaId });
       } else {
-        await store.updateTruck(truck);
+        const truck = await store.getTruck(truckId);
+        await store.updateTruck({ ...truck, displayName, schemaId });
       }
+      return { success: true, intent };
+    }
+
+    if (intent === "retire-truck" || intent === "reactivate-truck") {
+      const truckId = validateString(formData, "truckId", "Truck ID");
+      if (typeof truckId !== "string")
+        return data({ error: truckId.message }, { status: 400 });
+      const truck = await store.getTruck(truckId);
+      await store.updateTruck({
+        ...truck,
+        retired: intent === "retire-truck",
+      });
       return { success: true, intent };
     }
 
@@ -813,7 +825,7 @@ export default function ManageTruckChecks({
                         truckId: e.target.value,
                       })
                     }
-                    disabled={!!editingTruck}
+                    readOnly={!!editingTruck}
                     required
                     className="input input-bordered w-full"
                     placeholder="medic-1"
@@ -923,7 +935,14 @@ export default function ManageTruckChecks({
                         className="flex items-center justify-between py-4 first:pt-0 last:pb-0"
                       >
                         <div className="flex-1">
-                          <h3 className="font-semibold">{truck.displayName}</h3>
+                          <h3 className="font-semibold">
+                            {truck.displayName}
+                            {truck.retired && (
+                              <span className="badge badge-neutral badge-sm ml-2">
+                                Retired
+                              </span>
+                            )}
+                          </h3>
                           <p className="mt-0.5 font-mono text-xs opacity-50">
                             {truck.truckId}
                           </p>
@@ -939,12 +958,37 @@ export default function ManageTruckChecks({
                             )}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleEditTruck(truck)}
-                          className="btn btn-sm btn-ghost"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex gap-2">
+                          <fetcher.Form method="post">
+                            <input
+                              type="hidden"
+                              name="intent"
+                              value={
+                                truck.retired
+                                  ? "reactivate-truck"
+                                  : "retire-truck"
+                              }
+                            />
+                            <input
+                              type="hidden"
+                              name="truckId"
+                              value={truck.truckId}
+                            />
+                            <button
+                              type="submit"
+                              disabled={fetcher.state !== "idle"}
+                              className="btn btn-sm btn-outline"
+                            >
+                              {truck.retired ? "Reactivate" : "Retire"}
+                            </button>
+                          </fetcher.Form>
+                          <button
+                            onClick={() => handleEditTruck(truck)}
+                            className="btn btn-sm btn-ghost"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </div>
                     );
                   })}

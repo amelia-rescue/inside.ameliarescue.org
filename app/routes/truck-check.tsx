@@ -1,7 +1,7 @@
 import { appContext } from "~/context";
 import type { Route } from "./+types/truck-check";
 import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
-import { redirect, useFetcher, useLoaderData, Link } from "react-router";
+import { data, redirect, useFetcher, useLoaderData, Link } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { IoWarning } from "react-icons/io5";
 import {
@@ -168,6 +168,15 @@ export async function action({ context, request }: Route.ActionArgs) {
     const truckCheckStore = TruckCheckStore.make();
     const truckCheckSchemaStore = TruckCheckSchemaStore.make();
     const truckRecord = await truckCheckSchemaStore.getTruck(truck);
+    if (truckRecord.retired) {
+      return data(
+        {
+          error:
+            "This truck has been retired. New checks cannot be started for it.",
+        },
+        { status: 400 },
+      );
+    }
     const schema = await truckCheckSchemaStore.getSchema(truckRecord.schemaId);
     const truckCheck = await truckCheckStore.createTruckCheck({
       created_by: ctx.user.user_id,
@@ -244,8 +253,9 @@ export async function loader({ context }: Route.LoaderArgs) {
 export default function TruckCheck() {
   const { truckChecks, trucks, lastEvaluatedKey } =
     useLoaderData<typeof loader>();
+  const activeTrucks = trucks.filter((truck) => !truck.retired);
 
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<typeof action>();
   const modalRef = useRef<HTMLDialogElement>(null);
 
   const toggleModal = () => {
@@ -316,7 +326,11 @@ export default function TruckCheck() {
           <Link className="btn btn-secondary" to="/truck-check/analytics">
             Analytics
           </Link>
-          <button className="btn btn-primary" onClick={toggleModal}>
+          <button
+            className="btn btn-primary"
+            onClick={toggleModal}
+            disabled={activeTrucks.length === 0}
+          >
             Start New Check
           </button>
         </div>
@@ -338,9 +352,12 @@ export default function TruckCheck() {
               <IoWarning />
               Truck checks are automatically locked after 24 hours.
             </div>
+            {fetcher.data && "error" in fetcher.data && (
+              <div className="alert alert-error mt-4">{fetcher.data.error}</div>
+            )}
             <input type="hidden" name="intent" value="create" />
             <select className="select mt-4" required name="truck">
-              {trucks.map((truck) => (
+              {activeTrucks.map((truck) => (
                 <option key={truck.truckId} value={truck.truckId}>
                   {truck.displayName}
                 </option>

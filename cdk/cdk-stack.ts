@@ -1267,6 +1267,10 @@ export class CdkStack extends cdk.Stack {
 
     const httpApiDefaultStage = httpApi.defaultStage?.node
       .defaultChild as apigatewayv2.CfnStage;
+    httpApiDefaultStage.defaultRouteSettings = {
+      throttlingRateLimit: 20,
+      throttlingBurstLimit: 50,
+    };
     httpApiDefaultStage.accessLogSettings = {
       destinationArn: httpApiAccessLogGroup.logGroupArn,
       format: JSON.stringify({
@@ -1318,12 +1322,12 @@ export class CdkStack extends cdk.Stack {
       {
         alarmName: "inside-amelia-rescue-http-api-5xx-errors",
         alarmDescription:
-          "Alarm when the inside.ameliarescue.org HTTP API returns any 5xx response.",
+          "Alarm when the inside.ameliarescue.org HTTP API returns at least five 5xx responses in five minutes.",
         metric: httpApi.metricServerError({
           period: errorAlarmPeriod,
           statistic: "Sum",
         }),
-        threshold: 1,
+        threshold: 5,
         evaluationPeriods: 1,
         comparisonOperator:
           cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,

@@ -2,6 +2,7 @@ export interface Truck {
   truckId: string;
   displayName: string; // "Medic 1"
   schemaId: string; // active schema for this truck
+  retired?: boolean;
 }
 
 export interface TruckCheckSchema {
