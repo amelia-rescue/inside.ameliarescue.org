@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import {
   FiAlertTriangle,
+  FiBarChart2,
   FiCheck,
   FiChevronDown,
   FiChevronRight,
@@ -447,6 +448,7 @@ export default function TruckCheck() {
             className="btn btn-outline border-base-content border-2"
             to="/truck-check/analytics"
           >
+            <FiBarChart2 className="h-5 w-5" aria-hidden="true" />
             Analytics
           </Link>
           <button
