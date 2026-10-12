@@ -12,8 +12,8 @@ export const DATE_FORMATS = {
   mediumDate: "MMM D, YYYY",
   longDate: "dddd, MMMM D, YYYY",
   weekdayDate: "ddd, MMM D, YYYY",
-  shortTime: "h:mm:ss A",
-  shortDateTime: "M/D/YYYY h:mm:ss A",
+  shortTime: "HH:mm:ss",
+  shortDateTime: "M/D/YYYY HH:mm:ss",
 } as const;
 
 type DateFormatName = keyof typeof DATE_FORMATS;

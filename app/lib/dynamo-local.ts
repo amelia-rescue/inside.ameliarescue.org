@@ -81,6 +81,11 @@ export async function setupDynamo() {
           partitionKey: "list_pk",
           sortKey: "created_at",
         },
+        {
+          indexName: "TruckIndex",
+          partitionKey: "truck",
+          sortKey: "created_at",
+        },
       ],
     },
     {

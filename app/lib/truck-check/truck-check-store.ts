@@ -495,6 +495,30 @@ export class TruckCheckStore {
     };
   }
 
+  public async listTruckChecksByTruck(params: {
+    truck: string;
+    lastEvaluatedKey?: Record<string, unknown>;
+    limit?: number;
+  }): Promise<{
+    lastEvaluatedKey?: Record<string, unknown>;
+    truckChecks: DocumentTruckCheck[];
+  }> {
+    const command = new QueryCommand({
+      TableName: this.tableName,
+      IndexName: "TruckIndex",
+      KeyConditionExpression: "truck = :truck",
+      ExpressionAttributeValues: { ":truck": params.truck },
+      ScanIndexForward: false,
+      ExclusiveStartKey: params.lastEvaluatedKey,
+      Limit: params.limit ?? 100,
+    });
+    const response = await TruckCheckStore.client.send(command);
+    return {
+      lastEvaluatedKey: response.LastEvaluatedKey,
+      truckChecks: (response.Items || []) as unknown as DocumentTruckCheck[],
+    };
+  }
+
   public async listTruckChecksInRange(params: {
     startDate?: string;
     endDate?: string;

@@ -125,7 +125,7 @@ export async function loadHomeData({
       locked: todayCheckDoc.locked,
       requiredCompleted,
       requiredTotal,
-      startedAt: local(todayCheckDoc.created_at).format("h:mm A"),
+      startedAt: local(todayCheckDoc.created_at).format("HH:mm"),
       isContributor: Boolean(todayCheckDoc.contributors[userId]),
       contributors: Object.entries(todayCheckDoc.contributors)
         .filter(([id]) => id !== userId)
@@ -212,7 +212,7 @@ export async function loadHomeData({
     todayCheck,
     previousCheck: previousCheck && {
       truckName: truckName(previousCheck.truck),
-      dayLabel: local(previousCheck.created_at).format("ddd h:mm A"),
+      dayLabel: local(previousCheck.created_at).format("ddd HH:mm"),
       by: Object.values(previousCheck.contributors).map(shortName).join(", "),
     },
     recentIssues: recentIssues.slice(0, MAX_ISSUES),

@@ -533,6 +533,19 @@ export class CdkStack extends cdk.Stack {
       },
     });
 
+    // One truck's checks, newest first: per-truck history and "last checked".
+    truckChecksTable.addGlobalSecondaryIndex({
+      indexName: "TruckIndex",
+      partitionKey: {
+        name: "truck",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "created_at",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
     const truckCheckSchemasTable = new dynamodb.Table(
       this,
       "TruckCheckSchemasTable",

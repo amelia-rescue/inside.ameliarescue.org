@@ -725,6 +725,7 @@ describe("listTruckChecksInRange", () => {
   async function createCheckAt(
     store: TruckCheckStore,
     createdAt: string,
+    truck = "Ambulance 1",
   ): Promise<DocumentTruckCheck> {
     const id = crypto.randomUUID();
     const document: DocumentTruckCheck = {
@@ -733,7 +734,7 @@ describe("listTruckChecksInRange", () => {
       updated_at: new Date().toISOString(),
       list_pk: "TRUCK_CHECK",
       created_by: "user-456",
-      truck: "Ambulance 1",
+      truck,
       data: { oil_level: "full" },
       contributors: contributors("user-456"),
       locked: false,
@@ -749,6 +750,34 @@ describe("listTruckChecksInRange", () => {
 
     return store.getTruckCheck(id);
   }
+
+  it("lists one truck's checks newest first", async () => {
+    const store = TruckCheckStore.make();
+    const now = dayjs();
+    const older = await createCheckAt(
+      store,
+      now.subtract(3, "day").toISOString(),
+      "Medic 2",
+    );
+    await createCheckAt(store, now.subtract(2, "day").toISOString(), "Medic 1");
+    const newer = await createCheckAt(
+      store,
+      now.subtract(1, "day").toISOString(),
+      "Medic 2",
+    );
+
+    const { truckChecks } = await store.listTruckChecksByTruck({
+      truck: "Medic 2",
+    });
+    expect(truckChecks.map((c) => c.id)).toEqual([newer.id, older.id]);
+
+    const latest = await store.listTruckChecksByTruck({
+      truck: "Medic 2",
+      limit: 1,
+    });
+    expect(latest.truckChecks.map((c) => c.id)).toEqual([newer.id]);
+    expect(latest.lastEvaluatedKey).toBeDefined();
+  });
 
   it("returns only truck checks within the date range", async () => {
     const store = TruckCheckStore.make();
