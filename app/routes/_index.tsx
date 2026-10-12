@@ -39,7 +39,7 @@ export async function loader({ context }: Route.LoaderArgs) {
   return { user: c.user, home };
 }
 
-function summaryLine(home: HomeData): string {
+function summaryLine(home: HomeData): ReactNode {
   const { todayCheck, myCertifications } = home;
   const check = !todayCheck
     ? "Nobody has started a truck check today."
@@ -54,7 +54,12 @@ function summaryLine(home: HomeData): string {
       : cert.status === "expired"
         ? `your ${cert.type} has expired`
         : `you have no ${cert.type} card on file`;
-  return `${check} Also, ${certText}.`;
+  return (
+    <>
+      {check} Also,{" "}
+      {cert.status === "expired" ? <strong>{certText}</strong> : certText}.
+    </>
+  );
 }
 
 export default function Index({ loaderData }: Route.ComponentProps) {
