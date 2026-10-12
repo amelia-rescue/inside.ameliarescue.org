@@ -26,6 +26,7 @@ import {
   HiOutlineChevronLeft,
   HiOutlineCamera,
   HiOutlinePhoto,
+  HiOutlineTrash,
 } from "react-icons/hi2";
 import { DateDisplay } from "~/components/date-display";
 import { getFieldId, getPhotoUrls } from "~/lib/truck-check/issues";
@@ -200,6 +201,7 @@ function TruckCheckDynamicView({
   const canLockTruckCheck = !isLocked && isCreator;
   const isLocking =
     navigation.formData?.get("intent") === "lock" || sync.preparing;
+  const isDeleting = navigation.formData?.get("intent") === "delete";
   const connectionStatus: ConnectionStatus = sync.live;
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
   const contributors = Object.entries(sync.snapshot.contributors).map(
@@ -230,6 +232,7 @@ function TruckCheckDynamicView({
   const lastUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lockNoticeShownRef = useRef(false);
   const lockModalRef = useRef<HTMLDialogElement>(null);
+  const deleteModalRef = useRef<HTMLDialogElement>(null);
   const handledCompletionEventsRef = useRef(new Set<string>());
 
   // Field updates are queued while the socket is down and replayed on rejoin.
@@ -1118,24 +1121,14 @@ function TruckCheckDynamicView({
                   </button>
                 )}
                 {canDeleteTruckCheck && (
-                  <Form method="post">
-                    <input type="hidden" name="intent" value="delete" />
-                    <button
-                      type="submit"
-                      className="btn btn-error btn-outline btn-sm w-full sm:w-auto"
-                      onClick={(event) => {
-                        if (
-                          !window.confirm(
-                            "Delete this truck check? This action cannot be undone.",
-                          )
-                        ) {
-                          event.preventDefault();
-                        }
-                      }}
-                    >
-                      Delete Truck Check
-                    </button>
-                  </Form>
+                  <button
+                    type="button"
+                    className="btn btn-error btn-outline btn-sm w-full sm:w-auto"
+                    onClick={() => deleteModalRef.current?.showModal()}
+                  >
+                    <HiOutlineTrash className="h-4 w-4" />
+                    Delete Truck Check
+                  </button>
                 )}
               </div>
             )}
@@ -1442,6 +1435,47 @@ function TruckCheckDynamicView({
                     <span className="loading loading-spinner loading-sm" />
                   )}
                   {isLocking ? "Locking..." : "Lock check"}
+                </button>
+              </Form>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button>close</button>
+          </form>
+        </dialog>
+      )}
+
+      {canDeleteTruckCheck && (
+        <dialog ref={deleteModalRef} className="modal">
+          <div className="modal-box">
+            <h3 className="flex items-center gap-2 text-lg font-bold">
+              <HiOutlineTrash className="h-5 w-5" />
+              Delete this truck check?
+            </h3>
+            <p className="py-3">
+              This permanently removes the check and everything recorded on it
+              for all contributors. This action cannot be undone.
+            </p>
+            <div className="modal-action">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={isDeleting}
+                onClick={() => deleteModalRef.current?.close()}
+              >
+                Cancel
+              </button>
+              <Form method="post">
+                <input type="hidden" name="intent" value="delete" />
+                <button
+                  type="submit"
+                  className="btn btn-error"
+                  disabled={isDeleting}
+                >
+                  {isDeleting && (
+                    <span className="loading loading-spinner loading-sm" />
+                  )}
+                  {isDeleting ? "Deleting..." : "Delete check"}
                 </button>
               </Form>
             </div>
