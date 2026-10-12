@@ -704,7 +704,7 @@ function LogRow({
             {!complete && " · not finished"}
           </span>
         </span>
-        <span className="flex w-36 justify-end">
+        <span className="ml-auto flex w-36 justify-end">
           {check.problemCount > 0 ? (
             <button
               type="button"
