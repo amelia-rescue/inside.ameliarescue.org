@@ -30,7 +30,7 @@ function isFieldFilled(value: unknown): boolean {
   return true;
 }
 
-async function resolveSchema(
+export async function resolveSchema(
   check: TruckCheck,
   trucks: Truck[],
   schemaStore: TruckCheckSchemaStore,

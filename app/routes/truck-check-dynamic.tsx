@@ -709,13 +709,17 @@ function TruckCheckDynamicView({
             : checkboxValue === "not-present"
               ? "✕"
               : "";
-        const checkboxButtonClass = `flex h-6 w-6 items-center justify-center rounded border-2 text-sm font-bold transition-colors ${
+        // The whole row is the tap target; the box shows the state.
+        const checkboxButtonClass = `flex min-h-11 w-full items-center gap-3 rounded-md text-left ${
+          checkboxValue === "not-present" ? "bg-error/10" : ""
+        } ${fieldDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`;
+        const checkboxBoxClass = `flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 text-base font-bold transition-colors ${
           checkboxValue === true
             ? "border-success bg-success text-success-content"
             : checkboxValue === "not-present"
               ? "border-error bg-error text-error-content"
-              : "border-base-content/30 bg-base-100 text-base-content/50"
-        } ${fieldDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`;
+              : "border-base-content/40 bg-base-100"
+        }`;
 
         return (
           <div key={fieldId} className={fieldContainerClass}>
@@ -740,13 +744,17 @@ function TruckCheckDynamicView({
                   )
                 }
               >
-                {checkboxStateIcon}
+                <span className={checkboxBoxClass} aria-hidden="true">
+                  {checkboxStateIcon}
+                </span>
+                <span className="label-text text-base-content font-medium">
+                  {field.label}
+                  {field.required && <span className="text-error"> *</span>}
+                </span>
               </button>
-              <span className="label-text">{field.label}</span>
-              {field.required && <span className="text-error">*</span>}
             </div>
             {isRemoteUpdate && (
-              <span className="label-text-alt text-info ml-9 text-xs italic">
+              <span className="label-text-alt text-info ml-10 text-xs italic">
                 Updated by {lastUpdate.userName}
               </span>
             )}
@@ -1445,50 +1453,49 @@ function TruckCheckDynamicView({
       )}
 
       {/* Sticky Action Bar */}
-      <div className="bg-base-100/80 fixed right-0 bottom-0 left-0 z-10 border-t backdrop-blur-sm">
-        {(!isLocked || pendingUpdateCount > 0) && (
-          <div
-            role="status"
-            aria-live="polite"
-            className={`px-4 pt-2 text-center text-xs ${needsAttention || pendingUpdateCount > 0 ? "text-warning" : "text-success"}`}
-          >
-            {saveStatus}
-          </div>
+      <div className="bg-base-100/80 fixed right-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 z-10 border-t backdrop-blur-sm lg:bottom-0">
+        {!isLocked && (
+          <progress
+            className="progress progress-primary block h-1 w-full rounded-none"
+            value={filledRequiredCount}
+            max={requiredTotal}
+            aria-label="Required items completed"
+          />
         )}
-        <div className="container mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-          {isLocked ? (
-            <>
-              <span className="text-sm opacity-60">View-only</span>
-              <a href="/truck-check" className="btn btn-ghost btn-sm">
-                Back to Truck Checks
-              </a>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-1 items-center gap-3">
-                <progress
-                  className="progress progress-primary w-32"
-                  value={filledRequiredCount}
-                  max={requiredTotal}
-                />
-                <span className="text-sm opacity-60">
-                  {filledRequiredCount}/{requiredTotal} required
-                </span>
-                {firstIncompleteField && (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={handleJumpToNextIncomplete}
-                  >
-                    Next incomplete
-                  </button>
-                )}
+        <div className="container mx-auto flex max-w-4xl items-center gap-3 px-4 py-2">
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="text-sm font-semibold tabular-nums">
+              {isLocked ? (
+                <span className="font-normal opacity-60">View-only</span>
+              ) : (
+                <>
+                  {filledRequiredCount}/{requiredTotal}{" "}
+                  <span className="font-normal opacity-60">required</span>
+                </>
+              )}
+            </div>
+            {(!isLocked || pendingUpdateCount > 0) && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`truncate text-xs ${needsAttention || pendingUpdateCount > 0 ? "text-warning" : "text-success"}`}
+              >
+                {saveStatus}
               </div>
-              <a href="/truck-check" className="btn btn-ghost btn-sm">
-                Exit
-              </a>
-            </>
+            )}
+          </div>
+          {!isLocked && firstIncompleteField && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleJumpToNextIncomplete}
+            >
+              Next incomplete
+            </button>
           )}
+          <a href="/truck-check" className="btn btn-ghost btn-sm">
+            {isLocked ? "Back to Truck Checks" : "Exit"}
+          </a>
         </div>
       </div>
     </div>

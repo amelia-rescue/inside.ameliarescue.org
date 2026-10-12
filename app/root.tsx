@@ -2,6 +2,7 @@ import {
   isRouteErrorResponse,
   Link,
   Links,
+  NavLink,
   Meta,
   Outlet,
   Scripts,
@@ -15,7 +16,17 @@ import {
   useRevalidator,
 } from "react-router";
 import { useEffect, useRef, useState } from "react";
-import { FiShare2 } from "react-icons/fi";
+import {
+  FiAward,
+  FiFile,
+  FiHome,
+  FiMoon,
+  FiSettings,
+  FiShare2,
+  FiSun,
+  FiTruck,
+  FiUser,
+} from "react-icons/fi";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -40,7 +51,7 @@ export const links: Route.LinksFunction = () => [
   },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&family=Public+Sans:wght@400;500;600;700&display=swap",
   },
   { rel: "manifest", href: "/manifest.webmanifest" },
   { rel: "icon", href: "/favicon.ico", sizes: "any" },
@@ -78,10 +89,9 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 
   return {
     user: appCtx?.user,
-    theme: appCtx?.theme || preferences?.theme || "forest",
+    theme: appCtx?.theme || preferences?.theme || "system",
     locale: appCtx?.locale || preferences?.locale || "en-US",
     timeZone: appCtx?.timeZone || preferences?.timeZone || "UTC",
-    currentYear: new Date().getUTCFullYear(),
     rum: getRumConfig(request, appCtx?.user.user_id),
   };
 }
@@ -103,12 +113,14 @@ export async function action({ request }: Route.ActionArgs) {
     user: appContext.defaultValue?.user?.user_id,
   });
 
-  const { getPreferences, setPreferences } =
+  const { getPreferences, normalizeTheme, setPreferences } =
     await import("./lib/preferences.server");
   const preferences = await getPreferences(request);
   const headers = await setPreferences({
     ...preferences,
-    ...(typeof theme === "string" && theme ? { theme } : {}),
+    ...(typeof theme === "string" && theme
+      ? { theme: normalizeTheme(theme) }
+      : {}),
     ...(typeof locale === "string" && locale ? { locale } : {}),
     ...(typeof timeZone === "string" && timeZone ? { timeZone } : {}),
   });
@@ -157,6 +169,33 @@ function NavigationLoadingIndicator() {
   );
 }
 
+const THEME_COLORS = { light: "#0f1b2d", dark: "#050a13" } as const;
+
+const NAV_LINKS = [
+  { to: "/", label: "Home", shortLabel: "Home", icon: FiHome },
+  {
+    to: "/truck-check",
+    label: "Truck checks",
+    shortLabel: "Checks",
+    icon: FiTruck,
+  },
+  {
+    to: "/certification-status",
+    label: "Certifications",
+    shortLabel: "Certs",
+    icon: FiAward,
+  },
+  { to: "/documents", label: "Documents", shortLabel: "Docs", icon: FiFile },
+  { to: "/roster", label: "Roster", shortLabel: "Roster", icon: FiUser },
+  {
+    to: "/admin",
+    label: "Admin",
+    shortLabel: "Admin",
+    icon: FiSettings,
+    adminOnly: true,
+  },
+];
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const loaderData = useRouteLoaderData<typeof loader>("root");
   const error = useRouteError();
@@ -167,22 +206,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const revalidatedPreferencesRef = useRef<string | null>(null);
   const location = useLocation();
   const rumConfig = loaderData?.rum;
-  const theme = loaderData?.theme || "forest";
+  const theme = loaderData?.theme || "system";
   const locale = loaderData?.locale || "en-US";
   const timeZone = loaderData?.timeZone || "UTC";
   const isWideContentRoute = location.pathname === "/certification-status";
   const contentWidthClass = isWideContentRoute ? "max-w-[1800px]" : "max-w-7xl";
-  const themeColor =
-    theme === "light"
-      ? "#f5f5f5"
-      : theme === "retro"
-        ? "#ece3ca"
-        : theme === "dark"
-          ? "#1d232a"
-          : "#1f2937";
+  const user = loaderData?.user;
+  const navLinks = NAV_LINKS.filter(
+    (link) => !link.adminOnly || user?.website_role === "admin",
+  );
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "system") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", theme);
+    }
   }, [theme]);
 
   useEffect(() => {
@@ -254,7 +293,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
     void navigator.serviceWorker.register("/sw.js");
   }, []);
 
-  const handleThemeChange = (newTheme: string) => {
+  const handleThemeToggle = () => {
+    const current =
+      document.documentElement.getAttribute("data-theme") ??
+      (window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light");
+    const newTheme = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", newTheme);
     const formData = new FormData();
     formData.append("theme", newTheme);
     fetcher.submit(formData, { method: "post" });
@@ -278,11 +324,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <html lang={locale} data-theme={theme}>
+    <html lang={locale} data-theme={theme === "system" ? undefined : theme}>
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content={themeColor} />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
+        {theme === "light" || theme === "dark" ? (
+          <meta name="theme-color" content={THEME_COLORS[theme]} />
+        ) : (
+          <>
+            <meta
+              name="theme-color"
+              content={THEME_COLORS.light}
+              media="(prefers-color-scheme: light)"
+            />
+            <meta
+              name="theme-color"
+              content={THEME_COLORS.dark}
+              media="(prefers-color-scheme: dark)"
+            />
+          </>
+        )}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
@@ -295,86 +359,93 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <NavigationLoadingIndicator />
-        <div className="bg-base-200 flex min-h-screen flex-col">
-          <div className="navbar bg-base-100 shadow">
+        <div
+          className={`bg-base-200 flex min-h-screen flex-col ${
+            user ? "pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0" : ""
+          }`}
+        >
+          <header className="bg-bar text-white">
             <div
-              className={`mx-auto w-full px-4 sm:px-6 lg:px-8 ${contentWidthClass}`}
+              className={`mx-auto flex w-full items-center gap-x-8 px-4 py-2 sm:px-6 lg:px-8 ${contentWidthClass}`}
             >
-              <div className="flex w-full items-center justify-between">
-                <Link to="/" aria-label="Inside Amelia Rescue">
-                  <img
-                    src="/logo-192.png"
-                    alt="Inside Amelia Rescue"
-                    className="h-10 w-10 rounded"
-                  />
-                </Link>
-                <div className="flex items-center gap-4">
-                  {loaderData?.user && (
-                    <Link
-                      to="/account/security"
-                      className="btn btn-ghost btn-sm"
+              <Link
+                to="/"
+                className="flex items-center gap-3 py-1"
+                aria-label="Inside Amelia Rescue home"
+              >
+                <img
+                  src="/logo-192.png"
+                  alt=""
+                  className="h-10 w-10 rounded-full"
+                />
+                <span className="font-display text-xl leading-none font-bold tracking-wide uppercase">
+                  <span className="sm:hidden">Inside AES</span>
+                  <span className="hidden sm:inline">Inside Amelia Rescue</span>
+                </span>
+              </Link>
+              {user && (
+                <nav
+                  aria-label="Main"
+                  className="hidden flex-1 gap-6 text-[15px] font-semibold lg:flex"
+                >
+                  {navLinks.map((link) => (
+                    <NavLink
+                      key={link.to}
+                      to={link.to}
+                      end={link.to === "/"}
+                      className={({ isActive }) =>
+                        `shrink-0 border-b-[3px] py-2.5 whitespace-nowrap ${
+                          isActive
+                            ? "border-primary text-white"
+                            : "text-bar-muted border-transparent hover:text-white"
+                        }`
+                      }
                     >
-                      Security
-                    </Link>
-                  )}
-                  <div className="dropdown dropdown-end">
-                    <div
-                      tabIndex={0}
-                      role="button"
-                      className="btn btn-ghost btn-sm"
-                    >
-                      Theme
-                    </div>
-                    <ul
-                      tabIndex={0}
-                      className="menu dropdown-content bg-base-100 rounded-box z-10 w-52 p-2 shadow"
-                    >
-                      <li>
-                        <button onClick={() => handleThemeChange("light")}>
-                          Light
-                        </button>
-                      </li>
-                      <li>
-                        <button onClick={() => handleThemeChange("dark")}>
-                          Dark
-                        </button>
-                      </li>
-                      <li>
-                        <button onClick={() => handleThemeChange("retro")}>
-                          Retro
-                        </button>
-                      </li>
-                      <li>
-                        <button onClick={() => handleThemeChange("forest")}>
-                          Forest
-                        </button>
-                      </li>
-                    </ul>
-                  </div>
-                  {loaderData?.user && (
-                    <Link to="/profile">
-                      <div className="avatar">
-                        <div className="ring-primary ring-offset-base-100 w-10 rounded-full ring ring-offset-2">
-                          {loaderData.user.profile_picture_url ? (
-                            <img
-                              src={loaderData.user.profile_picture_url}
-                              alt={`${loaderData.user.first_name} ${loaderData.user.last_name}`}
-                            />
-                          ) : (
-                            <div className="bg-neutral text-neutral-content flex h-full w-full items-center justify-center">
-                              <span className="text-xl">
-                                {loaderData.user.first_name.charAt(0)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                      {link.label}
+                    </NavLink>
+                  ))}
+                </nav>
+              )}
+              <div className="ml-auto flex items-center gap-3">
+                {user && (
+                  <Link
+                    to="/account/security"
+                    className="text-bar-muted hidden text-sm font-semibold hover:text-white lg:inline"
+                  >
+                    Security
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={handleThemeToggle}
+                  className="bg-bar-chip flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-white"
+                  aria-label="Toggle dark mode"
+                >
+                  <FiMoon className="theme-icon-moon h-5 w-5" />
+                  <FiSun className="theme-icon-sun h-5 w-5" />
+                </button>
+                {user && (
+                  <Link to="/profile" aria-label="Your profile">
+                    <div className="avatar">
+                      <div className="ring-primary ring-offset-bar w-10 rounded-full ring-2 ring-offset-2">
+                        {user.profile_picture_url ? (
+                          <img
+                            src={user.profile_picture_url}
+                            alt={`${user.first_name} ${user.last_name}`}
+                          />
+                        ) : (
+                          <div className="text-bar flex h-full w-full items-center justify-center bg-white font-bold">
+                            {user.first_name.charAt(0)}
+                            {user.last_name.charAt(0)}
+                          </div>
+                        )}
                       </div>
-                    </Link>
-                  )}
-                </div>
+                    </div>
+                  </Link>
+                )}
               </div>
             </div>
-          </div>
+          </header>
 
           <main
             className={`mx-auto w-full flex-1 px-4 py-10 sm:px-6 lg:px-8 ${contentWidthClass}`}
@@ -382,21 +453,47 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
 
-          <footer className="footer footer-center bg-base-300 text-base-content p-4">
-            <aside className="flex items-center gap-3">
-              <span>AES {loaderData?.currentYear}</span>
+          <footer className="bg-bar text-bar-muted text-sm">
+            <div
+              className={`mx-auto flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8 ${contentWidthClass}`}
+            >
+              <span className="font-mono tracking-widest uppercase">
+                AES · Since 1958
+              </span>
               <button
                 onClick={handleShare}
-                className="btn btn-ghost btn-sm flex items-center gap-2"
+                className="border-bar-chip flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-white"
                 aria-label="Share page link"
                 type="button"
               >
                 <FiShare2 />
-                <span>Share page link</span>
+                <span>Copy page link</span>
               </button>
-            </aside>
+            </div>
           </footer>
         </div>
+        {user && (
+          <nav
+            aria-label="Main"
+            className="dock border-base-300 z-40 border-t lg:hidden"
+          >
+            {navLinks.map(({ to, shortLabel, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === "/"}
+                className={({ isActive }) =>
+                  `min-w-0 ${isActive ? "dock-active text-primary" : ""}`
+                }
+              >
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span className="dock-label truncate font-semibold">
+                  {shortLabel}
+                </span>
+              </NavLink>
+            ))}
+          </nav>
+        )}
         <Toaster />
         <ScrollRestoration />
         <Scripts />

@@ -391,6 +391,12 @@ export default function Profile() {
                 >
                   {user.profile_picture_url ? "Change" : "Upload"} Photo
                 </button>
+                <Link
+                  to="/account/security"
+                  className="btn btn-xs btn-ghost lg:hidden"
+                >
+                  Security
+                </Link>
               </div>
             </div>
 

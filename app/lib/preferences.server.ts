@@ -9,8 +9,19 @@ export const preferencesCookie = createCookie("preferences", {
   maxAge: 60 * 60 * 24 * 365, // 1 year
 });
 
+export const themePreferences = ["light", "dark", "system"] as const;
+export type ThemePreference = (typeof themePreferences)[number];
+
+// Older cookies may hold retired daisyUI themes ("forest", "retro"); those
+// fall back to following the device setting.
+export function normalizeTheme(theme: unknown): ThemePreference {
+  return themePreferences.includes(theme as ThemePreference)
+    ? (theme as ThemePreference)
+    : "system";
+}
+
 export interface Preferences {
-  theme: string;
+  theme: ThemePreference;
   locale: string;
   timeZone: string;
 }
@@ -47,7 +58,7 @@ export async function getPreferences(request: Request): Promise<Preferences> {
       : "UTC";
 
   return {
-    theme: preferences?.theme || "forest",
+    theme: normalizeTheme(preferences?.theme),
     locale: preferences?.locale || getRequestLocale(request),
     timeZone,
   };

@@ -27,13 +27,13 @@ import {
   FaCheckCircle,
   FaArrowDown,
   FaArrowUp,
+  FaExclamation,
   FaExclamationTriangle,
   FaMinus,
-  FaTimesCircle,
-  FaMinusCircle,
   FaCalendarAlt,
   FaUsers,
 } from "react-icons/fa";
+import { FiCheck, FiX } from "react-icons/fi";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 
@@ -178,7 +178,7 @@ function ComplianceTrendChart({
   };
 
   return (
-    <div className="h-64 w-full">
+    <div className="relative h-64 w-full min-w-0">
       <Line data={data} options={options} />
     </div>
   );
@@ -237,10 +237,68 @@ function RiskTrendChart({ points }: { points: TrainingStatusTrendPoint[] }) {
   };
 
   return (
-    <div className="h-64 w-full">
+    <div className="relative h-64 w-full min-w-0">
       <Bar data={data} options={options} />
     </div>
   );
+}
+
+const statusLegend: { status: CertStatus; label: string }[] = [
+  { status: "active", label: "Active" },
+  { status: "expiring_soon", label: "Expiring soon" },
+  { status: "expired", label: "Expired" },
+  { status: "missing", label: "Missing" },
+];
+
+// Each status differs in shape as well as color, so the board still reads
+// for color-blind members and in bright sunlight.
+function StatusMark({ status }: { status: CertStatus }) {
+  const label = statusLegend.find((item) => item.status === status)?.label;
+  const base = "flex h-7 w-7 items-center justify-center";
+  switch (status) {
+    case "active":
+      return (
+        <span
+          role="img"
+          aria-label={label}
+          title={label}
+          className={`${base} bg-success text-success-content rounded-md`}
+        >
+          <FiCheck className="h-4 w-4" strokeWidth={4} />
+        </span>
+      );
+    case "expiring_soon":
+      return (
+        <span
+          role="img"
+          aria-label={label}
+          title={label}
+          className={`${base} bg-warning text-warning-content rounded-full`}
+        >
+          <FaExclamation className="h-3.5 w-3.5" />
+        </span>
+      );
+    case "expired":
+      return (
+        <span
+          role="img"
+          aria-label={label}
+          title={label}
+          className={`${base} bg-error text-error-content rounded-md`}
+        >
+          <FiX className="h-4 w-4" strokeWidth={4} />
+        </span>
+      );
+    default:
+      return (
+        <span
+          role="img"
+          aria-label={label}
+          title={label}
+          className={`${base} border-base-content/50 rounded-md border-2 border-dashed`}
+        />
+      );
+  }
 }
 
 export default function TrainingStatus() {
@@ -301,27 +359,9 @@ export default function TrainingStatus() {
               return <span className="text-base-content/20">—</span>;
             }
 
-            const badgeClass =
-              status === "active"
-                ? "badge-success"
-                : status === "expiring_soon"
-                  ? "badge-warning"
-                  : status === "expired"
-                    ? "badge-error"
-                    : "badge-error"; // missing is also red/error
-            const icon =
-              status === "active" ? (
-                <FaCheckCircle />
-              ) : status === "expiring_soon" ? (
-                <FaExclamationTriangle />
-              ) : status === "expired" ? (
-                <FaTimesCircle />
-              ) : (
-                <FaMinusCircle />
-              );
             return (
               <div className="flex justify-center">
-                <span className={`badge ${badgeClass} badge-sm`}>{icon}</span>
+                <StatusMark status={status} />
               </div>
             );
           },
@@ -371,7 +411,9 @@ export default function TrainingStatus() {
 
           <p className="text-base">
             This page shows the certifications across the organization that are
-            either required by local protocols, the training officer, by law, or because someone in government has a dogmatic insistence on antiquated powerpoints.
+            either required by local protocols, the training officer, by law, or
+            because someone in government has a dogmatic insistence on
+            antiquated powerpoints.
           </p>
 
           <div className="flex flex-col gap-3 pt-2 lg:flex-row lg:items-center lg:justify-between">
@@ -397,30 +439,12 @@ export default function TrainingStatus() {
           </div>
 
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="badge badge-success badge-sm">
-                <FaCheckCircle />
-              </span>
-              <span>Active</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-warning badge-sm">
-                <FaExclamationTriangle />
-              </span>
-              <span>Expiring Soon</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-error badge-sm">
-                <FaTimesCircle />
-              </span>
-              <span>Expired</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-error badge-sm">
-                <FaMinusCircle />
-              </span>
-              <span>Missing</span>
-            </div>
+            {statusLegend.map(({ status, label }) => (
+              <div key={status} className="flex items-center gap-2">
+                <StatusMark status={status} />
+                <span>{label}</span>
+              </div>
+            ))}
           </div>
 
           <div className="rounded-box border-base-300/60 w-full overflow-x-auto border">
@@ -565,7 +589,7 @@ export default function TrainingStatus() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-2">
-            <div className="card bg-base-200 shadow-sm">
+            <div className="card bg-base-200 min-w-0 shadow-sm">
               <div className="card-body">
                 <div className="mb-3 flex items-start justify-between gap-4">
                   <div>
@@ -582,7 +606,7 @@ export default function TrainingStatus() {
               </div>
             </div>
 
-            <div className="card bg-base-200 shadow-sm">
+            <div className="card bg-base-200 min-w-0 shadow-sm">
               <div className="card-body">
                 <div className="mb-3 flex items-start justify-between gap-4">
                   <div>
