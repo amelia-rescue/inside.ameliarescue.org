@@ -2,6 +2,7 @@ import { data } from "react-router";
 import type { Route } from "./+types/certifications.save";
 import { CertificationStore } from "~/lib/certifications/certification-store";
 import { CertificationTypeStore } from "~/lib/certifications/certification-type-store";
+import { normalizeCertificationDate } from "~/lib/certifications/training-status-export";
 import dayjs from "dayjs";
 import { log } from "~/lib/logger";
 import { requireSelfOrAdmin } from "~/lib/authorize.server";
@@ -14,8 +15,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     "certification_type_name",
   ) as string;
   const fileUrl = formData.get("file_url") as string;
-  const expires_on = formData.get("expires_on") as string | undefined;
-  const issued_on = formData.get("issued_on") as string | undefined;
+  const expires_on =
+    normalizeCertificationDate(formData.get("expires_on") as string | null) ||
+    undefined;
+  const issued_on =
+    normalizeCertificationDate(formData.get("issued_on") as string | null) ||
+    undefined;
 
   if (!certificationId || !userId || !certificationTypeName || !fileUrl) {
     return data({ error: "Missing required fields" }, { status: 400 });

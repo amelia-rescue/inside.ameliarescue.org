@@ -249,6 +249,10 @@ function TruckCheckDynamicView({
   const rejectedChanges = sync.pending.filter(
     (change) => isLocked || change.rejected,
   );
+  const dismissModalRef = useRef<HTMLDialogElement>(null);
+  const [changeToDismiss, setChangeToDismiss] = useState<
+    (typeof rejectedChanges)[number] | null
+  >(null);
   const uploadingPhotos = Object.values(photoUploadStatus).some(
     (status) => status.isUploading,
   );
@@ -1232,12 +1236,8 @@ function TruckCheckDynamicView({
                   type="button"
                   className="btn btn-xs ml-2"
                   onClick={() => {
-                    if (
-                      window.confirm(
-                        "Dismiss this unsaved change from this device?",
-                      )
-                    )
-                      sync.dismiss(change);
+                    setChangeToDismiss(change);
+                    dismissModalRef.current?.showModal();
                   }}
                 >
                   Dismiss
@@ -1485,6 +1485,50 @@ function TruckCheckDynamicView({
           </form>
         </dialog>
       )}
+
+      <dialog
+        ref={dismissModalRef}
+        className="modal"
+        onClose={() => setChangeToDismiss(null)}
+      >
+        <div className="modal-box">
+          <h3 className="text-lg font-bold">Dismiss this unsaved change?</h3>
+          <p className="py-3">
+            This removes the change from this device. It was never saved to the
+            check, so it will be lost.
+          </p>
+          {changeToDismiss && (
+            <p className="bg-base-200 rounded-box p-3 text-sm break-words">
+              <strong>{changeToDismiss.fieldId}</strong>:{" "}
+              <span className="select-text">
+                {JSON.stringify(changeToDismiss.value)}
+              </span>
+            </p>
+          )}
+          <div className="modal-action">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => dismissModalRef.current?.close()}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-warning"
+              onClick={() => {
+                if (changeToDismiss) sync.dismiss(changeToDismiss);
+                dismissModalRef.current?.close();
+              }}
+            >
+              Dismiss change
+            </button>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
 
       {/* Sticky Action Bar */}
       <div className="bg-base-100/80 fixed right-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 z-10 border-t backdrop-blur-sm lg:bottom-0">

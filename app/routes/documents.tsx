@@ -36,6 +36,13 @@ export default function Documents() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | undefined>();
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const [documentToDelete, setDocumentToDelete] = useState<{
+    key: string;
+    name: string;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | undefined>();
 
   const formatDocumentName = (name: string) => {
     const formattedName = name
@@ -141,14 +148,20 @@ export default function Documents() {
     }
   };
 
-  const handleDelete = async (key: string) => {
-    if (!window.confirm("Delete this document?")) {
-      return;
-    }
+  const openDeleteDialog = (doc: { key: string; name: string }) => {
+    setDeleteError(undefined);
+    setDocumentToDelete(doc);
+    deleteDialogRef.current?.showModal();
+  };
+
+  const handleDelete = async () => {
+    if (!documentToDelete) return;
+    setDeleting(true);
+    setDeleteError(undefined);
 
     try {
       const formData = new FormData();
-      formData.append("key", key);
+      formData.append("key", documentToDelete.key);
 
       const response = await fetch("/api/documents/delete", {
         method: "POST",
@@ -163,8 +176,11 @@ export default function Documents() {
       }
 
       revalidator.revalidate();
+      deleteDialogRef.current?.close();
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "Delete failed");
+      setDeleteError(error instanceof Error ? error.message : "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -272,6 +288,47 @@ export default function Documents() {
             </form>
           </dialog>
 
+          <dialog ref={deleteDialogRef} className="modal">
+            <div className="modal-box">
+              <h3 className="text-lg font-bold">Delete this document?</h3>
+              <p className="py-3">
+                {documentToDelete && (
+                  <strong>{formatDocumentName(documentToDelete.name)}</strong>
+                )}{" "}
+                will be removed for everyone. This action cannot be undone.
+              </p>
+              {deleteError && (
+                <div className="alert alert-error">
+                  <span>{deleteError}</span>
+                </div>
+              )}
+              <div className="modal-action">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => deleteDialogRef.current?.close()}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-error"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting && (
+                    <span className="loading loading-spinner loading-sm" />
+                  )}
+                  {deleting ? "Deleting..." : "Delete document"}
+                </button>
+              </div>
+            </div>
+            <form method="dialog" className="modal-backdrop">
+              <button disabled={deleting}>close</button>
+            </form>
+          </dialog>
+
           <div className="grid gap-4">
             {documents.map((doc) => (
               <div key={doc.key} className="card bg-base-200">
@@ -302,7 +359,7 @@ export default function Documents() {
                             <button
                               type="button"
                               className="btn btn-error btn-sm"
-                              onClick={() => handleDelete(doc.key)}
+                              onClick={() => openDeleteDialog(doc)}
                             >
                               Delete
                             </button>

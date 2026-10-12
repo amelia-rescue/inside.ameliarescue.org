@@ -121,6 +121,45 @@ describe("buildTrainingStatusData", () => {
   });
 });
 
+describe("non-expiring certifications", () => {
+  it('treats legacy "null" date strings as no date', () => {
+    const result = buildTrainingStatusData({
+      now: new Date("2026-03-21T18:00:00.000Z"),
+      users: [
+        {
+          user_id: "u1",
+          first_name: "Jane",
+          last_name: "Doe",
+          email: "jane@ameliarescue.org",
+          website_role: "user",
+          membership_roles: [],
+        },
+      ],
+      tracks: [],
+      certificationsByUserId: {
+        u1: [
+          {
+            certification_id: "c1",
+            user_id: "u1",
+            certification_type_name: "NIMS 100",
+            file_url: "https://inside.ameliarescue.org/files/nims.pdf",
+            issued_on: "null",
+            expires_on: "null",
+            uploaded_at: "2025-01-02T00:00:00.000Z",
+            created_by: "test-user",
+          },
+        ],
+      },
+    });
+
+    expect(result.exportRows[0]).toMatchObject({
+      status: "active",
+      issued_on: "",
+      expires_on: "",
+    });
+  });
+});
+
 describe("serializeTrainingStatusExportRowsToCsv", () => {
   it("escapes commas and quotes and normalizes booleans", () => {
     const csv = serializeTrainingStatusExportRowsToCsv([

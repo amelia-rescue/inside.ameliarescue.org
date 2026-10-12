@@ -50,6 +50,12 @@ interface BuildTrainingStatusDataParams {
   now?: Date;
 }
 
+// Older uploads of non-expiring certifications stored the string "null", so
+// anything that is not a real date is treated as no date.
+export function normalizeCertificationDate(value: string | null | undefined) {
+  return value && !Number.isNaN(new Date(value).getTime()) ? value : "";
+}
+
 export function calculateCertificationStatus(
   certification: Pick<Certification, "expires_on"> | null | undefined,
   now: Date = new Date(),
@@ -58,11 +64,12 @@ export function calculateCertificationStatus(
     return "missing";
   }
 
-  if (!certification.expires_on) {
+  const expiresOnValue = normalizeCertificationDate(certification.expires_on);
+  if (!expiresOnValue) {
     return "active";
   }
 
-  const expiresOn = new Date(certification.expires_on);
+  const expiresOn = new Date(expiresOnValue);
   const threeMonthsFromNow = new Date(now);
   threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
 
@@ -208,8 +215,8 @@ export function buildTrainingStatusData({
         certification_type: certificationTypeName,
         required,
         status: calculateCertificationStatus(certification, now),
-        issued_on: certification?.issued_on || "",
-        expires_on: certification?.expires_on || "",
+        issued_on: normalizeCertificationDate(certification?.issued_on),
+        expires_on: normalizeCertificationDate(certification?.expires_on),
         uploaded_at: certification?.uploaded_at || "",
         created_by: certification?.created_by || "",
         file_url: certification?.file_url || "",

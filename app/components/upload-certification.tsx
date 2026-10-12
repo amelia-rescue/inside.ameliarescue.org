@@ -69,8 +69,11 @@ export function CertificationUpload({
       saveFormData.append("user_id", userId);
       saveFormData.append("certification_type_name", certificationType.name);
       saveFormData.append("file_url", fileUrl);
-      saveFormData.append("expires_on", formData.get("expires_on") as string);
-      saveFormData.append("issued_on", formData.get("issued_on") as string);
+      for (const field of ["expires_on", "issued_on"]) {
+        const value = formData.get(field);
+        if (typeof value === "string" && value)
+          saveFormData.append(field, value);
+      }
 
       const saveResponse = await fetch("/api/certifications/save", {
         method: "POST",
