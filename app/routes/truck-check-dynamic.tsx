@@ -231,7 +231,6 @@ function TruckCheckDynamicView({
   const lockNoticeShownRef = useRef(false);
   const lockModalRef = useRef<HTMLDialogElement>(null);
   const handledCompletionEventsRef = useRef(new Set<string>());
-  const completionSoundRef = useRef<HTMLAudioElement | null>(null);
 
   // Field updates are queued while the socket is down and replayed on rejoin.
   // Taking a photo backgrounds the browser, which drops the connection, so
@@ -469,10 +468,6 @@ function TruckCheckDynamicView({
             });
           }, 250);
         }
-        if (completionSoundRef.current) {
-          completionSoundRef.current.currentTime = 0;
-          void completionSoundRef.current.play().catch(() => {});
-        }
         showToast({
           message: `${data.completedByName || "Someone"} completed the truck check!`,
           type: "alert-success",
@@ -515,20 +510,6 @@ function TruckCheckDynamicView({
       void revalidator.revalidate();
     }
   }, [sync.snapshot.locked, truckCheck.locked, revalidator]);
-
-  useEffect(() => {
-    completionSoundRef.current = new Audio(
-      "/sounds/Zelda-Get-Item-Sound-Effect.mp3",
-    );
-    completionSoundRef.current.preload = "auto";
-
-    return () => {
-      if (completionSoundRef.current) {
-        completionSoundRef.current.pause();
-        completionSoundRef.current = null;
-      }
-    };
-  }, []);
 
   useEffect(
     () => () => {
