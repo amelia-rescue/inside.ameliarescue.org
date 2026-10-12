@@ -1091,7 +1091,7 @@ function TruckCheckDynamicView({
   );
 
   return (
-    <div className="container mx-auto max-w-4xl px-0 pt-8 pb-24 sm:px-4">
+    <div className="container mx-auto max-w-4xl px-0 pb-24 sm:px-4">
       {/* Breadcrumb */}
       <div className="mb-4">
         <a

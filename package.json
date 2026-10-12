@@ -22,6 +22,7 @@
     "deploy:app": "npm run build && npm run cdk deploy InsideAmeliaRescueStack -- --profile aes",
     "destroy": "npm run cdk destroy -- --profile aes",
     "diff": "npm run cdk diff -- --profile aes",
+    "console:prod": "tsx scripts/open-console.ts aes",
     "migrate:users:v2": "tsx scripts/migrate-users-to-v2.ts",
     "backfill:truck-check-contributors": "tsx scripts/backfill-truck-check-contributors.ts",
     "backfill:truck-check-gsi": "tsx scripts/backfill-truck-check-gsi.ts"

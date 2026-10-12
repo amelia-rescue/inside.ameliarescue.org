@@ -1,14 +1,29 @@
 import { appContext } from "~/context";
 import type { Route } from "./+types/truck-check";
 import { TruckCheckStore } from "~/lib/truck-check/truck-check-store";
-import { data, redirect, useFetcher, useLoaderData, Link } from "react-router";
+import {
+  data,
+  redirect,
+  useFetcher,
+  useLoaderData,
+  useNavigate,
+  Link,
+} from "react-router";
 import { useEffect, useRef, useState } from "react";
-import { IoWarning } from "react-icons/io5";
+import {
+  FiAlertTriangle,
+  FiCheck,
+  FiChevronDown,
+  FiChevronRight,
+  FiX,
+} from "react-icons/fi";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import {
   TruckCheckSchemaStore,
   type TruckCheckSchema,
 } from "~/lib/truck-check/truck-check-schema-store";
-import { DateDisplay } from "~/components/date-display";
 import {
   extractIssues,
   getFieldId,
@@ -32,9 +47,13 @@ type TruckCheckWithCompletion = TruckCheckListItem & {
   photos: PhotoAttachment[];
 };
 
-function photoCount(photos: PhotoAttachment[]): number {
-  return photos.reduce((sum, photo) => sum + photo.urls.length, 0);
-}
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// Matches the scheduled lock job in server/truck-check-lock.ts.
+const LOCK_AFTER_HOURS = 24;
+// Trucks not checked for this many days are flagged on their filter chip.
+const OVERDUE_DAYS = 7;
 
 function isFieldFilled(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -148,6 +167,59 @@ async function addCompletionProgress({
   );
 }
 
+// Display fields worked out on the server in the member's time zone, so the
+// rendered times match what they see elsewhere (24-hour clock).
+function toLogEntries(
+  checks: TruckCheckWithCompletion[],
+  trucks: Truck[],
+  timeZone: string,
+  now = new Date(),
+) {
+  const today = dayjs(now).tz(timeZone).startOf("day");
+  return checks.map((check) => {
+    const created = dayjs(check.created_at).tz(timeZone);
+    const daysAgo = today.diff(created.startOf("day"), "day");
+    const date = created.format("ddd, MMM D");
+    return {
+      ...check,
+      truckName:
+        trucks.find((t) => t.truckId === check.truck)?.displayName ??
+        check.truck,
+      time: created.format("HH:mm"),
+      dayKey: created.format("YYYY-MM-DD"),
+      dayLabel:
+        daysAgo === 0
+          ? `Today · ${date}`
+          : daysAgo === 1
+            ? `Yesterday · ${date}`
+            : date,
+      crew: Object.values(check.contributors)
+        .map((c) => `${c.first_name.charAt(0)}. ${c.last_name}`)
+        .join(", "),
+      locksInHours: check.locked
+        ? null
+        : Math.max(
+            0,
+            Math.ceil(
+              dayjs(check.created_at)
+                .add(LOCK_AFTER_HOURS, "hour")
+                .diff(now, "hour", true),
+            ),
+          ),
+    };
+  });
+}
+
+async function listChecks(
+  store: TruckCheckStore,
+  truck: string | null,
+  lastEvaluatedKey?: Record<string, unknown>,
+) {
+  return truck
+    ? store.listTruckChecksByTruck({ truck, lastEvaluatedKey })
+    : store.listTruckChecks(lastEvaluatedKey);
+}
+
 export async function action({ context, request }: Route.ActionArgs) {
   const ctx = context.get(appContext);
   if (!ctx) {
@@ -202,9 +274,14 @@ export async function action({ context, request }: Route.ActionArgs) {
     const lastEvaluatedKey = lastEvaluatedKeyJson
       ? (JSON.parse(lastEvaluatedKeyJson as string) as Record<string, unknown>)
       : undefined;
+    const truckFilter = formData.get("truck");
     const truckCheckStore = TruckCheckStore.make();
     const truckCheckSchemaStore = TruckCheckSchemaStore.make();
-    const result = await truckCheckStore.listTruckChecks(lastEvaluatedKey);
+    const result = await listChecks(
+      truckCheckStore,
+      typeof truckFilter === "string" && truckFilter ? truckFilter : null,
+      lastEvaluatedKey,
+    );
     const trucks = await truckCheckSchemaStore.listTrucks();
     const truckChecksWithCompletion = await addCompletionProgress({
       truckChecks: result.truckChecks,
@@ -213,24 +290,43 @@ export async function action({ context, request }: Route.ActionArgs) {
     });
 
     return {
-      truckChecks: truckChecksWithCompletion,
+      truckChecks: toLogEntries(
+        truckChecksWithCompletion,
+        trucks,
+        ctx.timeZone,
+      ),
       lastEvaluatedKey: result.lastEvaluatedKey,
     };
   }
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ context, request }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
   if (!ctx) {
     throw new Error("context not found");
   }
 
+  const truckFilter = new URL(request.url).searchParams.get("truck") || null;
   const truckCheckStore = TruckCheckStore.make();
   const truckCheckSchemaStore = TruckCheckSchemaStore.make();
 
-  const { truckChecks: previousChecks, lastEvaluatedKey } =
-    await truckCheckStore.listTruckChecks();
   const trucks = await truckCheckSchemaStore.listTrucks();
+  const activeTrucks = trucks
+    .filter((truck) => !truck.retired)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  const [{ truckChecks: previousChecks, lastEvaluatedKey }, lastChecks] =
+    await Promise.all([
+      listChecks(truckCheckStore, truckFilter),
+      Promise.all(
+        activeTrucks.map((truck) =>
+          truckCheckStore.listTruckChecksByTruck({
+            truck: truck.truckId,
+            limit: 1,
+          }),
+        ),
+      ),
+    ]);
 
   // Sort checks by created_at descending (newest first)
   const sortedChecks = [...previousChecks].sort(
@@ -244,52 +340,64 @@ export async function loader({ context }: Route.LoaderArgs) {
     truckCheckSchemaStore,
   });
 
+  const today = dayjs().tz(ctx.timeZone).startOf("day");
+  const truckFilters = activeTrucks.map((truck, index) => {
+    const last = lastChecks[index].truckChecks[0]?.created_at;
+    const daysAgo = last
+      ? today.diff(dayjs(last).tz(ctx.timeZone).startOf("day"), "day")
+      : null;
+    return {
+      truckId: truck.truckId,
+      displayName: truck.displayName,
+      age: daysAgo === null ? null : daysAgo === 0 ? "today" : `${daysAgo}d`,
+      overdue: daysAgo === null || daysAgo >= OVERDUE_DAYS,
+    };
+  });
+
   return {
     user: ctx.user,
-    truckChecks: truckChecksWithCompletion,
+    truckChecks: toLogEntries(truckChecksWithCompletion, trucks, ctx.timeZone),
     trucks,
+    truckFilters,
+    truckFilter,
     lastEvaluatedKey,
   };
 }
 
+type LogEntry = ReturnType<typeof toLogEntries>[number];
+
 export default function TruckCheck() {
-  const { truckChecks, trucks, lastEvaluatedKey } =
-    useLoaderData<typeof loader>();
+  const {
+    user,
+    truckChecks,
+    trucks,
+    truckFilters,
+    truckFilter,
+    lastEvaluatedKey,
+  } = useLoaderData<typeof loader>();
   const activeTrucks = trucks.filter((truck) => !truck.retired);
+  const selectedTruck = truckFilters.find((t) => t.truckId === truckFilter);
+  const navigate = useNavigate();
 
   const fetcher = useFetcher<typeof action>();
   const modalRef = useRef<HTMLDialogElement>(null);
-
-  const toggleModal = () => {
-    if (modalRef.current) {
-      if (modalRef.current.open) {
-        modalRef.current.close();
-      } else {
-        modalRef.current.showModal();
-      }
-    }
-  };
-
   const truckCheckFetcher = useFetcher<typeof action>();
-  const [allChecks, setAllChecks] = useState(truckChecks);
+  const [allChecks, setAllChecks] = useState<LogEntry[]>(truckChecks);
   const [currentLastKey, setCurrentLastKey] = useState<
     Record<string, unknown> | undefined
   >(lastEvaluatedKey);
-  const [selectedCheck, setSelectedCheck] =
-    useState<TruckCheckWithCompletion | null>(null);
-  const problemModalRef = useRef<HTMLDialogElement>(null);
+  const [problemsOnly, setProblemsOnly] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const openProblemModal = (check: TruckCheckWithCompletion) => {
-    setSelectedCheck(check);
-    problemModalRef.current?.showModal();
-  };
+  // A new truck filter loads a fresh first page.
+  useEffect(() => {
+    setAllChecks(truckChecks);
+    setCurrentLastKey(lastEvaluatedKey);
+  }, [truckChecks, lastEvaluatedKey]);
 
   useEffect(() => {
     const data = truckCheckFetcher.data as
-      | {
-          truckChecks: typeof truckChecks;
-          lastEvaluatedKey?: Record<string, unknown>;
-        }
+      | { truckChecks: LogEntry[]; lastEvaluatedKey?: Record<string, unknown> }
       | undefined;
     if (!data) return;
     setAllChecks((prev) => {
@@ -303,40 +411,55 @@ export default function TruckCheck() {
     setCurrentLastKey(data.lastEvaluatedKey);
   }, [truckCheckFetcher.data]);
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="breadcrumbs mb-4 text-sm">
-        <ul>
-          <li>
-            <Link to="/">Home</Link>
-          </li>
-          <li>Truck Checks</li>
-        </ul>
-      </div>
+  const openChecks = allChecks.filter((check) => !check.locked);
+  const history = allChecks.filter(
+    (check) => check.locked && (!problemsOnly || check.problemCount > 0),
+  );
+  const days: { key: string; label: string; checks: LogEntry[] }[] = [];
+  for (const check of history) {
+    const day = days[days.length - 1];
+    if (day?.key === check.dayKey) {
+      day.checks.push(check);
+    } else {
+      days.push({ key: check.dayKey, label: check.dayLabel, checks: [check] });
+    }
+  }
 
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  return (
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Truck Checks</h1>
-          <p className="mt-2 opacity-70">
-            Collaborative truck inspection checklists
-          </p>
+          <p className="eyebrow text-base-content/70">Truck checks</p>
+          <h1 className="text-5xl leading-none font-bold sm:text-6xl">
+            Check log
+          </h1>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <a className="btn btn-ghost btn-sm" href="/truck-check-legacy">
-            Legacy Google Sheet
-          </a>
-          <Link className="btn btn-secondary" to="/truck-check/analytics">
+        <div className="flex flex-wrap gap-3">
+          <Link
+            className="btn btn-outline border-base-content border-2"
+            to="/truck-check/analytics"
+          >
             Analytics
           </Link>
           <button
             className="btn btn-primary"
-            onClick={toggleModal}
+            onClick={() => modalRef.current?.showModal()}
             disabled={activeTrucks.length === 0}
           >
-            Start New Check
+            Start a check
+            <FiChevronRight className="h-5 w-5" />
           </button>
         </div>
-      </div>
+      </section>
+
       <dialog ref={modalRef} id="start-new-check-modal" className="modal">
         <div className="modal-box">
           <form method="dialog">
@@ -344,313 +467,347 @@ export default function TruckCheck() {
               ✕
             </button>
           </form>
-          <fetcher.Form method="post">
-            <h3 className="text-lg font-bold">New Truck Check!</h3>
-            <p className="py-4">
-              Once you create a new check other members will be able to edit it
-              simultaneously.
+          <fetcher.Form method="post" className="flex flex-col gap-4">
+            <h3 className="section-title">Start a check</h3>
+            <p className="text-base-content/70">
+              Other members can join and edit the check at the same time. It
+              locks automatically after 24 hours.
             </p>
-            <div className="alert alert-warning">
-              <IoWarning />
-              Truck checks are automatically locked after 24 hours.
-            </div>
             {fetcher.data && "error" in fetcher.data && (
-              <div className="alert alert-error mt-4">{fetcher.data.error}</div>
+              <div className="alert alert-error">{fetcher.data.error}</div>
             )}
             <input type="hidden" name="intent" value="create" />
-            <select className="select mt-4" required name="truck">
-              {activeTrucks.map((truck) => (
-                <option key={truck.truckId} value={truck.truckId}>
-                  {truck.displayName}
-                </option>
-              ))}
-            </select>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-base-content/70 text-sm font-semibold">
+                Truck
+              </span>
+              <select
+                className="select select-lg w-full"
+                required
+                name="truck"
+                defaultValue={truckFilter ?? undefined}
+              >
+                {activeTrucks.map((truck) => (
+                  <option key={truck.truckId} value={truck.truckId}>
+                    {truck.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="modal-action">
               <button
                 type="submit"
-                className={`btn ${fetcher.state !== "idle" ? "btn-disabled" : "btn-primary"}`}
+                className="btn btn-primary"
                 disabled={fetcher.state !== "idle"}
               >
                 {fetcher.state !== "idle" ? (
                   <span className="loading loading-spinner" />
                 ) : (
-                  "Start New Check"
+                  "Start check"
                 )}
               </button>
             </div>
           </fetcher.Form>
         </div>
       </dialog>
-      <div className="space-y-4">
-        {allChecks.length === 0 ? (
-          <div className="card border-base-300 bg-base-100 border border-dashed">
-            <div className="card-body items-center py-12 text-center">
-              <div className="mb-2 text-4xl opacity-40">✓</div>
-              <h2 className="text-lg font-semibold">No truck checks yet</h2>
-              <p className="max-w-sm text-sm opacity-60">
-                Start your first check to begin tracking truck readiness.
-              </p>
-            </div>
+
+      {openChecks.length > 0 && (
+        <section aria-labelledby="open-now" className="flex flex-col gap-3">
+          <h2 id="open-now" className="eyebrow text-base-content/70">
+            Open now
+          </h2>
+          {openChecks.map((check) => (
+            <Link
+              key={check.id}
+              to={`/truck-checks/${check.id}`}
+              className="bg-base-100 border-base-content rounded-box flex flex-wrap items-center gap-x-6 gap-y-3 border-2 px-5 py-4"
+            >
+              <span className="flex min-w-36 flex-col">
+                <span className="font-display text-4xl leading-none font-bold">
+                  {check.truckName}
+                </span>
+                <span className="text-base-content/70 text-sm">
+                  Started {check.time}
+                  {check.locksInHours !== null &&
+                    ` · locks in ${check.locksInHours}h`}
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-1.5">
+                <progress
+                  className="progress progress-warning h-2.5 w-full"
+                  value={check.requiredCompleted}
+                  max={check.requiredTotal || 1}
+                />
+                <span className="text-base-content/70 text-sm">
+                  <strong className="text-base-content">
+                    {check.requiredCompleted}
+                  </strong>{" "}
+                  of {check.requiredTotal}
+                  {check.crew && ` · ${check.crew}`}
+                </span>
+              </span>
+              <span className="btn btn-primary">
+                {check.contributors[user.user_id] ? "Continue" : "Join"}
+                <FiChevronRight className="h-5 w-5" />
+              </span>
+            </Link>
+          ))}
+        </section>
+      )}
+
+      <section aria-labelledby="history" className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <h2 id="history" className="section-title mr-auto">
+            History
+          </h2>
+          <label className="flex items-center gap-2">
+            <span className="sr-only">Truck</span>
+            <select
+              className="select border-base-content w-auto min-w-44 border-2 font-semibold"
+              value={truckFilter ?? ""}
+              onChange={(event) =>
+                navigate(
+                  event.target.value
+                    ? `/truck-check?truck=${encodeURIComponent(event.target.value)}`
+                    : "/truck-check",
+                  { preventScrollReset: true },
+                )
+              }
+            >
+              <option value="">All trucks</option>
+              {truckFilters.map((truck) => (
+                <option key={truck.truckId} value={truck.truckId}>
+                  {truck.displayName}
+                </option>
+              ))}
+            </select>
+            {selectedTruck?.overdue && (
+              <span className="bg-warning text-warning-content rounded px-1.5 font-mono text-xs">
+                {selectedTruck.age ?? "none"}
+              </span>
+            )}
+          </label>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-primary"
+              checked={problemsOnly}
+              onChange={(event) => setProblemsOnly(event.target.checked)}
+            />
+            Problems only
+          </label>
+        </div>
+
+        {days.length === 0 ? (
+          <div className="bg-base-100 border-base-300 rounded-box text-base-content/70 border border-dashed p-8 text-center">
+            {problemsOnly
+              ? "No problems reported on these checks."
+              : "No finished checks yet."}
           </div>
         ) : (
-          allChecks.map((check) => {
-            const truck = trucks.find((t) => t.truckId === check.truck);
-            const checkDate = new Date(check.created_at);
-            const isRecent =
-              Date.now() - checkDate.getTime() < 24 * 60 * 60 * 1000;
-            const contributorNames = Object.values(check.contributors).map(
-              (contributor) =>
-                `${contributor.first_name} ${contributor.last_name}`.trim(),
-            );
-            const isComplete =
-              check.requiredTotal > 0 &&
-              check.requiredCompleted === check.requiredTotal;
-
-            return (
-              <article
-                key={check.id}
-                className="rounded-box border-base-300 bg-base-100 overflow-hidden border shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div className="flex flex-col gap-5 p-4 sm:p-5 lg:flex-row lg:items-center lg:gap-6">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="min-w-0 truncate text-lg font-bold sm:text-xl">
-                        {truck?.displayName || check.truck}
-                      </h2>
-                      {isRecent && (
-                        <span className="badge badge-info badge-sm">
-                          Recent
-                        </span>
-                      )}
-                      {check.locked && (
-                        <span className="badge badge-error badge-sm">
-                          Locked
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm opacity-60">
-                      <DateDisplay
-                        value={check.created_at}
-                        format="shortDate"
-                      />{" "}
-                      at{" "}
-                      <DateDisplay
-                        value={check.created_at}
-                        format="shortTime"
-                      />
-                      <span className="mx-2">·</span>
-                      <span className="font-mono text-xs">
-                        #{check.id.slice(0, 8)}
-                      </span>
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${isComplete ? "bg-success" : "bg-warning"}`}
-                        />
-                        <span>
-                          <span className="font-semibold">
-                            {check.requiredCompleted}/{check.requiredTotal}
-                          </span>{" "}
-                          complete
-                        </span>
-                      </div>
-                      <div className="max-w-full min-w-0 truncate opacity-70">
-                        {contributorNames.length > 0
-                          ? contributorNames.join(", ")
-                          : "No contributors"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row lg:w-44 lg:flex-col">
-                    {check.problemCount > 0 && (
-                      <button
-                        type="button"
-                        className="btn btn-error btn-sm sm:flex-1"
-                        onClick={() => openProblemModal(check)}
-                      >
-                        {check.problemCount} problem
-                        {check.problemCount === 1 ? "" : "s"} found
-                      </button>
-                    )}
-                    <a
-                      href={`/truck-checks/${check.id}`}
-                      className={`btn btn-sm sm:flex-1 ${check.locked ? "btn-outline" : "btn-primary"}`}
-                    >
-                      {check.locked ? "View check" : "Edit check"}
-                    </a>
-                  </div>
-                </div>
-              </article>
-            );
-          })
+          days.map((day) => (
+            <div key={day.key} className="flex flex-col gap-2">
+              <h3 className="eyebrow text-base-content/70">{day.label}</h3>
+              <ul className="bg-base-100 border-base-300 rounded-box overflow-hidden border">
+                {day.checks.map((check) => (
+                  <LogRow
+                    key={check.id}
+                    check={check}
+                    expanded={expanded.has(check.id)}
+                    onToggle={() => toggleExpanded(check.id)}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))
         )}
 
-        {currentLastKey && (
-          <div className="flex justify-center pt-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {currentLastKey ? (
             <button
-              className={`btn ${truckCheckFetcher.state !== "idle" ? "btn-disabled" : "btn-outline"}`}
+              className="btn btn-outline border-base-content border-2"
               disabled={truckCheckFetcher.state !== "idle"}
-              onClick={() => {
-                if (!currentLastKey || truckCheckFetcher.state !== "idle") {
-                  return;
-                }
-
+              onClick={() =>
                 truckCheckFetcher.submit(
                   {
                     intent: "scroll",
                     lastEvaluatedKey: JSON.stringify(currentLastKey),
+                    truck: truckFilter ?? "",
                   },
                   { method: "post" },
-                );
-              }}
+                )
+              }
               type="button"
             >
               {truckCheckFetcher.state !== "idle"
-                ? "Loading..."
-                : "Load more checks"}
+                ? "Loading…"
+                : "Load older checks"}
             </button>
-          </div>
-        )}
-      </div>
+          ) : (
+            <span />
+          )}
+          <a
+            className="text-base-content/70 text-sm underline"
+            href="/truck-check-legacy"
+          >
+            Old Google Sheet log
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
 
-      <dialog
-        ref={problemModalRef}
-        id="problem-detail-modal"
-        className="modal"
-        onClose={() => setSelectedCheck(null)}
-      >
-        <div className="modal-box max-w-3xl">
-          <form method="dialog">
+function LogRow({
+  check,
+  expanded,
+  onToggle,
+}: {
+  check: LogEntry;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const complete =
+    check.requiredTotal > 0 && check.requiredCompleted >= check.requiredTotal;
+  const panelId = `problems-${check.id}`;
+  return (
+    <li className="border-base-300 border-b last:border-b-0">
+      <div className="hover:bg-base-200 flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
+        <Link
+          to={`/truck-checks/${check.id}`}
+          className="flex min-w-0 flex-[1_1_320px] flex-col gap-0.5"
+        >
+          <span className="flex items-baseline gap-4">
+            <span className="text-base-content/70 w-12 shrink-0 font-mono text-sm">
+              {check.time}
+            </span>
+            <span className="font-display text-2xl leading-tight font-bold">
+              {check.truckName}
+            </span>
+          </span>
+          {check.crew && (
+            <span className="text-base-content/70 pl-16 text-sm">
+              {check.crew}
+            </span>
+          )}
+        </Link>
+        <span className="flex w-36 flex-col gap-1">
+          <progress
+            className={`progress h-1.5 w-full ${complete ? "progress-success" : "progress-warning"}`}
+            value={check.requiredCompleted}
+            max={check.requiredTotal || 1}
+          />
+          <span className="text-base-content/70 text-xs">
+            {check.requiredCompleted} / {check.requiredTotal}
+            {!complete && " · not finished"}
+          </span>
+        </span>
+        <span className="flex w-36 justify-end">
+          {check.problemCount > 0 ? (
             <button
-              type="submit"
-              className="btn btn-sm btn-circle btn-ghost absolute top-2 right-2"
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={panelId}
+              onClick={onToggle}
+              className="bg-error text-error-content flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-sm font-bold"
             >
-              ✕
+              <FiAlertTriangle className="h-3.5 w-3.5" />
+              {check.problemCount} problem{check.problemCount === 1 ? "" : "s"}
+              <FiChevronDown
+                className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+              />
             </button>
-          </form>
-          {selectedCheck && (
-            <>
-              <h3 className="text-lg font-bold">
-                {trucks.find((t) => t.truckId === selectedCheck.truck)
-                  ?.displayName || selectedCheck.truck}{" "}
-                Problems
-              </h3>
-              <p className="py-2 text-sm opacity-60">
-                <DateDisplay
-                  value={selectedCheck.created_at}
-                  format="shortDate"
-                />{" "}
-                at{" "}
-                <DateDisplay
-                  value={selectedCheck.created_at}
-                  format="shortTime"
-                />{" "}
-                · {selectedCheck.problemCount} problem
-                {selectedCheck.problemCount === 1 ? "" : "s"} found
-              </p>
-              <div className="mt-4 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-                {selectedCheck.problemSections.map((section) => (
-                  <div key={section.sectionTitle} className="card bg-base-200">
-                    <div className="card-body py-4">
-                      <h4 className="card-title text-base">
-                        {section.sectionTitle}
-                      </h4>
-                      <ul className="mt-2 space-y-2">
-                        {section.fields.map((field) => (
-                          <li
-                            key={field.fieldId}
-                            className="flex items-start gap-3"
-                          >
-                            <span className="border-error bg-error text-error-content flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 text-sm font-bold">
-                              ✕
-                            </span>
-                            <div className="min-w-0 pt-0.5">
-                              <span>{field.label}</span>
-                              {field.note && (
-                                <p className="text-sm break-words whitespace-pre-wrap">
-                                  {field.note}
-                                </p>
-                              )}
-                              {field.updatedBy && (
-                                <p className="text-xs opacity-60">
-                                  Last updated by {field.updatedBy.first_name}{" "}
-                                  {field.updatedBy.last_name}
-                                </p>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                ))}
-                {selectedCheck.textNotes.length > 0 && (
-                  <div className="card bg-base-200">
-                    <div className="card-body py-4">
-                      <h4 className="card-title text-base">Notes</h4>
-                      <dl className="mt-2 space-y-3">
-                        {selectedCheck.textNotes.map((note) => (
-                          <div key={note.fieldId}>
-                            <dt className="text-xs font-semibold opacity-60">
-                              {note.sectionTitle} · {note.label}
-                            </dt>
-                            <dd className="text-sm whitespace-pre-wrap">
-                              {note.value}
-                              {note.updatedBy && (
-                                <p className="text-xs opacity-60">
-                                  Last updated by {note.updatedBy.first_name}{" "}
-                                  {note.updatedBy.last_name}
-                                </p>
-                              )}
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </div>
-                  </div>
-                )}
-                {selectedCheck.photos.length > 0 && (
-                  <div className="card bg-base-200">
-                    <div className="card-body py-4">
-                      <h4 className="card-title text-base">
-                        Photos ({photoCount(selectedCheck.photos)})
-                      </h4>
-                      <div className="mt-2 space-y-3">
-                        {selectedCheck.photos.map((photo) => (
-                          <div key={photo.fieldId}>
-                            <p className="text-xs font-semibold opacity-60">
-                              {photo.sectionTitle} · {photo.label}
-                            </p>
-                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                              {photo.urls.map((photoUrl, index) => (
-                                <a
-                                  key={`${photoUrl}-${index}`}
-                                  href={photoUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Open full size"
-                                >
-                                  <img
-                                    src={photoUrl}
-                                    alt={`${photo.label} ${index + 1}`}
-                                    loading="lazy"
-                                    className="border-base-300 h-24 w-full rounded border object-cover transition-opacity hover:opacity-80"
-                                  />
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
+          ) : (
+            <span className="text-success flex items-center gap-1.5 text-sm font-semibold">
+              <FiCheck className="h-4 w-4" />
+              No problems
+            </span>
+          )}
+        </span>
+      </div>
+      {expanded && (
+        <div
+          id={panelId}
+          className="bg-error/10 mx-4 mb-3 rounded-lg px-4 py-1"
+        >
+          <ul>
+            {check.problemSections.flatMap((section) =>
+              section.fields.map((field) => (
+                <ProblemItem
+                  key={field.fieldId}
+                  label={field.label}
+                  section={section.sectionTitle}
+                  note={field.note}
+                  by={field.updatedBy}
+                />
+              )),
+            )}
+            {check.textNotes.map((note) => (
+              <ProblemItem
+                key={note.fieldId}
+                label={note.label}
+                section={note.sectionTitle}
+                note={note.value}
+                by={note.updatedBy}
+              />
+            ))}
+          </ul>
+          {check.photos.length > 0 && (
+            <div className="flex flex-wrap gap-2 py-3">
+              {check.photos.flatMap((photo) =>
+                photo.urls.map((url, index) => (
+                  <a
+                    key={`${url}-${index}`}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`${photo.sectionTitle} · ${photo.label}`}
+                  >
+                    <img
+                      src={url}
+                      alt={`${photo.label} ${index + 1}`}
+                      loading="lazy"
+                      className="border-base-300 h-20 w-20 rounded border object-cover"
+                    />
+                  </a>
+                )),
+              )}
+            </div>
           )}
         </div>
-      </dialog>
-    </div>
+      )}
+    </li>
+  );
+}
+
+function ProblemItem({
+  label,
+  section,
+  note,
+  by,
+}: {
+  label: string;
+  section: string;
+  note?: string;
+  by?: { first_name: string; last_name: string };
+}) {
+  return (
+    <li className="border-base-300 flex gap-3 border-b py-2.5 last:border-b-0">
+      <span className="bg-error text-error-content mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded">
+        <FiX className="h-3.5 w-3.5" strokeWidth={4} />
+      </span>
+      <span className="min-w-0">
+        <span className="font-semibold">{label}</span>{" "}
+        <span className="text-base-content/70">· {section}</span>
+        {note && (
+          <span className="block break-words whitespace-pre-wrap">{note}</span>
+        )}
+        {by && (
+          <span className="text-base-content/70 block text-sm">
+            Reported by {by.first_name} {by.last_name}
+          </span>
+        )}
+      </span>
+    </li>
   );
 }
