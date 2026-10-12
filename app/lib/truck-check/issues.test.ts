@@ -82,6 +82,39 @@ describe("extractIssues", () => {
     expect(hasIssues(issues)).toBe(true);
   });
 
+  it("includes explanations and exact editors without attributing historical issues to the crew", () => {
+    const editor = {
+      userId: "alex",
+      first_name: "Alex",
+      last_name: "Medic",
+      updatedAt: "2026-10-12T12:00:00Z",
+    };
+    const issues = extractIssues({
+      data: {
+        "zoll-defib-pads": "not-present",
+        "cab-cell-phone": "not-present",
+        "zoll-spare-paper": true,
+      },
+      schema,
+      fieldNotes: {
+        "zoll-defib-pads": "  Only one pack  ",
+        "zoll-spare-paper": "Stale note",
+      },
+      fieldUpdates: { "zoll-defib-pads": editor },
+    });
+    expect(issues.problemCount).toBe(2);
+    expect(issues.problemSections[0].fields[0]).toEqual({
+      fieldId: "zoll-defib-pads",
+      label: "Defib pads",
+      note: "Only one pack",
+      updatedBy: editor,
+    });
+    expect(issues.problemSections[1].fields[0]).toEqual({
+      fieldId: "cab-cell-phone",
+      label: "Cell phone",
+    });
+  });
+
   it("collects non-empty trimmed text notes and skips blank ones", () => {
     const issues = extractIssues({
       data: { "zoll-notes": "  low stock  " },

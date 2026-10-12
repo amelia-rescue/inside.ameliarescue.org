@@ -6,11 +6,12 @@ describe("durable truck-check outbox", () => {
   it("survives reload, isolates users and checks, and only removes the acknowledged edit", () => {
     const first = new SyncOutbox("a", "check", localStorage);
     const one = first.enqueue("oxygen", true);
-    const two = first.enqueue("oxygen", "not-present");
+    const two = first.enqueue("oxygen", "not-present", "Only one cylinder");
     const restored = new SyncOutbox("a", "check", localStorage);
     expect(restored.list()).toHaveLength(2);
     restored.acknowledge(one);
     expect(restored.list()).toEqual([two]);
+    expect(restored.list()[0].note).toBe("Only one cylinder");
     expect(new SyncOutbox("b", "check", localStorage).list()).toEqual([]);
     expect(new SyncOutbox("a", "other", localStorage).list()).toEqual([]);
   });

@@ -7,7 +7,11 @@ import { calculateCompletion } from "./completion";
 import { getFieldId } from "./issues";
 import { publishCheckEvent } from "./realtime.server";
 import { log } from "~/lib/logger";
-import type { FieldMutation, CheckSnapshot } from "./sync-protocol";
+import {
+  isFieldMutation,
+  type FieldMutation,
+  type CheckSnapshot,
+} from "./sync-protocol";
 
 export class InvalidFieldMutation extends Error {}
 
@@ -20,6 +24,8 @@ export function toSnapshot(
     userId,
     revision: check.revision ?? 0,
     data: check.data ?? {},
+    fieldNotes: check.field_notes ?? {},
+    fieldUpdates: check.field_updates ?? {},
     contributors: check.contributors ?? {},
     locked: check.locked,
   };
@@ -98,6 +104,9 @@ export async function applyCheckMutation({
     .find((field) => field.id === mutation.fieldId)?.field;
   if (
     !field ||
+    !isFieldMutation(mutation) ||
+    (mutation.note !== undefined &&
+      (field.type !== "checkbox" || mutation.value !== "not-present")) ||
     !validFieldValue(field, mutation.value) ||
     Buffer.byteLength(JSON.stringify(mutation)) > 24_000
   ) {
@@ -108,6 +117,7 @@ export async function applyCheckMutation({
   const result = await store.applyFieldMutation({
     fieldId: mutation.fieldId,
     value: mutation.value,
+    note: mutation.note,
     clientId: mutation.clientId,
     sequence: mutation.sequence,
     id,

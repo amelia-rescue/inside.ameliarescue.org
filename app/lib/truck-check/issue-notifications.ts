@@ -6,12 +6,15 @@ import {
 import { extractIssues, hasIssues } from "~/lib/truck-check/issues";
 import { EmailService } from "~/lib/email-service";
 import { UserStore } from "~/lib/user-store";
+import type { FieldUpdate } from "./sync-protocol";
 
 export type NotifiableTruckCheck = {
   id: string;
   truck: string;
   created_at: string;
   data: Record<string, unknown>;
+  field_notes?: Record<string, string>;
+  field_updates?: Record<string, FieldUpdate>;
   schema_id?: string;
   schema_created_at?: string;
 };
@@ -85,7 +88,12 @@ export async function notifyTruckCheckIssues({
       continue;
     }
 
-    const issues = extractIssues({ data: check.data ?? {}, schema });
+    const issues = extractIssues({
+      data: check.data ?? {},
+      schema,
+      fieldNotes: check.field_notes,
+      fieldUpdates: check.field_updates,
+    });
     if (!hasIssues(issues)) {
       continue;
     }

@@ -126,6 +126,8 @@ async function addCompletionProgress({
         extractIssues({
           data: check.data,
           schema,
+          fieldNotes: check.field_notes,
+          fieldUpdates: check.field_updates,
         });
 
       const requiredCompleted = requiredFieldIds.filter((fieldId) =>
@@ -563,7 +565,20 @@ export default function TruckCheck() {
                             <span className="border-error bg-error text-error-content flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 text-sm font-bold">
                               ✕
                             </span>
-                            <span className="pt-0.5">{field.label}</span>
+                            <div className="min-w-0 pt-0.5">
+                              <span>{field.label}</span>
+                              {field.note && (
+                                <p className="text-sm break-words whitespace-pre-wrap">
+                                  {field.note}
+                                </p>
+                              )}
+                              {field.updatedBy && (
+                                <p className="text-xs opacity-60">
+                                  Last updated by {field.updatedBy.first_name}{" "}
+                                  {field.updatedBy.last_name}
+                                </p>
+                              )}
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -582,6 +597,12 @@ export default function TruckCheck() {
                             </dt>
                             <dd className="text-sm whitespace-pre-wrap">
                               {note.value}
+                              {note.updatedBy && (
+                                <p className="text-xs opacity-60">
+                                  Last updated by {note.updatedBy.first_name}{" "}
+                                  {note.updatedBy.last_name}
+                                </p>
+                              )}
                             </dd>
                           </div>
                         ))}

@@ -147,20 +147,21 @@ export async function loadHomeData({
     const { problemSections, textNotes } = extractIssues({
       data: check.data,
       schema,
+      fieldNotes: check.field_notes,
+      fieldUpdates: check.field_updates,
     });
-    const reporter = Object.values(check.contributors)[0];
     const base = {
       checkId: check.id,
       truckName: truckName(check.truck),
       dayLabel: local(check.created_at).format("ddd"),
-      reporter: reporter ? shortName(reporter) : "",
     };
     for (const section of problemSections) {
       for (const field of section.fields) {
         recentIssues.push({
           ...base,
           key: `${check.id}:${field.fieldId}`,
-          label: `${field.label} (${section.sectionTitle})`,
+          label: `${field.label} (${section.sectionTitle})${field.note ? `: ${field.note}` : ""}`,
+          reporter: field.updatedBy ? shortName(field.updatedBy) : "",
         });
       }
     }
@@ -169,6 +170,7 @@ export async function loadHomeData({
         ...base,
         key: `${check.id}:${note.fieldId}`,
         label: `${note.label}: ${note.value}`,
+        reporter: note.updatedBy ? shortName(note.updatedBy) : "",
       });
     }
   }

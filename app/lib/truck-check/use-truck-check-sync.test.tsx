@@ -72,7 +72,9 @@ it("restores offline edits on remount and retains newer intent during an earlier
     useTruckCheckSync({ initial, wsUrl: "wss://example.test" }),
   );
   await waitFor(() => expect(sent).toBeDefined());
-  act(() => second.result.current.edit("oxygen", "not-present"));
+  act(() =>
+    second.result.current.edit("oxygen", "not-present", "Only one cylinder"),
+  );
   await act(async () =>
     resolveSave!(
       Response.json({
@@ -82,9 +84,82 @@ it("restores offline edits on remount and retains newer intent during an earlier
     ),
   );
   expect(second.result.current.values.oxygen).toBe("not-present");
+  expect(second.result.current.fieldNotes.oxygen).toBe("Only one cylinder");
   expect(second.result.current.pending).toHaveLength(1);
   second.unmount();
 });
+it("restores offline notes, sends them atomically with status, and receives server attribution", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+  const first = renderHook(() =>
+    useTruckCheckSync({ initial, wsUrl: "wss://example.test" }),
+  );
+  act(() =>
+    first.result.current.edit("oxygen", "not-present", "Only one cylinder"),
+  );
+  await waitFor(() => expect(first.result.current.pending).toHaveLength(1));
+  expect(first.result.current.fieldNotes.oxygen).toBe("Only one cylinder");
+  first.unmount();
+  const editor = {
+    userId: "a",
+    first_name: "Alex",
+    last_name: "Medic",
+    updatedAt: "2026-10-12T13:00:00Z",
+  };
+  const fetcher = vi.fn(async (_url, options) => {
+    if (options.method === "POST") {
+      const mutation = JSON.parse(options.body);
+      return Response.json({
+        snapshot: {
+          ...initial,
+          revision: 1,
+          data: { oxygen: mutation.value },
+          fieldNotes: { oxygen: mutation.note },
+          fieldUpdates: { oxygen: editor },
+        },
+        acknowledged: mutation,
+      });
+    }
+    return Response.json({ snapshot: initial, accessToken: "token" });
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const second = renderHook(() =>
+    useTruckCheckSync({ initial, wsUrl: "wss://example.test" }),
+  );
+  await waitFor(() => expect(second.result.current.pending).toHaveLength(0));
+  expect(second.result.current.values.oxygen).toBe("not-present");
+  expect(second.result.current.fieldNotes.oxygen).toBe("Only one cylinder");
+  expect(second.result.current.snapshot.fieldUpdates?.oxygen).toEqual(editor);
+  const sent = fetcher.mock.calls.find(
+    ([, options]) => options.method === "POST",
+  )!;
+  expect(JSON.parse(sent[1].body)).toMatchObject({
+    value: "not-present",
+    note: "Only one cylinder",
+  });
+  second.unmount();
+});
+
+it("clears optimistic notes when status changes and keeps rejected notes available after a remote lock", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+  const { result, rerender } = renderHook(
+    ({ snapshot }) =>
+      useTruckCheckSync({ initial: snapshot, wsUrl: "wss://example.test" }),
+    { initialProps: { snapshot: initial } },
+  );
+  await act(async () => result.current.edit("oxygen", "not-present", "Low"));
+  expect(result.current.fieldNotes.oxygen).toBe("Low");
+  await act(async () => result.current.edit("oxygen", true));
+  expect(result.current.fieldNotes.oxygen).toBeUndefined();
+  await act(async () =>
+    result.current.edit("oxygen", "not-present", "Still low"),
+  );
+  await act(async () =>
+    rerender({ snapshot: { ...initial, revision: 1, locked: true } }),
+  );
+  expect(result.current.fieldNotes.oxygen).toBeUndefined();
+  expect(result.current.pending.at(-1)?.note).toBe("Still low");
+});
+
 it("retains pending work on remote lock rather than reporting it saved", async () => {
   vi.stubGlobal(
     "fetch",

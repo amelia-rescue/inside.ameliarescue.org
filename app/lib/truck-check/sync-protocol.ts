@@ -1,8 +1,18 @@
+export const MAX_ISSUE_NOTE_LENGTH = 2000;
+
+export interface FieldUpdate {
+  userId: string;
+  first_name: string;
+  last_name: string;
+  updatedAt: string;
+}
+
 export interface FieldMutation {
   clientId: string;
   sequence: number;
   fieldId: string;
   value: unknown;
+  note?: string;
 }
 
 export interface CheckSnapshot {
@@ -10,6 +20,8 @@ export interface CheckSnapshot {
   userId: string;
   revision: number;
   data: Record<string, unknown>;
+  fieldNotes?: Record<string, string>;
+  fieldUpdates?: Record<string, FieldUpdate>;
   contributors: Record<string, { first_name: string; last_name: string }>;
   locked: boolean;
 }
@@ -35,7 +47,9 @@ export function isFieldMutation(value: unknown): value is FieldMutation {
     m.fieldId.length > 0 &&
     m.fieldId.length <= 512 &&
     Object.prototype.hasOwnProperty.call(m, "value") &&
-    m.value !== undefined
+    m.value !== undefined &&
+    (m.note === undefined ||
+      (typeof m.note === "string" && m.note.length <= MAX_ISSUE_NOTE_LENGTH))
   );
 }
 

@@ -70,6 +70,16 @@ describe("truck check store test", () => {
     expect(retry.duplicate).toBe(true);
     expect(retry.check.data.oxygen).toBe("not-present");
     expect(retry.check.revision).toBe(4);
+    expect(saved.field_updates?.oxygen).toMatchObject({
+      userId: "a",
+      first_name: "a",
+    });
+    expect(saved.field_updates?.fuel).toMatchObject({ userId: "b" });
+    expect(saved.field_updates?.tires).toMatchObject({ userId: "c" });
+    expect(retry.check.field_updates?.oxygen).toMatchObject({
+      userId: "b",
+      last_name: "Test",
+    });
     await store.lockTruckCheck({ id: check.id, userId: "a" });
     expect(
       (await store.applyFieldMutation(mutation("a", "oxygen", true))).duplicate,
@@ -84,6 +94,49 @@ describe("truck check store test", () => {
         value: "empty",
       }),
     ).rejects.toThrow("locked");
+  });
+
+  it("saves notes and attribution atomically, preserves notes on legacy edits, and clears resolved notes", async () => {
+    const store = TruckCheckStore.make();
+    const check = await store.createTruckCheck({
+      created_by: "a",
+      truck: "Medic",
+      data: {},
+      contributors: {},
+      locked: false,
+    });
+    const mutation = {
+      id: check.id,
+      userId: "a",
+      clientId: "client",
+      sequence: 1,
+      fieldId: "pads",
+      value: "not-present",
+      note: "Only one pack and no more in the closet",
+      contributor: { first_name: "Alex", last_name: "Medic" },
+    };
+    const saved = (await store.applyFieldMutation(mutation)).check;
+    expect(saved.data.pads).toBe("not-present");
+    expect(saved.field_notes?.pads).toBe(mutation.note);
+    expect(saved.field_updates?.pads).toEqual({
+      userId: "a",
+      first_name: "Alex",
+      last_name: "Medic",
+      updatedAt: saved.updated_at,
+    });
+    const { note, ...legacy } = mutation;
+    const preserved = (
+      await store.applyFieldMutation({ ...legacy, sequence: 2, legacy: true })
+    ).check;
+    expect(preserved.field_notes?.pads).toBe(note);
+    const cleared = (
+      await store.applyFieldMutation({ ...legacy, sequence: 3, value: true })
+    ).check;
+    expect(cleared.field_notes?.pads).toBeUndefined();
+    const retry = await store.applyFieldMutation(mutation);
+    expect(retry.duplicate).toBe(true);
+    expect(retry.check.field_updates).toEqual(cleared.field_updates);
+    expect(retry.check.field_notes?.pads).toBeUndefined();
   });
 
   it("initializes legacy mutation metadata and rejects mutations on missing checks", async () => {

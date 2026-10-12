@@ -97,6 +97,43 @@ it("rejects unknown fields before mutation", async () => {
   ).rejects.toThrow();
   expect(apply).not.toHaveBeenCalled();
 });
+it("passes checkbox notes to storage but ignores client-supplied attribution", async () => {
+  apply.mockClear();
+  await applyCheckMutation({
+    ...params,
+    mutation: {
+      ...params.mutation,
+      value: "not-present",
+      note: "Only one pack",
+      userId: "forged",
+      updatedAt: "yesterday",
+    } as any,
+  });
+  expect(apply).toHaveBeenCalledWith(
+    expect.objectContaining({
+      note: "Only one pack",
+      userId: "a",
+      contributor: params.contributor,
+    }),
+  );
+  expect(apply.mock.calls[0][0]).not.toHaveProperty("updatedAt");
+});
+
+it.each([
+  { value: true, note: "Stale note" },
+  { value: "not-present", note: "x".repeat(2001) },
+  { value: "not-present", note: 123 },
+])("rejects invalid problem notes before storage", async (change) => {
+  apply.mockClear();
+  await expect(
+    applyCheckMutation({
+      ...params,
+      mutation: { ...params.mutation, ...change } as any,
+    }),
+  ).rejects.toThrow();
+  expect(apply).not.toHaveBeenCalled();
+});
+
 describe("field validation", () => {
   it("accepts blank values and all checkbox states", () => {
     for (const value of [true, false, null, "not-present"])

@@ -16,6 +16,15 @@ export const truckCheckSchema = type({
   created_by: "string",
   truck: "string",
   data: "Record<string, unknown>",
+  "field_notes?": "Record<string, string>",
+  "field_updates?": {
+    "[string]": {
+      userId: "string",
+      first_name: "string",
+      last_name: "string",
+      updatedAt: "string",
+    },
+  },
   contributors: {
     "[string]": {
       first_name: "string",
@@ -163,6 +172,7 @@ export class TruckCheckStore {
     clientId: string;
     sequence: number;
     legacy?: boolean;
+    note?: string;
     contributor: { first_name: string; last_name: string };
   }): Promise<{
     check: DocumentTruckCheck;
@@ -187,6 +197,21 @@ export class TruckCheckStore {
         ...previous.contributors,
         [params.userId]: params.contributor,
       };
+      const now = new Date().toISOString();
+      const fieldNotes = { ...previous.field_notes };
+      if (params.value !== "not-present" || params.note === "") {
+        delete fieldNotes[params.fieldId];
+      } else if (params.note !== undefined) {
+        fieldNotes[params.fieldId] = params.note;
+      }
+      const fieldUpdates = {
+        ...previous.field_updates,
+        [params.fieldId]: {
+          userId: params.userId,
+          ...params.contributor,
+          updatedAt: now,
+        },
+      };
       const revision = previous.revision ?? 0;
       if (
         Object.keys(streams).length > 1000 ||
@@ -195,6 +220,8 @@ export class TruckCheckStore {
             ...previous,
             data: { ...previous.data, [params.fieldId]: params.value },
             contributors,
+            field_notes: fieldNotes,
+            field_updates: fieldUpdates,
             mutation_streams: streams,
           }),
         ) > 300_000
@@ -208,7 +235,7 @@ export class TruckCheckStore {
             Key: { id: params.id },
             ConditionExpression: `attribute_exists(id) AND locked = :false AND ${previous.revision === undefined ? "attribute_not_exists(revision)" : "revision = :previousRevision"}`,
             UpdateExpression:
-              "SET #data.#field = :value, contributors = :contributors, mutation_streams = :streams, revision = :revision, updated_at = :now, list_pk = if_not_exists(list_pk, :list)",
+              "SET #data.#field = :value, field_notes = :notes, field_updates = :updates, contributors = :contributors, mutation_streams = :streams, revision = :revision, updated_at = :now, list_pk = if_not_exists(list_pk, :list)",
             ExpressionAttributeNames: {
               "#data": "data",
               "#field": params.fieldId,
@@ -219,7 +246,9 @@ export class TruckCheckStore {
               ":contributors": contributors,
               ":streams": streams,
               ":revision": revision + 1,
-              ":now": new Date().toISOString(),
+              ":now": now,
+              ":notes": fieldNotes,
+              ":updates": fieldUpdates,
               ":list": "TRUCK_CHECK",
               ...(previous.revision === undefined
                 ? {}

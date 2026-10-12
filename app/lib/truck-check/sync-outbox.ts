@@ -62,7 +62,7 @@ export class SyncOutbox {
     );
   }
 
-  enqueue(fieldId: string, value: unknown): PendingMutation {
+  enqueue(fieldId: string, value: unknown, note?: string): PendingMutation {
     this.lastCreatedAt = Math.max(
       Date.now(),
       this.lastCreatedAt + 1,
@@ -75,6 +75,7 @@ export class SyncOutbox {
       createdAt: this.lastCreatedAt,
       fieldId,
       value,
+      ...(note !== undefined ? { note } : {}),
     };
     this.persist(record);
     return record;

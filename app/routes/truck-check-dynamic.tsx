@@ -16,6 +16,7 @@ import { log } from "~/lib/logger";
 import { compressImage } from "~/lib/truck-check/image-compression";
 import { showToast } from "~/components/toaster";
 import { useTruckCheckSync } from "~/lib/truck-check/use-truck-check-sync";
+import { MAX_ISSUE_NOTE_LENGTH } from "~/lib/truck-check/sync-protocol";
 import {
   HiOutlineUsers,
   HiOutlineExclamationTriangle,
@@ -185,6 +186,8 @@ function TruckCheckDynamicView({
       userId: user.user_id,
       revision: truckCheck.revision ?? 0,
       data: truckCheck.data || {},
+      fieldNotes: truckCheck.field_notes ?? {},
+      fieldUpdates: truckCheck.field_updates ?? {},
       contributors: truckCheck.contributors || {},
       locked: truckCheck.locked,
     },
@@ -689,8 +692,14 @@ function TruckCheckDynamicView({
     const value = fieldValues[fieldId];
     const isRemoteUpdate = lastUpdate?.fieldId === fieldId;
     const fieldDisabled = isLocked || !sync.ready || isLocking;
-    const fieldContainerClass = `form-control relative rounded-lg border border-base-300 p-2 pr-6 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`;
+    const fieldContainerClass = `form-control relative min-w-0 rounded-lg border border-base-300 p-2 pr-6 transition-all duration-500 ${isRemoteUpdate ? "bg-info/10 ring-info/30 ring-1" : ""}`;
     const isPending = pendingFields.has(fieldId) && !isLocked;
+    const editor = sync.snapshot.fieldUpdates?.[fieldId];
+    const lastEditor = editor && (
+      <p className="text-base-content/60 text-xs" title={editor.updatedAt}>
+        Last saved by {editor.first_name} {editor.last_name}
+      </p>
+    );
     const pendingIndicator = (
       <span
         role="img"
@@ -708,7 +717,7 @@ function TruckCheckDynamicView({
           checkboxValue === true
             ? "Present"
             : checkboxValue === "not-present"
-              ? "Not present"
+              ? "Problem reported"
               : "Unchecked";
         const checkboxStateIcon =
           checkboxValue === true
@@ -717,7 +726,7 @@ function TruckCheckDynamicView({
               ? "✕"
               : "";
         // The whole row is the tap target; the box shows the state.
-        const checkboxButtonClass = `flex min-h-11 w-full items-center gap-3 rounded-md text-left ${
+        const checkboxButtonClass = `flex min-h-11 w-full min-w-0 items-center gap-3 rounded-md text-left whitespace-normal ${
           checkboxValue === "not-present" ? "bg-error/10" : ""
         } ${fieldDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`;
         const checkboxBoxClass = `flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 text-base font-bold transition-colors ${
@@ -731,7 +740,8 @@ function TruckCheckDynamicView({
         return (
           <div key={fieldId} className={fieldContainerClass}>
             {pendingIndicator}
-            <div className="label justify-start gap-3">
+            {lastEditor}
+            <div className="w-full min-w-0 py-1">
               <button
                 id={fieldId}
                 type="button"
@@ -754,7 +764,7 @@ function TruckCheckDynamicView({
                 <span className={checkboxBoxClass} aria-hidden="true">
                   {checkboxStateIcon}
                 </span>
-                <span className="label-text text-base-content font-medium">
+                <span className="label-text text-base-content min-w-0 flex-1 font-medium break-words">
                   {field.label}
                   {field.required && <span className="text-error"> *</span>}
                 </span>
@@ -764,6 +774,42 @@ function TruckCheckDynamicView({
               <span className="label-text-alt text-info ml-10 text-xs italic">
                 Updated by {lastUpdate.userName}
               </span>
+            )}
+            {checkboxValue === "not-present" && (
+              <div className="mt-2 min-w-0 sm:ml-9">
+                {isLocked ? (
+                  <p className="text-sm break-words whitespace-pre-wrap">
+                    {sync.fieldNotes?.[fieldId] || "No explanation recorded."}
+                  </p>
+                ) : (
+                  <>
+                    <label
+                      htmlFor={`${fieldId}-note`}
+                      className="mb-1 block text-sm font-medium"
+                    >
+                      What's wrong?{" "}
+                      <span className="font-normal opacity-60">(optional)</span>
+                    </label>
+                    <textarea
+                      id={`${fieldId}-note`}
+                      aria-label={`${field.label}: What's wrong?`}
+                      className="textarea textarea-bordered w-full min-w-0 resize-y"
+                      rows={2}
+                      maxLength={MAX_ISSUE_NOTE_LENGTH}
+                      value={sync.fieldNotes?.[fieldId] ?? ""}
+                      disabled={fieldDisabled}
+                      placeholder="Missing, low stock, damaged… Tell us what needs attention."
+                      onChange={(event) =>
+                        handleFieldChange(
+                          fieldId,
+                          "not-present",
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </>
+                )}
+              </div>
             )}
             {field.helpText && (
               <span className="label-text-alt ml-9 opacity-60">
@@ -778,6 +824,7 @@ function TruckCheckDynamicView({
         return (
           <div key={fieldId} className={fieldContainerClass}>
             {pendingIndicator}
+            {lastEditor}
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -813,6 +860,7 @@ function TruckCheckDynamicView({
         return (
           <div key={fieldId} className={fieldContainerClass}>
             {pendingIndicator}
+            {lastEditor}
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -860,6 +908,7 @@ function TruckCheckDynamicView({
         return (
           <div key={fieldId} className={fieldContainerClass}>
             {pendingIndicator}
+            {lastEditor}
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -908,6 +957,7 @@ function TruckCheckDynamicView({
         return (
           <div key={fieldId} className={fieldContainerClass}>
             {pendingIndicator}
+            {lastEditor}
             <label className="label">
               <span className="label-text">
                 {field.label}
@@ -1041,7 +1091,7 @@ function TruckCheckDynamicView({
   );
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 pt-8 pb-24">
+    <div className="container mx-auto max-w-4xl px-0 pt-8 pb-24 sm:px-4">
       {/* Breadcrumb */}
       <div className="mb-4">
         <a
@@ -1230,6 +1280,11 @@ function TruckCheckDynamicView({
                 <strong>{change.fieldId}</strong>:{" "}
                 <span className="select-text">
                   {JSON.stringify(change.value)}
+                  {change.note !== undefined && (
+                    <span className="block whitespace-pre-wrap">
+                      {change.note}
+                    </span>
+                  )}
                 </span>
                 {change.rejected && <p>{change.rejected}</p>}
                 <button
@@ -1312,7 +1367,7 @@ function TruckCheckDynamicView({
             >
               <button
                 type="button"
-                className="collapse-title w-full cursor-pointer text-left text-xl font-medium"
+                className="collapse-title w-full min-w-0 cursor-pointer pl-0 text-left text-xl font-medium sm:pl-4"
                 aria-expanded={isOpen}
                 aria-controls={`truck-check-section-${section.id}`}
                 onClick={() =>
@@ -1322,8 +1377,8 @@ function TruckCheckDynamicView({
                   }))
                 }
               >
-                <div className="flex items-center justify-between gap-3 pr-8">
-                  <span>{section.title}</span>
+                <div className="flex min-w-0 items-center justify-between gap-3 sm:pr-8">
+                  <span className="min-w-0 break-words">{section.title}</span>
                   {(() => {
                     const progress = sectionProgress.find(
                       ({ sectionId }) => sectionId === section.id,
@@ -1357,7 +1412,7 @@ function TruckCheckDynamicView({
               </button>
               <div
                 id={`truck-check-section-${section.id}`}
-                className="collapse-content"
+                className="collapse-content min-w-0 px-0 sm:px-4"
               >
                 <div className="space-y-3 pt-4">
                   {section.fields.map((field: any) =>
@@ -1502,6 +1557,11 @@ function TruckCheckDynamicView({
               <strong>{changeToDismiss.fieldId}</strong>:{" "}
               <span className="select-text">
                 {JSON.stringify(changeToDismiss.value)}
+                {changeToDismiss.note !== undefined && (
+                  <span className="block whitespace-pre-wrap">
+                    {changeToDismiss.note}
+                  </span>
+                )}
               </span>
             </p>
           )}

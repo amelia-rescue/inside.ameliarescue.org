@@ -327,7 +327,7 @@ function RecentIssues({ home }: { home: HomeData }) {
                 className="hover:bg-base-200 flex gap-3 px-5 py-3"
               >
                 <FiAlertTriangle className="text-error mt-1 h-4 w-4 shrink-0" />
-                <span>
+                <span className="min-w-0 break-words">
                   <span className="block font-semibold">{issue.label}</span>
                   <span className="text-base-content/70 block text-sm">
                     {[issue.truckName, issue.dayLabel, issue.reporter]

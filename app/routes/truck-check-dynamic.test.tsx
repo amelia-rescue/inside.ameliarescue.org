@@ -61,6 +61,7 @@ beforeEach(() => {
       contributors: {},
     },
     values: {},
+    fieldNotes: {},
     pending: [],
     ready: true,
     reachable: true,
@@ -85,6 +86,84 @@ it("shows server save status independently of a disconnected websocket", () => {
   fireEvent.click(screen.getByRole("checkbox", { hidden: true }));
   expect(sync.edit).toHaveBeenCalledWith("s-oxygen", true);
 });
+it("reveals an optional explanation for a problem and queues it with the existing checkbox value", () => {
+  sync.values = { "s-oxygen": true };
+  const view = render(<TruckCheckDynamic />);
+  expect(
+    screen.queryByLabelText("Oxygen: What's wrong?"),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("checkbox", { hidden: true }));
+  expect(sync.edit).toHaveBeenCalledWith("s-oxygen", "not-present");
+  sync.values = { "s-oxygen": "not-present" };
+  view.rerender(<TruckCheckDynamic />);
+  const note = screen.getByLabelText("Oxygen: What's wrong?");
+  expect(note).toHaveAttribute("maxlength", "2000");
+  expect(note).toHaveClass("w-full", "min-w-0", "resize-y");
+  expect(note.parentElement).toHaveClass("min-w-0", "sm:ml-9");
+  expect(note.parentElement).not.toHaveClass("ml-9");
+  fireEvent.change(note, { target: { value: "Only one cylinder" } });
+  expect(sync.edit).toHaveBeenCalledWith(
+    "s-oxygen",
+    "not-present",
+    "Only one cylinder",
+  );
+  sync.fieldNotes = { "s-oxygen": "Only one cylinder" };
+  view.rerender(<TruckCheckDynamic />);
+  expect(note).toHaveValue("Only one cylinder");
+  fireEvent.click(screen.getByRole("checkbox", { hidden: true }));
+  expect(sync.edit).toHaveBeenCalledWith("s-oxygen", null);
+});
+
+it("shows saved explanations and attribution on locked checks without inventing attribution on old checks", () => {
+  sync.snapshot.locked = true;
+  sync.values = { "s-oxygen": "not-present" };
+  const view = render(<TruckCheckDynamic />);
+  expect(screen.getByText("No explanation recorded.")).toBeInTheDocument();
+  expect(screen.queryByText(/Last saved by/)).not.toBeInTheDocument();
+  sync.fieldNotes = { "s-oxygen": "Only one cylinder" };
+  sync.snapshot.fieldUpdates = {
+    "s-oxygen": {
+      userId: "b",
+      first_name: "Alex",
+      last_name: "Medic",
+      updatedAt: "2026-10-12T13:00:00Z",
+    },
+  };
+  view.rerender(<TruckCheckDynamic />);
+  expect(screen.getByText("Only one cylinder")).toBeInTheDocument();
+  expect(screen.getByText("Last saved by Alex Medic")).toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("Oxygen: What's wrong?"),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { hidden: true })).toBeDisabled();
+});
+
+it("keeps long checkbox labels and explanations within a wider mobile layout", () => {
+  const field = routeData.schema.sections[0].fields[0];
+  const originalLabel = field.label;
+  const label =
+    "Med admin needles (22ga, 18ga, blunt fill needles and replacement supplies)";
+  field.label = label;
+  try {
+    const { container } = render(<TruckCheckDynamic />);
+    const checkbox = screen.getByRole("checkbox", { hidden: true });
+    expect(container.firstElementChild).toHaveClass("px-0", "sm:px-4");
+    expect(container.querySelector(".collapse-content")).toHaveClass(
+      "px-0",
+      "sm:px-4",
+    );
+    expect(checkbox.parentElement).not.toHaveClass("label");
+    expect(checkbox).toHaveClass("min-w-0", "whitespace-normal");
+    expect(screen.getByText(label)).toHaveClass(
+      "min-w-0",
+      "flex-1",
+      "break-words",
+    );
+  } finally {
+    field.label = originalLabel;
+  }
+});
+
 it("keeps the pending indicator out of the checkbox layout", () => {
   const view = render(<TruckCheckDynamic />);
   const checkbox = screen.getByRole("checkbox", { hidden: true });

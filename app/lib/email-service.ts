@@ -217,12 +217,15 @@ https://inside.ameliarescue.org
 
     const problemsHtml =
       problemCount > 0
-        ? `<h3>Missing or not present (${problemCount})</h3>` +
+        ? `<h3>Items needing attention (${problemCount})</h3>` +
           problemSections
             .map(
               (section) =>
                 `<p><strong>${escapeHtml(section.sectionTitle)}</strong></p><ul>${section.fields
-                  .map((field) => `<li>${escapeHtml(field.label)}</li>`)
+                  .map(
+                    (field) =>
+                      `<li>${escapeHtml(field.label)}${field.note ? `<div style="white-space:pre-wrap">${escapeHtml(field.note)}</div>` : ""}${field.updatedBy ? `<div>Last updated by ${escapeHtml(`${field.updatedBy.first_name} ${field.updatedBy.last_name}`)}</div>` : ""}</li>`,
+                  )
                   .join("")}</ul>`,
             )
             .join("")
@@ -232,7 +235,7 @@ https://inside.ameliarescue.org
         ? `<h3>Notes (${textNotes.length})</h3><ul>${textNotes
             .map(
               (note) =>
-                `<li><strong>${escapeHtml(note.sectionTitle)} - ${escapeHtml(note.label)}:</strong> ${escapeHtml(note.value)}</li>`,
+                `<li><strong>${escapeHtml(note.sectionTitle)} - ${escapeHtml(note.label)}:</strong> ${escapeHtml(note.value)}${note.updatedBy ? `<div>Last updated by ${escapeHtml(`${note.updatedBy.first_name} ${note.updatedBy.last_name}`)}</div>` : ""}</li>`,
             )
             .join("")}</ul>`
         : "";
@@ -273,12 +276,17 @@ https://inside.ameliarescue.org
 
     const problemsText =
       problemCount > 0
-        ? `Missing or not present (${problemCount}):\n` +
+        ? `Items needing attention (${problemCount}):\n` +
           problemSections
             .map(
               (section) =>
                 `${section.sectionTitle}\n` +
-                section.fields.map((field) => `  - ${field.label}`).join("\n"),
+                section.fields
+                  .map(
+                    (field) =>
+                      `  - ${field.label}${field.note ? `\n    ${field.note}` : ""}${field.updatedBy ? `\n    Last updated by ${field.updatedBy.first_name} ${field.updatedBy.last_name}` : ""}`,
+                  )
+                  .join("\n"),
             )
             .join("\n") +
           "\n\n"
@@ -289,7 +297,7 @@ https://inside.ameliarescue.org
           textNotes
             .map(
               (note) =>
-                `  - ${note.sectionTitle} - ${note.label}: ${note.value}`,
+                `  - ${note.sectionTitle} - ${note.label}: ${note.value}${note.updatedBy ? `\n    Last updated by ${note.updatedBy.first_name} ${note.updatedBy.last_name}` : ""}`,
             )
             .join("\n") +
           "\n\n"

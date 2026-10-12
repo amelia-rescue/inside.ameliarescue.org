@@ -192,6 +192,7 @@ export const handler = async (
     const mutation = {
       fieldId: body.fieldId,
       value: body.value,
+      ...(body.note !== undefined ? { note: body.note } : {}),
       clientId: body.clientId ?? `legacy-${crypto.randomUUID()}`,
       sequence: body.sequence ?? 1,
     };

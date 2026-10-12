@@ -74,6 +74,44 @@ describe("truck check issue notifications test", () => {
     };
   }
 
+  it("renders explanations and per-item attribution safely in both email formats", async () => {
+    sendEmailSpy.mockRestore();
+    const send = vi
+      .spyOn(EmailService.prototype as any, "sendEmail")
+      .mockResolvedValue(undefined);
+    vi.spyOn(
+      UserStore.prototype,
+      "listTruckCheckIssueSubscribers",
+    ).mockResolvedValue([subscriber("chief@example.com")]);
+    const editor = {
+      userId: "alex",
+      first_name: "Alex",
+      last_name: "<Medic>",
+      updatedAt: "2026-10-12T13:00:00Z",
+    };
+    await notifyTruckCheckIssues({
+      checks: [
+        check(
+          { "cab-flashlight": "not-present", "cab-notes": "Low tire" },
+          {
+            field_notes: { "cab-flashlight": "Only one <pack> & no spares" },
+            field_updates: { "cab-flashlight": editor, "cab-notes": editor },
+          },
+        ),
+      ],
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    const email = send.mock.calls[0][0] as {
+      htmlBody: string;
+      textBody: string;
+    };
+    expect(email.htmlBody).toContain("Only one &lt;pack&gt; &amp; no spares");
+    expect(email.htmlBody).toContain("Last updated by Alex &lt;Medic&gt;");
+    expect(email.htmlBody).not.toContain("<pack>");
+    expect(email.textBody).toContain("Only one <pack> & no spares");
+    expect(email.textBody).toContain("Last updated by Alex <Medic>");
+  });
+
   it("emails every subscriber about a check with issues", async () => {
     vi.spyOn(
       UserStore.prototype,

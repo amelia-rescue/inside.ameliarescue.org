@@ -1,8 +1,11 @@
 import type { TruckCheckSchema } from "./truck-check-schema-store";
+import type { FieldUpdate } from "./sync-protocol";
 
 export type ProblemField = {
   fieldId: string;
   label: string;
+  note?: string;
+  updatedBy?: FieldUpdate;
 };
 
 export type ProblemSection = {
@@ -15,6 +18,7 @@ export type TextNote = {
   sectionTitle: string;
   label: string;
   value: string;
+  updatedBy?: FieldUpdate;
 };
 
 export type PhotoAttachment = {
@@ -46,9 +50,13 @@ export function getFieldId(sectionId: string, fieldLabel: string): string {
 export function extractIssues({
   data,
   schema,
+  fieldNotes = {},
+  fieldUpdates = {},
 }: {
   data: Record<string, unknown>;
   schema: TruckCheckSchema;
+  fieldNotes?: Record<string, string>;
+  fieldUpdates?: Record<string, FieldUpdate>;
 }): TruckCheckIssues {
   const problemSections: ProblemSection[] = [];
   const textNotes: TextNote[] = [];
@@ -58,9 +66,18 @@ export function extractIssues({
     const problemFields: ProblemField[] = [];
     for (const field of section.fields) {
       const fieldId = getFieldId(section.id, field.label);
+      const attribution = fieldUpdates[fieldId]
+        ? { updatedBy: fieldUpdates[fieldId] }
+        : {};
 
       if (field.type === "checkbox" && data[fieldId] === "not-present") {
-        problemFields.push({ fieldId, label: field.label });
+        const note = fieldNotes[fieldId]?.trim();
+        problemFields.push({
+          fieldId,
+          label: field.label,
+          ...(note ? { note } : {}),
+          ...attribution,
+        });
         continue;
       }
 
@@ -73,6 +90,7 @@ export function extractIssues({
             sectionTitle: section.title,
             label: field.label,
             value: value.trim(),
+            ...attribution,
           });
         }
         continue;

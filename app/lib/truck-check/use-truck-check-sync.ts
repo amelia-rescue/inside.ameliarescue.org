@@ -22,7 +22,7 @@ interface SyncState {
 interface Runtime {
   id: string;
   userId: string;
-  edit: (fieldId: string, value: unknown) => void;
+  edit: (fieldId: string, value: unknown, note?: string) => void;
   retry: () => void;
   accept: (snapshot: CheckSnapshot) => void;
   prepareLock: () => Promise<boolean>;
@@ -189,6 +189,7 @@ export function useTruckCheckSync({
                     sequence: body.sequence,
                     fieldId: body.fieldId,
                     value: body.value,
+                    ...(body.note !== undefined ? { note: body.note } : {}),
                   }),
                 }
               : {}),
@@ -515,7 +516,7 @@ export function useTruckCheckSync({
     runtime.current = {
       id: initial.id,
       userId: initial.userId,
-      edit(fieldId, value) {
+      edit(fieldId, value, note) {
         if (
           stopped ||
           current.snapshot.locked ||
@@ -523,7 +524,7 @@ export function useTruckCheckSync({
           current.preparing
         )
           return;
-        outbox.enqueue(fieldId, value);
+        outbox.enqueue(fieldId, value, note);
         emit();
         void flush();
       },
@@ -614,12 +615,12 @@ export function useTruckCheckSync({
     runtime.current?.accept(initial);
   }, [initial.id, initial.userId, initial.revision, initial.locked]);
   const edit = useCallback(
-    (fieldId: string, value: unknown) => {
+    (fieldId: string, value: unknown, note?: string) => {
       if (
         runtime.current?.id === initial.id &&
         runtime.current.userId === initial.userId
       )
-        runtime.current.edit(fieldId, value);
+        runtime.current.edit(fieldId, value, note);
     },
     [initial.id, initial.userId],
   );
@@ -661,9 +662,21 @@ export function useTruckCheckSync({
               .map((m) => [m.fieldId, m.value]),
           ),
         };
+  const fieldNotes = { ...scoped.snapshot.fieldNotes };
+  if (!scoped.snapshot.locked && !scoped.missing) {
+    for (const mutation of scoped.pending) {
+      if (mutation.rejected) continue;
+      if (mutation.value !== "not-present" || mutation.note === "") {
+        delete fieldNotes[mutation.fieldId];
+      } else if (mutation.note !== undefined) {
+        fieldNotes[mutation.fieldId] = mutation.note;
+      }
+    }
+  }
   return {
     ...scoped,
     values,
+    fieldNotes,
     edit,
     addPhoto,
     retry,
