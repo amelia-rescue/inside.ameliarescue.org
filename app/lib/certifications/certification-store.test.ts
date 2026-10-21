@@ -264,6 +264,20 @@ describe("certification store test", () => {
     });
 
     expect(withoutExpiration.expires_on).toBeUndefined();
+
+    const withUndefinedExpiration = await store.createCertification({
+      certification_id: "cert-undefined-exp",
+      user_id: "user-456",
+      certification_type_name: "ICS-100",
+      file_url: "https://example.com/ics100.pdf",
+      uploaded_at: "2024-01-01T00:00:00Z",
+      created_by: "test-user",
+      issued_on: undefined,
+      expires_on: undefined,
+    });
+
+    expect(withUndefinedExpiration.issued_on).toBeUndefined();
+    expect(withUndefinedExpiration.expires_on).toBeUndefined();
   });
 
   it("should soft-delete previous certifications when uploading a replacement", async () => {

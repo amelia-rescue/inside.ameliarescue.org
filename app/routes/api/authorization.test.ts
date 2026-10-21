@@ -244,6 +244,12 @@ describe("POST /api/certifications/save", () => {
     expect(createCertification).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: MEMBER_ID, created_by: MEMBER_ID }),
     );
+    const savedArg = createCertification.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(savedArg).not.toHaveProperty("expires_on");
+    expect(savedArg).not.toHaveProperty("issued_on");
   });
 
   it("lets an admin save on behalf of another member and records the actor", async () => {

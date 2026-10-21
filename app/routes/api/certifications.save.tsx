@@ -66,8 +66,8 @@ export async function action({ request, context }: Route.ActionArgs) {
       certification_type_name: certificationTypeName,
       file_url: fileUrl,
       uploaded_at: new Date().toISOString(),
-      expires_on,
-      issued_on,
+      ...(expires_on ? { expires_on } : {}),
+      ...(issued_on ? { issued_on } : {}),
       created_by: ctx.user.user_id,
     });
 
@@ -77,7 +77,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     return data({ success: true, certification });
   } catch (error) {
-    log.error("Error saving certification:", { error });
+    log.error("Error saving certification:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return data({ error: "Failed to save certification" }, { status: 500 });
   }
 }

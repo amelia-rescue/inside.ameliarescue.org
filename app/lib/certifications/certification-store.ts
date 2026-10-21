@@ -16,8 +16,8 @@ export const certificationSchema = type({
   user_id: "string",
   certification_type_name: "string",
   file_url: "string",
-  "issued_on?": "string",
-  "expires_on?": "string",
+  "issued_on?": "string | undefined",
+  "expires_on?": "string | undefined",
   uploaded_at: "string",
   created_by: "string",
 });
@@ -67,7 +67,11 @@ export class CertificationStore {
         : {},
     );
     const docClient = instrumentAwsSdkClient(
-      DynamoDBDocumentClient.from(client),
+      DynamoDBDocumentClient.from(client, {
+        marshallOptions: {
+          removeUndefinedValues: true,
+        },
+      }),
     );
     const tableName =
       process.env.USER_CERTIFICATIONS_TABLE_NAME || "aes_user_certifications";
