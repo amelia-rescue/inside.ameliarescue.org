@@ -21,10 +21,12 @@ import * as targets from "aws-cdk-lib/aws-route53-targets";
 import * as ses from "aws-cdk-lib/aws-ses";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
+import * as lambdaDestinations from "aws-cdk-lib/aws-lambda-destinations";
 import * as events from "aws-cdk-lib/aws-events";
 import * as eventsTargets from "aws-cdk-lib/aws-events-targets";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
+import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1401,6 +1403,152 @@ export class CdkStack extends cdk.Stack {
       });
       alarm.addAlarmAction(operationalAlarmAction);
     });
+
+    // Alarm triage: on every ALARM, Claude Code (running on the Claude subscription via
+    // an OAuth token from `claude setup-token`) reads the logs and source and emails a diagnosis.
+    // The token lives in a free SSM SecureString created by hand (CloudFormation can't create SecureStrings):
+    //   aws ssm put-parameter --name /inside-amelia-rescue/claude-code-oauth-token --type SecureString --value <token> --profile aes
+    const claudeTokenParameterName =
+      "/inside-amelia-rescue/claude-code-oauth-token";
+
+    // Separate from operationalAlarmsTopic so triage failures can't trigger another triage.
+    const alarmTriageFailuresTopic = new sns.Topic(
+      this,
+      "AlarmTriageFailuresTopic",
+      {
+        topicName: "inside-amelia-rescue-alarm-triage-failures",
+        displayName: "inside.ameliarescue.org alarm triage failures",
+      },
+    );
+    alarmTriageFailuresTopic.addSubscription(
+      new subscriptions.EmailSubscription(alarmEmail),
+    );
+
+    const alarmTriageLogGroup = new logs.LogGroup(this, "AlarmTriageLogs", {
+      logGroupName: "/aws/lambda/inside-amelia-rescue-alarm-triage",
+      retention: logs.RetentionDays.SEVEN_YEARS,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const gitOutput = (command: string) => {
+      try {
+        return execSync(command, { encoding: "utf8" }).trim();
+      } catch {
+        return "";
+      }
+    };
+
+    const alarmTriageFunction = new nodejs.NodejsFunction(
+      this,
+      "AlarmTriageFunction",
+      {
+        functionName: "inside-amelia-rescue-alarm-triage",
+        runtime: lambda.Runtime.NODEJS_24_X,
+        handler: "handler",
+        entry: path.join(__dirname, "../server/alarm-triage.ts"),
+        memorySize: 2048,
+        // Room for the ~290 MB Claude Code binary, its download, and the repo source.
+        ephemeralStorageSize: cdk.Size.gibibytes(2),
+        timeout: cdk.Duration.minutes(15),
+        architecture: cdk.aws_lambda.Architecture.ARM_64,
+        logGroup: alarmTriageLogGroup,
+        // Don't re-run a failed triage, and drop alarms that waited over an hour to run.
+        retryAttempts: 0,
+        maxEventAge: cdk.Duration.hours(1),
+        onFailure: new lambdaDestinations.SnsDestination(
+          alarmTriageFailuresTopic,
+        ),
+        bundling: {
+          externalModules: ["@aws-sdk/*"],
+          minify: true,
+          sourceMap: true,
+          keepNames: true,
+          target: "es2022",
+          format: nodejs.OutputFormat.CJS,
+        },
+        environment: {
+          NODE_OPTIONS: "--enable-source-maps",
+          NODE_ENV: "production",
+          ALARM_EMAIL: alarmEmail,
+          FROM_EMAIL: `noreply@${appDomainName}`,
+          CLAUDE_TOKEN_PARAMETER_NAME: claudeTokenParameterName,
+          GITHUB_REPO: "amelia-rescue/inside.ameliarescue.org",
+          GIT_COMMIT: gitOutput("git rev-parse HEAD"),
+          GIT_DIRTY: gitOutput("git status --porcelain") ? "true" : "false",
+          APP_LOG_GROUP: logGroup.logGroupName,
+          HTTP_API_ACCESS_LOG_GROUP: httpApiAccessLogGroup.logGroupName,
+        },
+      },
+    );
+
+    alarmTriageFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["logs:StartQuery"],
+        // Trailing * matches both the bare log group ARN and the ":*" form.
+        resources: [
+          "/aws/lambda/inside-amelia-rescue*",
+          `${httpApiAccessLogGroup.logGroupName}*`,
+        ].map((resourceName) =>
+          cdk.Stack.of(this).formatArn({
+            service: "logs",
+            resource: "log-group",
+            resourceName,
+            arnFormat: cdk.ArnFormat.COLON_RESOURCE_NAME,
+          }),
+        ),
+      }),
+    );
+    alarmTriageFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["logs:GetQueryResults"],
+        resources: ["*"],
+      }),
+    );
+    // SecureStrings encrypted with the AWS managed aws/ssm key need no extra kms:Decrypt grant.
+    alarmTriageFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["ssm:GetParameter"],
+        resources: [
+          cdk.Stack.of(this).formatArn({
+            service: "ssm",
+            resource: "parameter",
+            resourceName: claudeTokenParameterName.slice(1),
+          }),
+        ],
+      }),
+    );
+    alarmTriageFunction.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["ses:SendEmail"],
+        resources: ["*"],
+      }),
+    );
+
+    operationalAlarmsTopic.addSubscription(
+      new subscriptions.LambdaSubscription(alarmTriageFunction),
+    );
+
+    const alarmTriageErrorAlarm = new cloudwatch.Alarm(
+      this,
+      "AlarmTriageErrorAlarm",
+      {
+        alarmName: "inside-amelia-rescue-alarm-triage-errors",
+        alarmDescription:
+          "Alarm when the alarm triage Lambda has an unhandled error.",
+        metric: alarmTriageFunction.metricErrors({
+          period: errorAlarmPeriod,
+          statistic: "Sum",
+        }),
+        threshold: 1,
+        evaluationPeriods: 1,
+        comparisonOperator:
+          cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      },
+    );
+    alarmTriageErrorAlarm.addAlarmAction(
+      new cloudwatchActions.SnsAction(alarmTriageFailuresTopic),
+    );
 
     // Create S3 bucket for static assets
     const staticBucket = new s3.Bucket(this, "StaticBucket", {
