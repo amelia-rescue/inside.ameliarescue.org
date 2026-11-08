@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { DynaliteServer } from "dynalite";
 import { setupDynamo, teardownDynamo } from "../dynamo-local";
-import { CertificationReminder } from "./certification-reminder";
+import {
+  CertificationReminder,
+  isCertificationExpired,
+  isCertificationExpiringSoon,
+} from "./certification-reminder";
 import { UserStore } from "../user-store";
 import { RoleStore } from "../role-store";
 import { TrackStore } from "../track-store";
@@ -501,6 +505,52 @@ describe("certification reminder test", () => {
     ).not.toHaveBeenCalled();
   });
 
+  it("should not send reminders for certifications without an expiration", async () => {
+    const user = await userStore.createUser({
+      first_name: "Grace",
+      last_name: "Hopper",
+      email: "grace@example.com",
+      website_role: "user",
+      membership_roles: [
+        { role_name: "Crew Member", track_name: "BLS", precepting: false },
+      ],
+    });
+
+    // newer uploads omit expires_on entirely
+    await certificationStore.createCertification({
+      certification_id: "cert-no-exp",
+      user_id: user.user_id,
+      certification_type_name: "CPR",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
+    });
+
+    // older uploads stored the string "null"
+    await certificationStore.createCertification({
+      certification_id: "cert-null-exp",
+      user_id: user.user_id,
+      certification_type_name: "First Aid",
+      file_url: "https://example.com/cert.pdf",
+      uploaded_at: dayjs().toISOString(),
+      created_by: "test-user",
+      expires_on: "null",
+    });
+
+    const certificationReminder = new CertificationReminder({ userStore });
+    await certificationReminder.checkAllUserCertifications();
+
+    expect(
+      EmailService.prototype.sendCertificationExpiredEmail,
+    ).not.toHaveBeenCalled();
+    expect(
+      EmailService.prototype.sendCertificationExpiringSoonEmail,
+    ).not.toHaveBeenCalled();
+    expect(
+      EmailService.prototype.sendMissingCertificationEmail,
+    ).not.toHaveBeenCalled();
+  });
+
   it("should handle multiple users with different certification states", async () => {
     // User with expired cert
     const user1 = await userStore.createUser({
@@ -689,5 +739,44 @@ describe("certification reminder test", () => {
       }),
       certificationName: "First Aid",
     });
+  });
+});
+
+describe("certification expiration checks", () => {
+  // a "now" in the future makes the old dayjs(undefined) bug fail every time
+  // instead of only when the clock ticks between two dayjs() calls
+  const now = dayjs().add(1, "day");
+
+  it("should treat a missing expiration as not expired", () => {
+    expect(isCertificationExpired(undefined, now)).toBe(false);
+    expect(isCertificationExpiringSoon(undefined, now)).toBe(false);
+  });
+
+  it("should treat a legacy \"null\" expiration as not expired", () => {
+    expect(isCertificationExpired("null", now)).toBe(false);
+    expect(isCertificationExpiringSoon("null", now)).toBe(false);
+  });
+
+  it("should treat an unparseable expiration as not expired", () => {
+    expect(isCertificationExpired("not a date", now)).toBe(false);
+    expect(isCertificationExpiringSoon("not a date", now)).toBe(false);
+  });
+
+  it("should detect expired certifications", () => {
+    const yesterday = now.subtract(1, "day").format("YYYY-MM-DD");
+    expect(isCertificationExpired(yesterday, now)).toBe(true);
+    expect(isCertificationExpiringSoon(yesterday, now)).toBe(false);
+  });
+
+  it("should detect certifications expiring within 3 months", () => {
+    const nextMonth = now.add(1, "month").format("YYYY-MM-DD");
+    expect(isCertificationExpired(nextMonth, now)).toBe(false);
+    expect(isCertificationExpiringSoon(nextMonth, now)).toBe(true);
+  });
+
+  it("should ignore certifications expiring after 3 months", () => {
+    const nextYear = now.add(1, "year").format("YYYY-MM-DD");
+    expect(isCertificationExpired(nextYear, now)).toBe(false);
+    expect(isCertificationExpiringSoon(nextYear, now)).toBe(false);
   });
 });
