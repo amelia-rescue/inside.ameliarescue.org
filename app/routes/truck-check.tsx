@@ -8,6 +8,7 @@ import {
   useLoaderData,
   useNavigate,
   Link,
+  type ShouldRevalidateFunctionArgs,
 } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -299,6 +300,18 @@ export async function action({ context, request }: Route.ActionArgs) {
       lastEvaluatedKey: result.lastEvaluatedKey,
     };
   }
+}
+
+// Loading older checks appends to the list on the client. Reloading the page
+// afterwards would replace the list with the first page again.
+export function shouldRevalidate({
+  formData,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formData?.get("intent") === "scroll") {
+    return false;
+  }
+  return defaultShouldRevalidate;
 }
 
 export async function loader({ context, request }: Route.LoaderArgs) {
