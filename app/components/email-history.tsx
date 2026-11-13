@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
+import { useFetcher, type ShouldRevalidateFunctionArgs } from "react-router";
 import { DateDisplay } from "~/components/date-display";
 import type {
   EmailHistoryEntry,
@@ -7,6 +7,20 @@ import type {
 } from "~/lib/email-history.server";
 
 export const LOAD_MORE_EMAILS_INTENT = "load-more-emails";
+
+/**
+ * For a route's `shouldRevalidate`: loading another page of emails changes
+ * nothing else on the page, and reloading would reset the list to page one.
+ */
+export function shouldRevalidateEmailHistory({
+  formData,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formData?.get("intent") === LOAD_MORE_EMAILS_INTENT) {
+    return false;
+  }
+  return defaultShouldRevalidate;
+}
 
 const EVENT_LABELS: Record<string, { label: string; badge: string }> = {
   SEND: { label: "Sent", badge: "badge-ghost" },
@@ -32,7 +46,13 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function EmailRow({ email }: { email: EmailHistoryEntry }) {
+function EmailRow({
+  email,
+  isOwnHistory,
+}: {
+  email: EmailHistoryEntry;
+  isOwnHistory: boolean;
+}) {
   return (
     <details className="collapse-arrow bg-base-200 collapse">
       <summary className="collapse-title flex flex-col gap-1 pe-10 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -63,8 +83,12 @@ function EmailRow({ email }: { email: EmailHistoryEntry }) {
         {email.status === "Bounce" && (
           <p className="mt-3 text-sm opacity-70">
             {email.bounce_type === "Permanent"
-              ? "Your mail server rejected this email permanently. Check that your email address is correct."
-              : "Your mail server couldn't accept this email at the time."}
+              ? isOwnHistory
+                ? "Your mail server rejected this email permanently. Check that your email address is correct."
+                : "The recipient's mail server rejected this email permanently. Check that their email address is correct."
+              : isOwnHistory
+                ? "Your mail server couldn't accept this email at the time."
+                : "The recipient's mail server couldn't accept this email at the time."}
           </p>
         )}
       </div>
@@ -72,7 +96,15 @@ function EmailRow({ email }: { email: EmailHistoryEntry }) {
   );
 }
 
-export function EmailHistory({ initial }: { initial: EmailHistoryPage }) {
+export function EmailHistory({
+  initial,
+  recipientName,
+}: {
+  initial: EmailHistoryPage;
+  /** Set when showing someone else's emails, e.g. to an admin. */
+  recipientName?: string;
+}) {
+  const isOwnHistory = recipientName === undefined;
   const fetcher = useFetcher<{ emailHistory?: EmailHistoryPage }>();
   const [emails, setEmails] = useState(initial.emails);
   const [cursor, setCursor] = useState(initial.cursor);
@@ -116,11 +148,16 @@ export function EmailHistory({ initial }: { initial: EmailHistoryPage }) {
           <div className="alert alert-warning">{initial.error}</div>
         ) : emails.length === 0 ? (
           <p className="py-4 text-center opacity-60">
-            No emails have been sent to you yet.
+            No emails have been sent to {isOwnHistory ? "you" : recipientName}{" "}
+            yet.
           </p>
         ) : (
           emails.map((email) => (
-            <EmailRow key={email.message_id} email={email} />
+            <EmailRow
+              key={email.message_id}
+              email={email}
+              isOwnHistory={isOwnHistory}
+            />
           ))
         )}
 

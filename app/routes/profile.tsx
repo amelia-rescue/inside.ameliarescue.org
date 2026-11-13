@@ -27,8 +27,12 @@ import { showToast } from "~/components/toaster";
 import {
   EmailHistory,
   LOAD_MORE_EMAILS_INTENT,
+  shouldRevalidateEmailHistory,
 } from "~/components/email-history";
-import { loadEmailHistory } from "~/lib/email-history.server";
+import {
+  loadEmailHistory,
+  loadMoreEmailHistory,
+} from "~/lib/email-history.server";
 
 async function getCertificationData(user_id: string) {
   const certificationTypeStore = CertificationTypeStore.make();
@@ -123,16 +127,8 @@ export async function loader({ context }: Route.LoaderArgs) {
   };
 }
 
-// Loading another page of emails doesn't change anything else on the page,
-// and reloading would reset the email list back to its first page.
-export function shouldRevalidate({
-  formData,
-  defaultShouldRevalidate,
-}: ShouldRevalidateFunctionArgs) {
-  if (formData?.get("intent") === LOAD_MORE_EMAILS_INTENT) {
-    return false;
-  }
-  return defaultShouldRevalidate;
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return shouldRevalidateEmailHistory(args);
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -144,12 +140,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   const store = UserStore.make();
 
   if (formData.get("intent") === LOAD_MORE_EMAILS_INTENT) {
-    const cursor = formData.get("cursor");
     return {
-      emailHistory: await loadEmailHistory(
-        ctx.user.email,
-        typeof cursor === "string" ? cursor : null,
-      ),
+      emailHistory: await loadMoreEmailHistory(ctx.user.email, formData),
     };
   }
 

@@ -1,4 +1,9 @@
-import { Link, useLoaderData, redirect } from "react-router";
+import {
+  Link,
+  useLoaderData,
+  redirect,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 import type { Route } from "./+types/user.$user_id";
 import { appContext } from "~/context";
 import { UserStore } from "~/lib/user-store";
@@ -11,6 +16,16 @@ import { TrackStore } from "~/lib/track-store";
 import { RoleStore } from "~/lib/role-store";
 import { CertificationReminderStore } from "~/lib/certifications/certification-reminder-store";
 import { DateDisplay } from "~/components/date-display";
+import {
+  EmailHistory,
+  LOAD_MORE_EMAILS_INTENT,
+  shouldRevalidateEmailHistory,
+} from "~/components/email-history";
+import {
+  loadEmailHistory,
+  loadMoreEmailHistory,
+} from "~/lib/email-history.server";
+import { isAdmin, requireAdmin } from "~/lib/authorize.server";
 
 async function getCertificationData(user_id: string) {
   const certificationTypeStore = CertificationTypeStore.make();
@@ -99,12 +114,28 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const user = await userStore.getUser(userId);
   const reminders = await reminderStore.getRemindersByUser(userId);
   const certification_data = await getCertificationData(userId);
+  // Only admins may see the emails sent to other members.
+  const emailHistory = isAdmin(ctx) ? await loadEmailHistory(user.email) : null;
 
-  return { user, certification_data, reminders };
+  return { user, certification_data, reminders, emailHistory };
+}
+
+export async function action({ request, params, context }: Route.ActionArgs) {
+  requireAdmin(context);
+  const formData = await request.formData();
+  if (formData.get("intent") !== LOAD_MORE_EMAILS_INTENT) {
+    throw Response.json({ error: "Unknown action" }, { status: 400 });
+  }
+  const user = await UserStore.make().getUser(params.user_id);
+  return { emailHistory: await loadMoreEmailHistory(user.email, formData) };
+}
+
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return shouldRevalidateEmailHistory(args);
 }
 
 export default function User() {
-  const { user, certification_data, reminders } =
+  const { user, certification_data, reminders, emailHistory } =
     useLoaderData<typeof loader>();
 
   const formatDateValue = (value: string | null | undefined) => {
@@ -491,6 +522,14 @@ export default function User() {
           </div>
         </div>
       </div>
+      {emailHistory && (
+        <div className="mt-6">
+          <EmailHistory
+            initial={emailHistory}
+            recipientName={user.first_name}
+          />
+        </div>
+      )}
     </>
   );
 }

@@ -89,6 +89,15 @@ export async function loadEmailHistory(
     };
   } catch (error) {
     log.error("Failed to load email history", { error });
-    return { emails: [], error: "Couldn't load your emails right now." };
+    return { emails: [], error: "Couldn't load emails right now." };
   }
+}
+
+/** Loads the next page for a "Load more emails" form submission. */
+export function loadMoreEmailHistory(
+  email: string,
+  formData: FormData,
+): Promise<EmailHistoryPage> {
+  const cursor = formData.get("cursor");
+  return loadEmailHistory(email, typeof cursor === "string" ? cursor : null);
 }

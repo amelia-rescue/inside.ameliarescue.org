@@ -1,4 +1,11 @@
-import { data, Link, useFetcher, redirect, useRevalidator } from "react-router";
+import {
+  data,
+  Link,
+  useFetcher,
+  redirect,
+  useRevalidator,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 import type { Route } from "./+types/update-user";
 import { appContext } from "~/context";
 import {
@@ -20,6 +27,15 @@ import { TrackStore } from "~/lib/track-store";
 import { showToast } from "~/components/toaster";
 import { DateDisplay } from "~/components/date-display";
 import { requireAdmin } from "~/lib/authorize.server";
+import {
+  EmailHistory,
+  LOAD_MORE_EMAILS_INTENT,
+  shouldRevalidateEmailHistory,
+} from "~/components/email-history";
+import {
+  loadEmailHistory,
+  loadMoreEmailHistory,
+} from "~/lib/email-history.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -50,15 +66,25 @@ export async function loader({ context, params }: Route.LoaderArgs) {
 
   const roleStore = RoleStore.make();
   const trackStore = TrackStore.make();
-  const roles = await roleStore.listRoles();
-  const tracks = await trackStore.listTracks();
+  const [roles, tracks, emailHistory] = await Promise.all([
+    roleStore.listRoles(),
+    trackStore.listTracks(),
+    loadEmailHistory(user.email),
+  ]);
 
-  return { ...c, user, tableData, roles, tracks };
+  return { ...c, user, tableData, roles, tracks, emailHistory };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
   requireAdmin(context);
   const formData = await request.formData();
+
+  if (formData.get("intent") === LOAD_MORE_EMAILS_INTENT) {
+    const existing = await UserStore.make().getUser(params.user_id);
+    return {
+      emailHistory: await loadMoreEmailHistory(existing.email, formData),
+    };
+  }
 
   // Parse role-track combinations from form data
   const membershipRoleEntries: Array<{
@@ -145,8 +171,12 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   return { success: true };
 }
 
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return shouldRevalidateEmailHistory(args);
+}
+
 export default function UpdateUser({ loaderData }: Route.ComponentProps) {
-  const { user, tableData, roles, tracks } = loaderData;
+  const { user, tableData, roles, tracks, emailHistory } = loaderData;
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [assignments, setAssignments] = useState(
@@ -501,6 +531,10 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-6">
+        <EmailHistory initial={emailHistory} recipientName={user.first_name} />
       </div>
     </div>
   );
