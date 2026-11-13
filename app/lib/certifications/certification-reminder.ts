@@ -11,6 +11,39 @@ import { CertificationReminderStore } from "./certification-reminder-store";
 import { EmailService } from "../email-service";
 import { log } from "../logger";
 
+/**
+ * returns the expiration date, or null when the certification doesn't expire.
+ * a missing value must be checked explicitly because dayjs(undefined) is "now",
+ * and older uploads stored the string "null"
+ */
+function parseExpiration(expiresOn: string | undefined) {
+  if (!expiresOn) {
+    return null;
+  }
+  const expiration = dayjs(expiresOn);
+  return expiration.isValid() ? expiration : null;
+}
+
+export function isCertificationExpired(
+  expiresOn: string | undefined,
+  now = dayjs(),
+) {
+  const expiration = parseExpiration(expiresOn);
+  return expiration !== null && expiration.isBefore(now);
+}
+
+export function isCertificationExpiringSoon(
+  expiresOn: string | undefined,
+  now = dayjs(),
+) {
+  const expiration = parseExpiration(expiresOn);
+  return (
+    expiration !== null &&
+    expiration.isBefore(now.add(3, "months")) &&
+    expiration.isAfter(now)
+  );
+}
+
 interface CertificationReminderDeps {
   userStore?: UserStore;
   roleStore?: RoleStore;
@@ -109,18 +142,13 @@ export class CertificationReminder {
       },
     );
 
-    const certificationsExpiringIn3Months = certifications.filter((cert) => {
-      if (cert.expires_on) {
-        return (
-          dayjs(cert.expires_on).isBefore(dayjs().add(3, "months")) &&
-          dayjs(cert.expires_on).isAfter(dayjs())
-        );
-      }
-      return false;
-    });
+    const now = dayjs();
+    const certificationsExpiringIn3Months = certifications.filter((cert) =>
+      isCertificationExpiringSoon(cert.expires_on, now),
+    );
 
     const expiredCerts = certifications.filter((cert) =>
-      dayjs(cert.expires_on).isBefore(dayjs()),
+      isCertificationExpired(cert.expires_on, now),
     );
 
     for (const cert of expiredCerts) {

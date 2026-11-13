@@ -496,6 +496,18 @@ export class CdkStack extends cdk.Stack {
       },
     });
 
+    emailEventsTable.addGlobalSecondaryIndex({
+      indexName: "RecipientIndex",
+      partitionKey: {
+        name: "recipient_email",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "list_sort",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
     const websocketConnectionsTable = new dynamodb.Table(
       this,
       "WebSocketConnectionsTable",
