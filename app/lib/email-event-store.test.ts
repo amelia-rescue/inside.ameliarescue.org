@@ -211,4 +211,93 @@ describe("email event store", () => {
     expect(recent).toHaveLength(1);
     expect(recent[0]!.message_id).toBe("msg-2");
   });
+
+  it("lists a recipient's emails newest first, case-insensitively", async () => {
+    const store = EmailEventStore.make();
+
+    await store.createSentEmailEvent({
+      messageId: "msg-old",
+      toEmails: ["Member@Example.com"],
+      subject: "Old",
+      sentAt: "2026-04-01T00:00:00.000Z",
+    });
+    await store.createSentEmailEvent({
+      messageId: "msg-other",
+      toEmails: ["someone-else@example.com"],
+      subject: "Other",
+      sentAt: "2026-04-02T00:00:00.000Z",
+    });
+    await store.createSentEmailEvent({
+      messageId: "msg-new",
+      toEmails: ["member@example.com"],
+      subject: "New",
+      sentAt: "2026-04-03T00:00:00.000Z",
+    });
+
+    const created = await store.getEmailEvent("msg-old");
+    expect(created.recipient_email).toBe("member@example.com");
+
+    const events = await store.listEmailEventsByRecipient(
+      " MEMBER@example.com ",
+    );
+    expect(events.map((e) => e.message_id)).toEqual(["msg-new", "msg-old"]);
+  });
+
+  it("respects the listEmailEventsByRecipient limit", async () => {
+    const store = EmailEventStore.make();
+
+    await store.createSentEmailEvent({
+      messageId: "msg-1",
+      toEmails: ["member@example.com"],
+      subject: "A",
+      sentAt: "2026-05-01T00:00:00.000Z",
+    });
+    await store.createSentEmailEvent({
+      messageId: "msg-2",
+      toEmails: ["member@example.com"],
+      subject: "B",
+      sentAt: "2026-05-02T00:00:00.000Z",
+    });
+
+    const events = await store.listEmailEventsByRecipient(
+      "member@example.com",
+      1,
+    );
+    expect(events.map((e) => e.message_id)).toEqual(["msg-2"]);
+  });
+
+  it("indexes records created or updated from SES callbacks by recipient", async () => {
+    const store = EmailEventStore.make();
+
+    await store.upsertStatusFromSesCallback({
+      messageId: "msg-cognito",
+      eventType: "Delivery",
+      eventAt: "2026-06-01T00:00:00.000Z",
+      toEmails: ["Member@example.com"],
+      subject: "Your verification code",
+      origin: "cognito",
+    });
+
+    await store.createSentEmailEvent({
+      messageId: "msg-app",
+      toEmails: ["member@example.com"],
+      subject: "App email",
+      sentAt: "2026-06-02T00:00:00.000Z",
+    });
+    const updated = await store.upsertStatusFromSesCallback({
+      messageId: "msg-app",
+      eventType: "Delivery",
+      eventAt: "2026-06-02T00:00:05.000Z",
+      toEmails: ["member@example.com"],
+    });
+    expect(updated.recipient_email).toBe("member@example.com");
+
+    const events = await store.listEmailEventsByRecipient("member@example.com");
+    expect(events.map((e) => e.message_id)).toEqual(["msg-app", "msg-cognito"]);
+  });
+
+  it("returns no emails for a blank recipient", async () => {
+    const store = EmailEventStore.make();
+    expect(await store.listEmailEventsByRecipient("  ")).toEqual([]);
+  });
 });

@@ -44,6 +44,11 @@ export type EmailEvent = EmailEventBase & {
 interface DocumentEmailEvent extends EmailEvent {
   list_partition: string;
   list_sort: string;
+  /**
+   * Lowercased primary recipient, used as the RecipientIndex partition key.
+   * Omitted when no recipient is known, which keeps the item out of the index.
+   */
+  recipient_email?: string;
   created_at: string;
   updated_at: string;
 }
@@ -140,6 +145,7 @@ export class EmailEventStore {
       ],
       list_partition: this.listPartition,
       list_sort: this.makeListSort(timestamp, params.messageId),
+      recipient_email: toRecipientKey(params.toEmails),
       created_at: now,
       updated_at: now,
     };
@@ -211,6 +217,13 @@ export class EmailEventStore {
         updated_at: { name: "updated_at", value: now },
       };
 
+      const nextRecipientEmail = toRecipientKey(nextToEmails);
+      if (nextRecipientEmail !== undefined) {
+        updates.recipient_email = {
+          name: "recipient_email",
+          value: nextRecipientEmail,
+        };
+      }
       if (nextSubject !== undefined) {
         updates.subject = { name: "subject", value: nextSubject };
       }
@@ -314,6 +327,7 @@ export class EmailEventStore {
       ],
       list_partition: this.listPartition,
       list_sort: this.makeListSort(params.eventAt, params.messageId),
+      recipient_email: toRecipientKey(params.toEmails),
       created_at: now,
       updated_at: now,
     };
@@ -347,7 +361,45 @@ export class EmailEventStore {
     return (response.Items || []) as DocumentEmailEvent[];
   }
 
+  public async listEmailEventsByRecipient(
+    email: string,
+    limit = 50,
+  ): Promise<DocumentEmailEvent[]> {
+    const recipientEmail = normalizeEmail(email);
+    if (!recipientEmail) {
+      return [];
+    }
+
+    const response = await EmailEventStore.client.send(
+      new QueryCommand({
+        TableName: this.tableName,
+        IndexName: "RecipientIndex",
+        KeyConditionExpression: "recipient_email = :recipientEmail",
+        ExpressionAttributeValues: {
+          ":recipientEmail": recipientEmail,
+        },
+        ScanIndexForward: false,
+        Limit: limit,
+      }),
+    );
+
+    return (response.Items || []) as DocumentEmailEvent[];
+  }
+
   private makeListSort(timestamp: string, messageId: string): string {
     return `${timestamp}#${messageId}`;
   }
+}
+
+function normalizeEmail(email: string | undefined): string | undefined {
+  const normalized = email?.trim().toLowerCase();
+  return normalized ? normalized : undefined;
+}
+
+/**
+ * The app sends every email to a single recipient, so the first address is
+ * the one we index by.
+ */
+export function toRecipientKey(toEmails: string[]): string | undefined {
+  return normalizeEmail(toEmails[0]);
 }

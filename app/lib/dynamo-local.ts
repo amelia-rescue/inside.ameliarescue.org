@@ -70,6 +70,11 @@ export async function setupDynamo() {
           partitionKey: "list_partition",
           sortKey: "list_sort",
         },
+        {
+          indexName: "RecipientIndex",
+          partitionKey: "recipient_email",
+          sortKey: "list_sort",
+        },
       ],
     },
     {

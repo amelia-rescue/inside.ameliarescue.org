@@ -25,7 +25,8 @@
     "console:prod": "tsx scripts/open-console.ts aes",
     "migrate:users:v2": "tsx scripts/migrate-users-to-v2.ts",
     "backfill:truck-check-contributors": "tsx scripts/backfill-truck-check-contributors.ts",
-    "backfill:truck-check-gsi": "tsx scripts/backfill-truck-check-gsi.ts"
+    "backfill:truck-check-gsi": "tsx scripts/backfill-truck-check-gsi.ts",
+    "backfill:email-recipient-gsi": "tsx scripts/backfill-email-recipient-gsi.ts"
   },
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.893.0",
