@@ -237,33 +237,84 @@ describe("email event store", () => {
     const created = await store.getEmailEvent("msg-old");
     expect(created.recipient_email).toBe("member@example.com");
 
-    const events = await store.listEmailEventsByRecipient(
+    const { emailEvents, cursor } = await store.listEmailEventsByRecipient(
       " MEMBER@example.com ",
     );
-    expect(events.map((e) => e.message_id)).toEqual(["msg-new", "msg-old"]);
+    expect(emailEvents.map((e) => e.message_id)).toEqual([
+      "msg-new",
+      "msg-old",
+    ]);
+    expect(cursor).toBeUndefined();
   });
 
-  it("respects the listEmailEventsByRecipient limit", async () => {
+  it("pages through a recipient's emails with a cursor", async () => {
     const store = EmailEventStore.make();
 
-    await store.createSentEmailEvent({
-      messageId: "msg-1",
-      toEmails: ["member@example.com"],
-      subject: "A",
-      sentAt: "2026-05-01T00:00:00.000Z",
-    });
-    await store.createSentEmailEvent({
-      messageId: "msg-2",
-      toEmails: ["member@example.com"],
-      subject: "B",
-      sentAt: "2026-05-02T00:00:00.000Z",
-    });
+    for (let i = 1; i <= 5; i++) {
+      await store.createSentEmailEvent({
+        messageId: `msg-${i}`,
+        toEmails: ["member@example.com"],
+        subject: `Email ${i}`,
+        sentAt: `2026-05-0${i}T00:00:00.000Z`,
+      });
+    }
 
-    const events = await store.listEmailEventsByRecipient(
+    const first = await store.listEmailEventsByRecipient("member@example.com", {
+      limit: 2,
+    });
+    expect(first.emailEvents.map((e) => e.message_id)).toEqual([
+      "msg-5",
+      "msg-4",
+    ]);
+    expect(first.cursor).toBeDefined();
+
+    const second = await store.listEmailEventsByRecipient(
       "member@example.com",
-      1,
+      { limit: 2, cursor: first.cursor },
     );
-    expect(events.map((e) => e.message_id)).toEqual(["msg-2"]);
+    expect(second.emailEvents.map((e) => e.message_id)).toEqual([
+      "msg-3",
+      "msg-2",
+    ]);
+
+    const third = await store.listEmailEventsByRecipient("member@example.com", {
+      limit: 2,
+      cursor: second.cursor,
+    });
+    expect(third.emailEvents.map((e) => e.message_id)).toEqual(["msg-1"]);
+    expect(third.cursor).toBeUndefined();
+  });
+
+  it("returns no cursor when a page is exactly full", async () => {
+    const store = EmailEventStore.make();
+
+    for (let i = 1; i <= 2; i++) {
+      await store.createSentEmailEvent({
+        messageId: `msg-${i}`,
+        toEmails: ["member@example.com"],
+        subject: `Email ${i}`,
+        sentAt: `2026-05-0${i}T00:00:00.000Z`,
+      });
+    }
+
+    const page = await store.listEmailEventsByRecipient("member@example.com", {
+      limit: 2,
+    });
+    expect(page.emailEvents).toHaveLength(2);
+    expect(page.cursor).toBeUndefined();
+  });
+
+  it("rejects a cursor that belongs to another recipient", async () => {
+    const store = EmailEventStore.make();
+    await expect(
+      store.listEmailEventsByRecipient("member@example.com", {
+        cursor: {
+          message_id: "msg-1",
+          recipient_email: "someone-else@example.com",
+          list_sort: "2026-05-01T00:00:00.000Z#msg-1",
+        },
+      }),
+    ).rejects.toThrow("Cursor does not belong to this recipient");
   });
 
   it("indexes records created or updated from SES callbacks by recipient", async () => {
@@ -292,12 +343,18 @@ describe("email event store", () => {
     });
     expect(updated.recipient_email).toBe("member@example.com");
 
-    const events = await store.listEmailEventsByRecipient("member@example.com");
-    expect(events.map((e) => e.message_id)).toEqual(["msg-app", "msg-cognito"]);
+    const { emailEvents } =
+      await store.listEmailEventsByRecipient("member@example.com");
+    expect(emailEvents.map((e) => e.message_id)).toEqual([
+      "msg-app",
+      "msg-cognito",
+    ]);
   });
 
   it("returns no emails for a blank recipient", async () => {
     const store = EmailEventStore.make();
-    expect(await store.listEmailEventsByRecipient("  ")).toEqual([]);
+    expect(await store.listEmailEventsByRecipient("  ")).toEqual({
+      emailEvents: [],
+    });
   });
 });

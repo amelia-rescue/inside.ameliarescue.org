@@ -4,6 +4,7 @@ import {
   Link,
   useRevalidator,
   Form,
+  type ShouldRevalidateFunctionArgs,
 } from "react-router";
 import { IoLogOut } from "react-icons/io5";
 import type { Route } from "./+types/profile";
@@ -23,6 +24,11 @@ import { ProfilePictureUpload } from "~/components/profile-picture-upload";
 import { CertificationReminderStore } from "~/lib/certifications/certification-reminder-store";
 import { DateDisplay } from "~/components/date-display";
 import { showToast } from "~/components/toaster";
+import {
+  EmailHistory,
+  LOAD_MORE_EMAILS_INTENT,
+} from "~/components/email-history";
+import { loadEmailHistory } from "~/lib/email-history.server";
 
 async function getCertificationData(user_id: string) {
   const certificationTypeStore = CertificationTypeStore.make();
@@ -99,16 +105,34 @@ export async function loader({ context }: Route.LoaderArgs) {
     throw new Error("No user found");
   }
   const certificationReminderStore = CertificationReminderStore.make();
-  const [certification_data, reminders] = await Promise.all([
+  const [certification_data, reminders, emailHistory] = await Promise.all([
     getCertificationData(ctx.user.user_id),
     certificationReminderStore.getRemindersByUser(ctx.user.user_id),
+    loadEmailHistory(ctx.user.email),
   ]);
 
   const sortedReminders = [...reminders].sort(
     (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
   );
 
-  return { user: ctx.user, certification_data, reminders: sortedReminders };
+  return {
+    user: ctx.user,
+    certification_data,
+    reminders: sortedReminders,
+    emailHistory,
+  };
+}
+
+// Loading another page of emails doesn't change anything else on the page,
+// and reloading would reset the email list back to its first page.
+export function shouldRevalidate({
+  formData,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formData?.get("intent") === LOAD_MORE_EMAILS_INTENT) {
+    return false;
+  }
+  return defaultShouldRevalidate;
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -118,6 +142,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   const formData = await request.formData();
   const store = UserStore.make();
+
+  if (formData.get("intent") === LOAD_MORE_EMAILS_INTENT) {
+    const cursor = formData.get("cursor");
+    return {
+      emailHistory: await loadEmailHistory(
+        ctx.user.email,
+        typeof cursor === "string" ? cursor : null,
+      ),
+    };
+  }
 
   if (formData.get("intent") === "update-notification-preferences") {
     try {
@@ -151,7 +185,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function Profile() {
-  const { user, certification_data, reminders } =
+  const { user, certification_data, reminders, emailHistory } =
     useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const ref = useRef<HTMLDialogElement>(null);
@@ -728,6 +762,10 @@ export default function Profile() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <EmailHistory initial={emailHistory} />
       </div>
 
       <dialog

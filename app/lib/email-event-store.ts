@@ -53,6 +53,13 @@ interface DocumentEmailEvent extends EmailEvent {
   updated_at: string;
 }
 
+/** DynamoDB start key for paging through RecipientIndex. */
+export interface RecipientEmailCursor {
+  message_id: string;
+  recipient_email: string;
+  list_sort: string;
+}
+
 export class EmailEventNotFound extends Error {
   constructor(messageId: string) {
     super(`Email event not found: ${messageId}`);
@@ -361,13 +368,26 @@ export class EmailEventStore {
     return (response.Items || []) as DocumentEmailEvent[];
   }
 
+  /**
+   * Lists a recipient's emails, newest first, one page at a time.
+   *
+   * Fetches one extra item to tell whether another page exists, so `cursor`
+   * is only returned when there really are more emails to load.
+   */
   public async listEmailEventsByRecipient(
     email: string,
-    limit = 50,
-  ): Promise<DocumentEmailEvent[]> {
+    options: { limit?: number; cursor?: RecipientEmailCursor } = {},
+  ): Promise<{
+    emailEvents: DocumentEmailEvent[];
+    cursor?: RecipientEmailCursor;
+  }> {
+    const limit = options.limit ?? 100;
     const recipientEmail = normalizeEmail(email);
     if (!recipientEmail) {
-      return [];
+      return { emailEvents: [] };
+    }
+    if (options.cursor && options.cursor.recipient_email !== recipientEmail) {
+      throw new Error("Cursor does not belong to this recipient");
     }
 
     const response = await EmailEventStore.client.send(
@@ -379,11 +399,26 @@ export class EmailEventStore {
           ":recipientEmail": recipientEmail,
         },
         ScanIndexForward: false,
-        Limit: limit,
+        ExclusiveStartKey: options.cursor,
+        Limit: limit + 1,
       }),
     );
 
-    return (response.Items || []) as DocumentEmailEvent[];
+    const items = (response.Items || []) as DocumentEmailEvent[];
+    if (items.length <= limit) {
+      return { emailEvents: items };
+    }
+
+    const emailEvents = items.slice(0, limit);
+    const last = emailEvents[emailEvents.length - 1]!;
+    return {
+      emailEvents,
+      cursor: {
+        message_id: last.message_id,
+        recipient_email: recipientEmail,
+        list_sort: last.list_sort,
+      },
+    };
   }
 
   private makeListSort(timestamp: string, messageId: string): string {
