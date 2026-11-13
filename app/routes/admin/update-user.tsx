@@ -19,6 +19,7 @@ import { RoleStore } from "~/lib/role-store";
 import { TrackStore } from "~/lib/track-store";
 import { showToast } from "~/components/toaster";
 import { DateDisplay } from "~/components/date-display";
+import { requireAdmin } from "~/lib/authorize.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -55,7 +56,8 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   return { ...c, user, tableData, roles, tracks };
 }
 
-export async function action({ request, params }: Route.ActionArgs) {
+export async function action({ request, context, params }: Route.ActionArgs) {
+  requireAdmin(context);
   const formData = await request.formData();
 
   // Parse role-track combinations from form data

@@ -6,6 +6,7 @@ import { CertificationTypeStore } from "~/lib/certifications/certification-type-
 import { type } from "arktype";
 import { IoWarning } from "react-icons/io5";
 import { useEffect, useRef, useState } from "react";
+import { requireAdmin } from "~/lib/authorize.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -38,7 +39,8 @@ export async function loader({ context }: Route.LoaderArgs) {
   return { ...c, tracks, certificationTypes };
 }
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
+  requireAdmin(context);
   const formData = await request.formData();
   const intent = formData.get("intent");
   const requiredCertifications = formData.getAll(
