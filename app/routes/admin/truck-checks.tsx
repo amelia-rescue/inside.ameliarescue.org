@@ -17,6 +17,7 @@ import {
 } from "react";
 import { DateDisplay } from "~/components/date-display";
 import { createTwoFilesPatch } from "diff";
+import { hasAdminAccess } from "~/lib/website-role";
 
 type JsonEditorProps = {
   value: string;
@@ -414,7 +415,7 @@ export async function loader({ context }: Route.LoaderArgs) {
     throw new Error("App context not found");
   }
 
-  if (c.user.website_role !== "admin") {
+  if (!hasAdminAccess(c.user.website_role)) {
     throw redirect("/");
   }
 
@@ -553,7 +554,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!ctx) {
     throw new Error("App context not found");
   }
-  if (ctx.user.website_role !== "admin") {
+  if (!hasAdminAccess(ctx.user.website_role)) {
     throw redirect("/");
   }
 

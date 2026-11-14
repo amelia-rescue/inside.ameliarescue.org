@@ -1,12 +1,19 @@
 import { data, Link, useActionData, useFetcher, redirect } from "react-router";
 import type { Route } from "./+types/create-user";
 import { appContext } from "~/context";
-import { userSchema, UserStore } from "~/lib/user-store";
+import {
+  DeletedUserHasEmail,
+  EmailInUse,
+  userSchema,
+  UserStore,
+} from "~/lib/user-store";
+import { isRoot, requireAdmin } from "~/lib/authorize.server";
 import { type } from "arktype";
 import { IoInformationCircle } from "react-icons/io5";
 import { useState } from "react";
 import { RoleStore } from "~/lib/role-store";
 import { TrackStore } from "~/lib/track-store";
+import { hasAdminAccess, isRootRole } from "~/lib/website-role";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -26,7 +33,7 @@ export async function loader({ context }: Route.LoaderArgs) {
   }
 
   // Check if user is admin
-  if (c.user.website_role !== "admin") {
+  if (!hasAdminAccess(c.user.website_role)) {
     throw redirect("/");
   }
 
@@ -35,10 +42,11 @@ export async function loader({ context }: Route.LoaderArgs) {
   const roles = await roleStore.listRoles();
   const tracks = await trackStore.listTracks();
 
-  return { ...c, roles, tracks };
+  return { ...c, roles, tracks, canGrantRoot: isRootRole(c.user.website_role) };
 }
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
+  const ctx = requireAdmin(context);
   const formData = await request.formData();
 
   // Parse role-track combinations from form data
@@ -102,13 +110,33 @@ export async function action({ request }: Route.ActionArgs) {
     return data({ error: user.summary, formValues }, { status: 400 });
   }
 
+  if (isRootRole(user.website_role) && !isRoot(ctx)) {
+    return data(
+      { error: "Only root users can grant root.", formValues },
+      { status: 403 },
+    );
+  }
+
   // normalize emails to be all lowercase on account creation
-  user.email = user.email.toLowerCase();
+  user.email = user.email.trim().toLowerCase();
 
   try {
     const store = UserStore.make();
     await store.createUser(user);
   } catch (error) {
+    if (error instanceof DeletedUserHasEmail) {
+      return data(
+        {
+          error: error.message,
+          formValues,
+          deletedUserEmail: error.deletedUser.email,
+        },
+        { status: 409 },
+      );
+    }
+    if (error instanceof EmailInUse) {
+      return data({ error: error.message, formValues }, { status: 409 });
+    }
     if (error instanceof Error) {
       return data({ error: error.message, formValues }, { status: 500 });
     }
@@ -119,8 +147,16 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function CreateUser({ loaderData }: Route.ComponentProps) {
-  const { roles, tracks } = loaderData;
+  const { roles, tracks, canGrantRoot } = loaderData;
   const fetcher = useFetcher<typeof action>();
+  const actionData = fetcher.data as
+    { error?: unknown; deletedUserEmail?: unknown } | undefined;
+  const actionError =
+    typeof actionData?.error === "string" ? actionData.error : undefined;
+  const deletedUserEmail =
+    typeof actionData?.deletedUserEmail === "string"
+      ? actionData.deletedUserEmail
+      : undefined;
   const [assignments, setAssignments] = useState([
     { id: Date.now(), role_name: "", track_name: "", precepting: false },
   ]);
@@ -194,6 +230,25 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
             </span>
           </div>
 
+          {fetcher.state === "idle" && actionError && (
+            <div role="alert" className="alert alert-error mb-4">
+              <span>
+                {actionError}
+                {deletedUserEmail && (
+                  <>
+                    {" "}
+                    <Link
+                      className="link font-semibold"
+                      to={`/admin/users?view=deleted&q=${encodeURIComponent(deletedUserEmail)}`}
+                    >
+                      Go to deleted users
+                    </Link>
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
           <fetcher.Form method="post" className="space-y-6">
             <div className="form-control w-full">
               <label className="label">
@@ -249,6 +304,7 @@ export default function CreateUser({ loaderData }: Route.ComponentProps) {
                 <option value="">Select a website role</option>
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
+                {canGrantRoot && <option value="root">Root</option>}
               </select>
             </div>
 

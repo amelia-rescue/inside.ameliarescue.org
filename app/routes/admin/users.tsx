@@ -20,12 +20,15 @@ import { FaMagnifyingGlass } from "react-icons/fa6";
 import type { Route } from "./+types/users";
 import { appContext } from "~/context";
 import { EmailService } from "~/lib/email-service";
-import { UserStore } from "~/lib/user-store";
+import { EmailInUse, SignInAccountConflict, UserStore } from "~/lib/user-store";
+import { isRoot, requireAdmin } from "~/lib/authorize.server";
 import { showToast } from "~/components/toaster";
 import { DateDisplay } from "~/components/date-display";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { hasAdminAccess, isRootRole } from "~/lib/website-role";
 
 type AdminUser = Awaited<ReturnType<typeof loader>>["users"][number];
+type DeletedUser = Awaited<ReturnType<typeof loader>>["deletedUsers"][number];
 
 const columnHelper = createColumnHelper<AdminUser>();
 
@@ -125,34 +128,48 @@ export const handle = {
 export async function loader({ context }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
 
-  if (!ctx?.user || ctx.user.website_role !== "admin") {
+  if (!ctx?.user || !hasAdminAccess(ctx.user.website_role)) {
     throw redirect("/");
   }
 
   const userStore = UserStore.make();
-  const users = (await userStore.listUsersWithAccountStatus()).sort((a, b) => {
-    const firstNameComparison = a.first_name.localeCompare(b.first_name);
-    if (firstNameComparison !== 0) {
-      return firstNameComparison;
-    }
+  const allUsers = (await userStore.listUsersWithAccountStatus(true)).sort(
+    (a, b) => {
+      const firstNameComparison = a.first_name.localeCompare(b.first_name);
+      if (firstNameComparison !== 0) {
+        return firstNameComparison;
+      }
 
-    const lastNameComparison = a.last_name.localeCompare(b.last_name);
-    if (lastNameComparison !== 0) {
-      return lastNameComparison;
-    }
+      const lastNameComparison = a.last_name.localeCompare(b.last_name);
+      if (lastNameComparison !== 0) {
+        return lastNameComparison;
+      }
 
-    return a.email.localeCompare(b.email);
-  });
+      return a.email.localeCompare(b.email);
+    },
+  );
 
-  return { users };
+  const users = allUsers.filter((user) => !user.deleted_at);
+  const deletedUsers = allUsers
+    .filter((user) => user.deleted_at)
+    .map((user) => ({
+      user_id: user.user_id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      email: user.email,
+      note: user.note,
+      deleted_at: user.deleted_at as string,
+    }));
+
+  return {
+    users,
+    deletedUsers,
+    canDeletePermanently: isRootRole(ctx.user.website_role),
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  const ctx = context.get(appContext);
-
-  if (!ctx?.user || ctx.user.website_role !== "admin") {
-    throw redirect("/");
-  }
+  const ctx = requireAdmin(context);
 
   const formData = await request.formData();
   const intent = formData.get("intent");
@@ -161,6 +178,13 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "delete" && typeof userId === "string") {
     const userStore = UserStore.make();
     try {
+      const target = await userStore.getUser(userId, { includeDeleted: true });
+      if (isRootRole(target.website_role) && !isRoot(ctx)) {
+        return data(
+          { success: false, error: "Only root users can delete root users." },
+          { status: 403 },
+        );
+      }
       await userStore.softDelete(userId);
       return data({ success: true, intent: "delete" });
     } catch (error) {
@@ -170,6 +194,95 @@ export async function action({ request, context }: Route.ActionArgs) {
 
       return data(
         { success: false, error: "Failed to delete user" },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (intent === "restore" && typeof userId === "string") {
+    const userStore = UserStore.make();
+    try {
+      const { user, temporaryPassword, temporaryPasswordExpiresAt } =
+        await userStore.restoreUser(userId);
+      await EmailService.make().sendTemporaryPasswordEmail({
+        user,
+        temporaryPassword,
+        temporaryPasswordExpiresAt,
+        reason: "restored",
+      });
+      return data({
+        success: true,
+        intent: "restore",
+        userEmail: user.email,
+      });
+    } catch (error) {
+      if (error instanceof EmailInUse) {
+        return data(
+          {
+            success: false,
+            error: `${error.message} They were probably re-onboarded as a new user, so this old record can't be restored.`,
+          },
+          { status: 409 },
+        );
+      }
+      if (error instanceof SignInAccountConflict) {
+        return data({ success: false, error: error.message }, { status: 409 });
+      }
+      return data(
+        {
+          success: false,
+          error:
+            error instanceof Error ? error.message : "Failed to restore user",
+        },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (intent === "delete-permanently" && typeof userId === "string") {
+    if (!isRoot(ctx)) {
+      return data(
+        {
+          success: false,
+          error: "Only root users can permanently delete users.",
+        },
+        { status: 403 },
+      );
+    }
+    const userStore = UserStore.make();
+    try {
+      const target = await userStore.getUser(userId, { includeDeleted: true });
+      if (!target.deleted_at) {
+        return data(
+          {
+            success: false,
+            error: "Delete the user first, then delete them permanently.",
+          },
+          { status: 400 },
+        );
+      }
+      const confirmation = String(formData.get("confirmEmail") ?? "");
+      if (confirmation.trim().toLowerCase() !== target.email.toLowerCase()) {
+        return data(
+          { success: false, error: "The email you typed doesn't match." },
+          { status: 400 },
+        );
+      }
+      await userStore.deletePermanently(userId);
+      return data({
+        success: true,
+        intent: "delete-permanently",
+        userEmail: target.email,
+      });
+    } catch (error) {
+      return data(
+        {
+          success: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to permanently delete user",
+        },
         { status: 500 },
       );
     }
@@ -209,7 +322,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function AdminUsers({ loaderData }: Route.ComponentProps) {
-  const { users } = loaderData;
+  const { users, deletedUsers, canDeletePermanently } = loaderData;
   const fetcher = useFetcher<typeof action>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -224,7 +337,50 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
   const [tempPasswordUserEmail, setTempPasswordUserEmail] =
     useState<string>("");
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [globalFilter, setGlobalFilter] = useState(
+    () => searchParams.get("q") ?? "",
+  );
+  const [view, setView] = useState<"active" | "deleted">(() =>
+    searchParams.get("view") === "deleted" ? "deleted" : "active",
+  );
+  const [restoreTarget, setRestoreTarget] = useState<DeletedUser | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<DeletedUser | null>(null);
+  const [purgeConfirmation, setPurgeConfirmation] = useState("");
+
+  const openRestoreModal = (user: DeletedUser) => {
+    setRestoreTarget(user);
+    (
+      document.getElementById("restore_modal") as HTMLDialogElement
+    )?.showModal();
+  };
+
+  const closeRestoreModal = () => {
+    setRestoreTarget(null);
+    (document.getElementById("restore_modal") as HTMLDialogElement)?.close();
+  };
+
+  const openPurgeModal = (user: DeletedUser) => {
+    setPurgeTarget(user);
+    setPurgeConfirmation("");
+    (document.getElementById("purge_modal") as HTMLDialogElement)?.showModal();
+  };
+
+  const closePurgeModal = () => {
+    setPurgeTarget(null);
+    setPurgeConfirmation("");
+    (document.getElementById("purge_modal") as HTMLDialogElement)?.close();
+  };
+
+  const filteredDeletedUsers = useMemo(() => {
+    const query = globalFilter.trim().toLowerCase();
+    if (!query) return deletedUsers;
+    return deletedUsers.filter((user) =>
+      [user.first_name, user.last_name, user.email, user.user_id, user.note]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [deletedUsers, globalFilter]);
 
   const openDeleteModal = (userId: string, userName: string) => {
     setDeleteUserId(userId);
@@ -311,6 +467,25 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
         closeDeleteModal();
         showToast({
           message: "User deleted successfully!",
+          type: "alert-success",
+        });
+        return;
+      }
+
+      if (actionIntent === "restore") {
+        closeRestoreModal();
+        showToast({
+          message: `User restored. Temporary password emailed to ${userEmail}.`,
+          type: "alert-success",
+          duration: 10_000,
+        });
+        return;
+      }
+
+      if (actionIntent === "delete-permanently") {
+        closePurgeModal();
+        showToast({
+          message: `${userEmail} was permanently deleted.`,
           type: "alert-success",
         });
         return;
@@ -525,11 +700,34 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
         </Link>
       </div>
 
+      <div role="tablist" className="tabs tabs-border mb-4">
+        <button
+          type="button"
+          role="tab"
+          className={`tab ${view === "active" ? "tab-active" : ""}`}
+          aria-selected={view === "active"}
+          onClick={() => setView("active")}
+        >
+          Active ({users.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`tab ${view === "deleted" ? "tab-active" : ""}`}
+          aria-selected={view === "deleted"}
+          onClick={() => setView("deleted")}
+        >
+          Deleted ({deletedUsers.length})
+        </button>
+      </div>
+
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="card-title">
-              Users ({rows.length} of {users.length})
+              {view === "active"
+                ? `Users (${rows.length} of ${users.length})`
+                : `Deleted users (${filteredDeletedUsers.length} of ${deletedUsers.length})`}
             </h2>
             <label className="input input-bordered flex items-center gap-2 sm:w-80">
               <FaMagnifyingGlass className="h-4 w-4 opacity-70" />
@@ -543,63 +741,135 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
             </label>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="table min-w-max">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <th key={header.id} className="whitespace-nowrap">
-                        {header.isPlaceholder ? null : (
-                          <div
-                            className={
-                              header.column.getCanSort()
-                                ? "flex cursor-pointer items-center gap-1 select-none"
-                                : "flex items-center"
-                            }
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                            {header.column.getCanSort() && (
-                              <span className="text-xs opacity-50">
-                                {{
-                                  asc: "↑",
-                                  desc: "↓",
-                                }[header.column.getIsSorted() as string] ?? "↕"}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </th>
-                    ))}
+          {view === "deleted" ? (
+            <div className="overflow-x-auto">
+              <p className="text-base-content/70 text-sm">
+                Deleted users can't sign in. Restoring someone brings back their
+                certifications and history and emails them a temporary password.
+              </p>
+              <table className="table min-w-max">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Deleted</th>
+                    <th>Note</th>
+                    <th className="text-right">Actions</th>
                   </tr>
-                ))}
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="align-top">
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
+                </thead>
+                <tbody>
+                  {filteredDeletedUsers.map((user) => (
+                    <tr key={user.user_id}>
+                      <td className="align-top">
+                        <div className="font-medium">
+                          {user.first_name} {user.last_name}
+                        </div>
+                        <div className="text-base-content/70 text-sm">
+                          {user.email}
+                        </div>
                       </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <td className="align-top text-sm">
+                        <DateDisplay
+                          value={user.deleted_at}
+                          format="mediumDate"
+                        />
+                      </td>
+                      <td className="align-top whitespace-normal">
+                        {user.note || "—"}
+                      </td>
+                      <td className="align-top">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            disabled={fetcher.state !== "idle"}
+                            onClick={() => openRestoreModal(user)}
+                          >
+                            Restore
+                          </button>
+                          {canDeletePermanently && (
+                            <button
+                              type="button"
+                              className="btn btn-error btn-outline btn-sm"
+                              disabled={fetcher.state !== "idle"}
+                              onClick={() => openPurgeModal(user)}
+                            >
+                              Delete permanently
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredDeletedUsers.length === 0 && (
+                <div className="text-base-content/60 py-6 text-center text-sm">
+                  {deletedUsers.length === 0
+                    ? "No deleted users."
+                    : "No deleted users match your search."}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table min-w-max">
+                <thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <th key={header.id} className="whitespace-nowrap">
+                          {header.isPlaceholder ? null : (
+                            <div
+                              className={
+                                header.column.getCanSort()
+                                  ? "flex cursor-pointer items-center gap-1 select-none"
+                                  : "flex items-center"
+                              }
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext(),
+                              )}
+                              {header.column.getCanSort() && (
+                                <span className="text-xs opacity-50">
+                                  {{
+                                    asc: "↑",
+                                    desc: "↓",
+                                  }[header.column.getIsSorted() as string] ??
+                                    "↕"}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="align-top">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-            {rows.length === 0 && (
-              <div className="text-base-content/60 py-6 text-center text-sm">
-                No users match your search.
-              </div>
-            )}
-          </div>
+              {rows.length === 0 && (
+                <div className="text-base-content/60 py-6 text-center text-sm">
+                  No users match your search.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -609,6 +879,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
           <p className="py-4">
             Are you sure you want to delete <strong>{deleteUserName}</strong>?
             This will disable their account and prevent them from signing in.
+            You can restore them later from the Deleted tab.
           </p>
           <div className="modal-action">
             <button onClick={closeDeleteModal} className="btn btn-ghost">
@@ -631,6 +902,103 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
           <button onClick={closeDeleteModal}>close</button>
         </form>
       </dialog>
+
+      <dialog id="restore_modal" className="modal">
+        <div className="modal-box">
+          <h3 className="text-lg font-bold">Restore User</h3>
+          <p className="py-4">
+            Restore{" "}
+            <strong>
+              {restoreTarget?.first_name} {restoreTarget?.last_name}
+            </strong>
+            ? Their certifications and history come back, and a temporary
+            password is emailed to {restoreTarget?.email}.
+          </p>
+          <div className="modal-action">
+            <button onClick={closeRestoreModal} className="btn btn-ghost">
+              Cancel
+            </button>
+            <fetcher.Form method="post">
+              <input type="hidden" name="intent" value="restore" />
+              <input
+                type="hidden"
+                name="userId"
+                value={restoreTarget?.user_id ?? ""}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={fetcher.state !== "idle"}
+              >
+                Restore User
+              </button>
+            </fetcher.Form>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button onClick={closeRestoreModal}>close</button>
+        </form>
+      </dialog>
+
+      {canDeletePermanently && (
+        <dialog id="purge_modal" className="modal">
+          <div className="modal-box">
+            <h3 className="text-error text-lg font-bold">Delete Permanently</h3>
+            <p className="py-4">
+              This removes{" "}
+              <strong>
+                {purgeTarget?.first_name} {purgeTarget?.last_name}
+              </strong>{" "}
+              for good. They can't be restored afterwards. Their certifications,
+              truck checks and email history stay in the database.
+            </p>
+            <fetcher.Form method="post">
+              <input type="hidden" name="intent" value="delete-permanently" />
+              <input
+                type="hidden"
+                name="userId"
+                value={purgeTarget?.user_id ?? ""}
+              />
+              <label className="form-control w-full">
+                <span className="label-text mb-1 text-sm">
+                  Type <strong>{purgeTarget?.email}</strong> to confirm
+                </span>
+                <input
+                  type="text"
+                  name="confirmEmail"
+                  className="input input-bordered w-full"
+                  autoComplete="off"
+                  value={purgeConfirmation}
+                  onChange={(event) => setPurgeConfirmation(event.target.value)}
+                />
+              </label>
+              <div className="modal-action">
+                <button
+                  type="button"
+                  onClick={closePurgeModal}
+                  className="btn btn-ghost"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-error"
+                  disabled={
+                    fetcher.state !== "idle" ||
+                    purgeConfirmation.trim().toLowerCase() !==
+                      (purgeTarget?.email ?? "").toLowerCase()
+                  }
+                >
+                  Delete Permanently
+                </button>
+              </div>
+            </fetcher.Form>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={closePurgeModal}>close</button>
+          </form>
+        </dialog>
+      )}
 
       <dialog id="temp_password_modal" className="modal">
         <div className="modal-box">

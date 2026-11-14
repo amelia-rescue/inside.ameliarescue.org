@@ -3,6 +3,7 @@ import type { Route } from "./+types/documents";
 import { Link, useLoaderData, useRevalidator } from "react-router";
 import { appContext } from "~/context";
 import { useRef, useState } from "react";
+import { hasAdminAccess } from "~/lib/website-role";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
@@ -202,7 +203,7 @@ export default function Documents() {
               <h1 className="card-title text-2xl">Useful Documents</h1>
               <p className="text-sm opacity-70">They're all PDF format</p>
             </div>
-            {user.website_role === "admin" && (
+            {hasAdminAccess(user.website_role) && (
               <button
                 type="button"
                 className="btn btn-primary btn-sm w-full sm:w-auto"
@@ -347,7 +348,7 @@ export default function Documents() {
                         >
                           View
                         </Link>
-                        {user.website_role === "admin" && (
+                        {hasAdminAccess(user.website_role) && (
                           <>
                             <button
                               type="button"

@@ -26,7 +26,7 @@ import { RoleStore } from "~/lib/role-store";
 import { TrackStore } from "~/lib/track-store";
 import { showToast } from "~/components/toaster";
 import { DateDisplay } from "~/components/date-display";
-import { requireAdmin } from "~/lib/authorize.server";
+import { isRoot, requireAdmin } from "~/lib/authorize.server";
 import {
   EmailHistory,
   LOAD_MORE_EMAILS_INTENT,
@@ -36,6 +36,7 @@ import {
   loadEmailHistory,
   loadMoreEmailHistory,
 } from "~/lib/email-history.server";
+import { hasAdminAccess, isRootRole } from "~/lib/website-role";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -55,7 +56,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   }
 
   // Check if user is admin
-  if (c.user.website_role !== "admin") {
+  if (!hasAdminAccess(c.user.website_role)) {
     throw redirect("/");
   }
 
@@ -72,11 +73,19 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     loadEmailHistory(user.email),
   ]);
 
-  return { ...c, user, tableData, roles, tracks, emailHistory };
+  return {
+    ...c,
+    user,
+    tableData,
+    roles,
+    tracks,
+    emailHistory,
+    canGrantRoot: isRootRole(c.user.website_role),
+  };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
-  requireAdmin(context);
+  const ctx = requireAdmin(context);
   const formData = await request.formData();
 
   if (formData.get("intent") === LOAD_MORE_EMAILS_INTENT) {
@@ -156,6 +165,20 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     );
   }
 
+  const changesRoot =
+    user.website_role !== existingUser.website_role &&
+    (isRootRole(user.website_role) || isRootRole(existingUser.website_role));
+  if (changesRoot && !isRoot(ctx)) {
+    return data(
+      {
+        success: false,
+        error: "Only root users can grant or remove root.",
+        formValues,
+      },
+      { status: 403 },
+    );
+  }
+
   try {
     await store.updateUser(user);
   } catch (error) {
@@ -176,7 +199,10 @@ export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
 }
 
 export default function UpdateUser({ loaderData }: Route.ComponentProps) {
-  const { user, tableData, roles, tracks, emailHistory } = loaderData;
+  const { user, tableData, roles, tracks, emailHistory, canGrantRoot } =
+    loaderData;
+  // Admins can see a root user's role but not change it.
+  const roleLocked = isRootRole(user.website_role) && !canGrantRoot;
   const fetcher = useFetcher<typeof action>();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [assignments, setAssignments] = useState(
@@ -319,15 +345,22 @@ export default function UpdateUser({ loaderData }: Route.ComponentProps) {
                 <span className="label-text">website_role</span>
               </label>
               <select
-                name="website_role"
+                name={roleLocked ? undefined : "website_role"}
                 defaultValue={user.website_role}
                 className="select select-bordered w-full"
+                disabled={roleLocked}
                 required
               >
                 <option value="">Select a website_role</option>
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
+                {(canGrantRoot || roleLocked) && (
+                  <option value="root">Root</option>
+                )}
               </select>
+              {roleLocked && (
+                <input type="hidden" name="website_role" value="root" />
+              )}
             </div>
 
             <div className="form-control w-full">

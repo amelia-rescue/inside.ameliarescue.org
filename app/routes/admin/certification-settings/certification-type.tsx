@@ -10,6 +10,7 @@ import { type } from "arktype";
 import { IoWarning } from "react-icons/io5";
 import { useEffect, useRef, useState } from "react";
 import { requireAdmin } from "~/lib/authorize.server";
+import { hasAdminAccess } from "~/lib/website-role";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -29,7 +30,7 @@ export async function loader({ context }: Route.LoaderArgs) {
   }
 
   // Check if user is admin
-  if (c.user.website_role !== "admin") {
+  if (!hasAdminAccess(c.user.website_role)) {
     throw redirect("/");
   }
 

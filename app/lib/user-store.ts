@@ -6,6 +6,7 @@ import {
   PutCommand,
   QueryCommand,
   ScanCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
   AdminCreateUserCommand,
@@ -33,7 +34,7 @@ export const userSchema = type({
   first_name: "string",
   last_name: "string",
   email: "string",
-  website_role: "'admin' | 'user'",
+  website_role: "'root' | 'admin' | 'user'",
   membership_roles: membershipRoleItem.array(),
   "phone?": "string",
   "profile_picture_url?": "string",
@@ -61,6 +62,36 @@ export class UserNotFound extends Error {
     super("User not found");
   }
 }
+
+/** Another active user already has this email. */
+export class EmailInUse extends Error {
+  constructor(public readonly existingUser: DocumentUser) {
+    super(
+      `${existingUser.first_name} ${existingUser.last_name} already has an active account with ${existingUser.email}.`,
+    );
+  }
+}
+
+/**
+ * A soft-deleted user has this email. Restore them instead of creating a new
+ * account, so their history stays attached to one record.
+ */
+export class DeletedUserHasEmail extends Error {
+  constructor(public readonly deletedUser: DocumentUser) {
+    super(
+      `${deletedUser.first_name} ${deletedUser.last_name} (${deletedUser.email}) was deleted. Restore them instead of creating a new account.`,
+    );
+  }
+}
+
+export class UserNotDeleted extends Error {
+  constructor() {
+    super("User is not deleted");
+  }
+}
+
+/** The email's sign-in account belongs to some other user record. */
+export class SignInAccountConflict extends Error {}
 
 /**
  * todo: correct this comment - it's technically not a singleton
@@ -151,6 +182,16 @@ export class UserStore {
   }
 
   public async createUser(user: Omit<User, "user_id">): Promise<DocumentUser> {
+    const matches = await this.findUsersByEmail(user.email);
+    const active = matches.find((match) => !match.deleted_at);
+    if (active) {
+      throw new EmailInUse(active);
+    }
+    const deleted = matches.find((match) => match.deleted_at);
+    if (deleted) {
+      throw new DeletedUserHasEmail(deleted);
+    }
+
     const temporary_password = this.generatePassword();
     const now = new Date();
     const temporaryPasswordExpiresAt = this.getTemporaryPasswordExpiration(now);
@@ -241,18 +282,32 @@ export class UserStore {
    * @returns A promise that resolves to an array of users.
    */
   public async listUsers(includeDeleted = false): Promise<DocumentUser[]> {
-    const command = new ScanCommand(
-      includeDeleted
-        ? {
-            TableName: this.tableName,
-          }
-        : {
-            TableName: this.tableName,
-            FilterExpression: "attribute_not_exists(deleted_at)",
-          },
-    );
-    const response = await UserStore.client.send(command);
-    return response.Items as unknown as DocumentUser[];
+    const users: DocumentUser[] = [];
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const response = await UserStore.client.send(
+        new ScanCommand({
+          TableName: this.tableName,
+          ExclusiveStartKey: exclusiveStartKey,
+          ...(includeDeleted
+            ? {}
+            : { FilterExpression: "attribute_not_exists(deleted_at)" }),
+        }),
+      );
+      users.push(...((response.Items ?? []) as unknown as DocumentUser[]));
+      exclusiveStartKey = response.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+    return users;
+  }
+
+  /**
+   * Every record with this email, deleted or not, ignoring case. Older records
+   * weren't lowercased, so this can't use the exact-match EmailIndex.
+   */
+  public async findUsersByEmail(email: string): Promise<DocumentUser[]> {
+    const target = email.trim().toLowerCase();
+    const users = await this.listUsers(true);
+    return users.filter((user) => user.email.toLowerCase() === target);
   }
 
   public async listUsersWithAccountStatus(
@@ -283,14 +338,7 @@ export class UserStore {
     user_id: string,
   ): Promise<UserWithAccountStatus> {
     const user = await this.getUser(user_id);
-    const escapedEmail = user.email.replace(/([\\"])/g, "\\$1");
-    const cognitoUsers = await this.listCognitoUsers(
-      `email = "${escapedEmail}"`,
-    );
-    const cognitoUser = cognitoUsers.find(
-      (candidate) =>
-        this.getCognitoUserEmail(candidate) === user.email.toLowerCase(),
-    );
+    const [cognitoUser] = await this.findCognitoUsersByEmail(user.email);
 
     return {
       ...user,
@@ -355,18 +403,12 @@ export class UserStore {
       deleted_at: now,
     };
 
-    // Delete user from Cognito - wrap in try-catch to handle errors gracefully
+    // Wrapped in try-catch so a Cognito failure doesn't block the soft delete.
+    // Sign-in is blocked either way: the app rejects deleted users.
     try {
-      await UserStore.cognito.send(
-        new AdminDeleteUserCommand({
-          UserPoolId: this.cognitoUserPoolId,
-          Username: existingUser.email,
-        }),
-      );
+      await this.deleteOwnSignInAccounts(existingUser);
     } catch (error) {
       log.error("Failed to delete user from Cognito", { error });
-      // Continue with DynamoDB update even if Cognito fails
-      // The user might already be deleted or the error might be transient
     }
 
     const command = new PutCommand({
@@ -377,7 +419,105 @@ export class UserStore {
     await UserStore.client.send(command);
   }
 
+  /**
+   * Brings back a soft-deleted user with the same user_id, so their
+   * certifications and history come back with them. Creates a new sign-in
+   * account linked to that user_id and returns a temporary password for the
+   * caller to send.
+   */
+  public async restoreUser(user_id: string): Promise<{
+    user: DocumentUser;
+    temporaryPassword: string;
+    temporaryPasswordExpiresAt: string;
+  }> {
+    const user = await this.getUser(user_id, { includeDeleted: true });
+    if (!user.deleted_at) {
+      throw new UserNotDeleted();
+    }
+
+    // Someone may have re-onboarded them as a new user in the meantime.
+    const active = (await this.findUsersByEmail(user.email)).find(
+      (match) => match.user_id !== user_id && !match.deleted_at,
+    );
+    if (active) {
+      throw new EmailInUse(active);
+    }
+
+    const cognitoUsers = await this.findCognitoUsersByEmail(user.email);
+    if (cognitoUsers.some((c) => !this.cognitoUserBelongsTo(c, user_id))) {
+      throw new SignInAccountConflict(
+        `A sign-in account for ${user.email} belongs to a different user record.`,
+      );
+    }
+
+    const temporaryPassword = this.generatePassword();
+    const temporaryPasswordExpiresAt = this.getTemporaryPasswordExpiration();
+
+    const [ownSignInAccount] = cognitoUsers;
+    if (ownSignInAccount?.Username) {
+      // Left behind by a soft delete whose Cognito call failed.
+      await UserStore.cognito.send(
+        new AdminSetUserPasswordCommand({
+          UserPoolId: this.cognitoUserPoolId,
+          Username: ownSignInAccount.Username,
+          Password: temporaryPassword,
+          Permanent: false,
+        }),
+      );
+    } else {
+      await UserStore.cognito.send(
+        new AdminCreateUserCommand({
+          UserPoolId: this.cognitoUserPoolId,
+          Username: user.email,
+          // The caller emails the temporary password.
+          MessageAction: "SUPPRESS",
+          TemporaryPassword: temporaryPassword,
+          UserAttributes: [
+            { Name: "email", Value: user.email },
+            { Name: "email_verified", Value: "true" },
+            { Name: "given_name", Value: user.first_name },
+            { Name: "family_name", Value: user.last_name },
+            // Sign-in maps this account back to the original record.
+            { Name: "custom:user_id", Value: user.user_id },
+          ],
+        }),
+      );
+    }
+
+    const now = new Date().toISOString();
+    await UserStore.client.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: { user_id },
+        UpdateExpression:
+          "SET updated_at = :now, temporary_password_expires_at = :expires REMOVE deleted_at",
+        ConditionExpression: "attribute_exists(deleted_at)",
+        ExpressionAttributeValues: {
+          ":now": now,
+          ":expires": temporaryPasswordExpiresAt,
+        },
+      }),
+    );
+
+    const { deleted_at: _deletedAt, ...restored } = user;
+    return {
+      user: {
+        ...restored,
+        updated_at: now,
+        temporary_password_expires_at: temporaryPasswordExpiresAt,
+      },
+      temporaryPassword,
+      temporaryPasswordExpiresAt,
+    };
+  }
+
+  /**
+   * Removes the user record and its own sign-in account. Leaves certifications,
+   * truck checks and email history in place.
+   */
   public async deletePermanently(user_id: string) {
+    const user = await this.getUser(user_id, { includeDeleted: true });
+    await this.deleteOwnSignInAccounts(user);
     const command = new DeleteCommand({
       TableName: this.tableName,
       Key: {
@@ -385,6 +525,50 @@ export class UserStore {
       },
     });
     await UserStore.client.send(command);
+  }
+
+  /**
+   * Deletes only sign-in accounts linked to this record. When a member was
+   * re-onboarded, their email's sign-in account belongs to the new record, and
+   * cleaning up the old one must not lock them out.
+   */
+  private async deleteOwnSignInAccounts(user: DocumentUser) {
+    const cognitoUsers = await this.findCognitoUsersByEmail(user.email);
+    for (const cognitoUser of cognitoUsers) {
+      if (
+        !cognitoUser.Username ||
+        !this.cognitoUserBelongsTo(cognitoUser, user.user_id)
+      ) {
+        continue;
+      }
+      await UserStore.cognito.send(
+        new AdminDeleteUserCommand({
+          UserPoolId: this.cognitoUserPoolId,
+          Username: cognitoUser.Username,
+        }),
+      );
+    }
+  }
+
+  // Mirrors the auth callback: migrated and restored accounts carry the
+  // record's id in custom:user_id; accounts created here use their own sub.
+  private cognitoUserBelongsTo(cognitoUser: UserType, user_id: string) {
+    const attribute = (name: string) =>
+      cognitoUser.Attributes?.find((a) => a.Name === name)?.Value;
+    const linkedId =
+      attribute("custom:user_id") ?? attribute("sub") ?? cognitoUser.Username;
+    return linkedId === user_id;
+  }
+
+  private async findCognitoUsersByEmail(email: string): Promise<UserType[]> {
+    const target = email.toLowerCase();
+    const escapedEmail = email.replace(/([\\"])/g, "\\$1");
+    const cognitoUsers = await this.listCognitoUsers(
+      `email = "${escapedEmail}"`,
+    );
+    return cognitoUsers.filter(
+      (candidate) => this.getCognitoUserEmail(candidate) === target,
+    );
   }
 
   private async listCognitoUsers(filter?: string): Promise<UserType[]> {

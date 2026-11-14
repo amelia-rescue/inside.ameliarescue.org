@@ -3,6 +3,7 @@ import type { Route } from "./+types/email-events";
 import { appContext } from "~/context";
 import { EmailEventStore, type EmailEvent } from "~/lib/email-event-store";
 import { DateDisplay } from "~/components/date-display";
+import { hasAdminAccess } from "~/lib/website-role";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -21,7 +22,7 @@ export async function loader({ context }: Route.LoaderArgs) {
     throw new Error("App context not found");
   }
 
-  if (c.user.website_role !== "admin") {
+  if (!hasAdminAccess(c.user.website_role)) {
     throw redirect("/");
   }
 

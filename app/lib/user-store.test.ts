@@ -399,12 +399,27 @@ describe("user store test", () => {
     const actualDeletedId = deletedUser.user_id;
 
     cognitoSendSpy.mockClear();
+    cognitoSendSpy.mockImplementation(async (command: { input: any }) =>
+      command.input.Filter
+        ? {
+            Users: [
+              {
+                Username: "cognito-deleted",
+                Attributes: [
+                  { Name: "email", Value: "deleted@example.com" },
+                  { Name: "sub", Value: actualDeletedId },
+                ],
+              },
+            ],
+          }
+        : {},
+    );
     await store.softDelete(actualDeletedId);
 
     expect(cognitoSendSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         input: {
-          Username: "deleted@example.com",
+          Username: "cognito-deleted",
           UserPoolId: "inside-amelia-rescue-users",
         },
       }),
@@ -538,18 +553,20 @@ describe("user store test", () => {
     });
     await store.softDelete(deletedUser.user_id);
 
-    // Create new active user with same email (new cognito mock response)
-    cognitoSendSpy.mockResolvedValueOnce({
-      User: { Username: crypto.randomUUID() },
-    });
+    // Older data has duplicates like this from re-onboarding a deleted member;
+    // createUser now refuses, so give a second user the email afterwards.
     const activeUser = await store.createUser({
       first_name: "Active",
       last_name: "User",
-      email: "shared@example.com",
+      email: "placeholder@example.com",
       website_role: "admin",
       membership_roles: [
         { role_name: "Provider", track_name: "EMT", precepting: false },
       ],
+    });
+    await store.updateUser({
+      user_id: activeUser.user_id,
+      email: "shared@example.com",
     });
 
     // Should find the active user, not the deleted one

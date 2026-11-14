@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import type { Route } from "./+types/index";
 import { appContext } from "~/context";
 import { redirect } from "react-router";
+import { hasAdminAccess } from "~/lib/website-role";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -17,7 +18,7 @@ export const handle = {
 export async function loader({ context }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
 
-  if (!ctx?.user || ctx.user.website_role !== "admin") {
+  if (!ctx?.user || !hasAdminAccess(ctx.user.website_role)) {
     throw redirect("/");
   }
 

@@ -9,6 +9,7 @@ import {
   IoBus,
   IoChevronForward,
 } from "react-icons/io5";
+import { hasAdminAccess } from "~/lib/website-role";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -24,14 +25,14 @@ export const handle = {
 export async function loader({ context }: Route.LoaderArgs) {
   const ctx = context.get(appContext);
 
-  if (!ctx?.user || ctx.user.website_role !== "admin") {
+  if (!ctx?.user || !hasAdminAccess(ctx.user.website_role)) {
     throw redirect("/");
   }
 
   const userStore = UserStore.make();
   const allUsers = await userStore.listUsers();
   const admins = allUsers
-    .filter((u) => u.website_role === "admin")
+    .filter((u) => hasAdminAccess(u.website_role))
     .sort((a, b) => a.last_name.localeCompare(b.last_name));
 
   return { user: ctx.user, admins };

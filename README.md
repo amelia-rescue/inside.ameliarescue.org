@@ -10,7 +10,7 @@ Member management system for Amelia Rescue Squad.
 │  ┌─────────────────────────────────────────────────────────────┐  │
 │  │ • user_id                                                   │  │
 │  │ • first_name, last_name, email, phone                       │  │
-│  │ • website_role (admin | user)                               │  │
+│  │ • website_role (root | admin | user)                        │  │
 │  │ • profile_picture_url                                       │  │
 │  └─────────────────────────────────────────────────────────────┘  │
 │                                                                   │

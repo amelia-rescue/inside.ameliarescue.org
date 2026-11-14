@@ -27,6 +27,7 @@ import {
   FiTruck,
   FiUser,
 } from "react-icons/fi";
+import { hasAdminAccess } from "~/lib/website-role";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -213,7 +214,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const contentWidthClass = isWideContentRoute ? "max-w-[1800px]" : "max-w-7xl";
   const user = loaderData?.user;
   const navLinks = NAV_LINKS.filter(
-    (link) => !link.adminOnly || user?.website_role === "admin",
+    (link) => !link.adminOnly || hasAdminAccess(user?.website_role),
   );
 
   useEffect(() => {

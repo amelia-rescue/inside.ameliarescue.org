@@ -38,8 +38,14 @@ export class EmailService {
     user: User;
     temporaryPassword: string;
     temporaryPasswordExpiresAt: string;
+    /** "restored" when an admin brings back a deleted account. */
+    reason?: "reset" | "restored";
   }): Promise<void> {
     const { user, temporaryPassword, temporaryPasswordExpiresAt } = params;
+    const intro =
+      params.reason === "restored"
+        ? "An administrator reactivated your inside.ameliarescue.org account."
+        : "An administrator reset your inside.ameliarescue.org password.";
     const userName = `${user.first_name} ${user.last_name}`;
     const expiration = `${temporaryPasswordExpiresAt.slice(0, 10)} ${temporaryPasswordExpiresAt.slice(11, 16)} UTC`;
     const appUrl = process.env.APP_URL || "https://inside.ameliarescue.org";
@@ -49,7 +55,7 @@ export class EmailService {
         <body>
           <h2>Temporary Password</h2>
           <p>Hi ${userName},</p>
-          <p>An administrator reset your inside.ameliarescue.org password.</p>
+          <p>${intro}</p>
           <p><strong>Username:</strong> ${user.email}</p>
           <p><strong>Temporary password:</strong> ${temporaryPassword}</p>
           <p>Please <a href="${appUrl}/auth/login?login_hint=${encodeURIComponent(user.email)}">sign in here</a> and change your password when prompted. This temporary password expires on ${expiration}.</p>
@@ -60,7 +66,7 @@ export class EmailService {
     const textBody = `
 Hi ${userName},
 
-An administrator reset your inside.ameliarescue.org password.
+${intro}
 
 Username: ${user.email}
 Temporary password: ${temporaryPassword}

@@ -1,4 +1,5 @@
 import { appContext, type Context } from "~/context";
+import { hasAdminAccess, isRootRole } from "~/lib/website-role";
 
 // Route args expose `context` as a RouterContextProvider; only `get` is needed
 // here, which also keeps these helpers trivial to call from tests.
@@ -20,7 +21,19 @@ export function requireContext(context: ContextProvider): Context {
 }
 
 export function isAdmin(ctx: Context): boolean {
-  return ctx.user.website_role === "admin";
+  return hasAdminAccess(ctx.user.website_role);
+}
+
+export function isRoot(ctx: Context): boolean {
+  return isRootRole(ctx.user.website_role);
+}
+
+export function requireRoot(context: ContextProvider): Context {
+  const ctx = requireContext(context);
+  if (!isRoot(ctx)) {
+    forbidden();
+  }
+  return ctx;
 }
 
 export function requireAdmin(context: ContextProvider): Context {
