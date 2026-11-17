@@ -2,7 +2,7 @@ import {
   TIME_ENTRY_TYPES,
   type TimeEntry,
   type TimeEntryType,
-} from "./time-entry-store";
+} from "./time-entry";
 
 /** SOP: active members keep at least 12.5 duty/standby hours a month. */
 export const MONTHLY_DUTY_HOURS_TARGET = 12.5;

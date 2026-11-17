@@ -11,17 +11,16 @@ import { hasAdminAccess } from "~/lib/website-role";
 import { DateDisplay } from "~/components/date-display";
 import { UserStore } from "~/lib/user-store";
 import { TruckCheckSchemaStore } from "~/lib/truck-check/truck-check-schema-store";
+import { TimeEntryError, TimeEntryStore } from "~/lib/time-entry-store";
 import {
   TIME_ENTRY_TYPES,
   TIME_ENTRY_TYPE_LABELS,
-  TimeEntryError,
-  TimeEntryStore,
   hoursBetween,
   isTimeEntryType,
   normalizeLocation,
   type TimeEntry,
   type TimeEntryLocation,
-} from "~/lib/time-entry-store";
+} from "~/lib/time-entry";
 import {
   MONTHLY_DUTY_HOURS_TARGET,
   summarizeByMember,
