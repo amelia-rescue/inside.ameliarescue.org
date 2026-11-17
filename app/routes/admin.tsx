@@ -7,6 +7,7 @@ import {
   IoClipboard,
   IoMail,
   IoBus,
+  IoTime,
   IoChevronForward,
 } from "react-icons/io5";
 import { hasAdminAccess } from "~/lib/website-role";
@@ -74,6 +75,15 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
       cta: "Manage truck checks",
       icon: IoBus,
       iconColor: "text-warning",
+    },
+    {
+      title: "Time Tracking (Prototype)",
+      description:
+        "Clock in and out of duty, 2nd calls, training, and meetings. Replaces the paper duty hours log.",
+      to: "/admin/time-tracking",
+      cta: "Open time tracking",
+      icon: IoTime,
+      iconColor: "text-secondary",
     },
   ] as const;
 

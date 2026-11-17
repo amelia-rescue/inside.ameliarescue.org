@@ -560,6 +560,35 @@ export class CdkStack extends cdk.Stack {
       },
     });
 
+    // Duty-hours clock-ins: one member's entries newest first by key, and the
+    // whole org's entries by clock-in time through ClockInIndex.
+    const timeEntriesTable = new dynamodb.Table(this, "TimeEntriesTable", {
+      tableName: "aes_time_entries",
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: {
+        name: "user_id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "entry_id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    timeEntriesTable.addGlobalSecondaryIndex({
+      indexName: "ClockInIndex",
+      partitionKey: {
+        name: "list_pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "clock_in_at",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
     const truckCheckSchemasTable = new dynamodb.Table(
       this,
       "TruckCheckSchemasTable",
@@ -757,6 +786,7 @@ export class CdkStack extends cdk.Stack {
     emailEventsTable.grantReadWriteData(lambdaFunction);
     truckChecksTable.grantReadWriteData(lambdaFunction);
     truckCheckSchemasTable.grantReadWriteData(lambdaFunction);
+    timeEntriesTable.grantReadWriteData(lambdaFunction);
     fileUploadsBucket.grantReadWrite(lambdaFunction);
 
     lambdaFunction.addToRolePolicy(
