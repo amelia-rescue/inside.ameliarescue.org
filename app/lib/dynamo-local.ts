@@ -98,18 +98,6 @@ export async function setupDynamo() {
       partitionKey: "document_key",
       sortKey: "range_key",
     },
-    {
-      tableName: "aes_time_entries",
-      partitionKey: "user_id",
-      sortKey: "entry_id",
-      gsi: [
-        {
-          indexName: "ClockInIndex",
-          partitionKey: "list_pk",
-          sortKey: "clock_in_at",
-        },
-      ],
-    },
   ];
 
   return await _setupDynamo(...schemas);

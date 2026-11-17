@@ -14,7 +14,6 @@ export default [
     route("email-events", "./routes/admin/email-events.tsx"),
     route("update-user/:user_id", "./routes/admin/update-user.tsx"),
     route("truck-checks", "./routes/admin/truck-checks.tsx"),
-    route("time-tracking", "./routes/admin/time-tracking.tsx"),
     ...prefix("certification-settings", [
       index("./routes/admin/certification-settings/index.tsx"),
       route(
