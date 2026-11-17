@@ -27,6 +27,7 @@ import { TrackStore } from "~/lib/track-store";
 import { showToast } from "~/components/toaster";
 import { DateDisplay } from "~/components/date-display";
 import { isRoot, requireAdmin } from "~/lib/authorize.server";
+import { diffUser, logUserAudit } from "~/lib/user-audit.server";
 import {
   EmailHistory,
   LOAD_MORE_EMAILS_INTENT,
@@ -181,6 +182,12 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 
   try {
     await store.updateUser(user);
+    logUserAudit(
+      "user_updated",
+      ctx.user,
+      existingUser,
+      diffUser(existingUser, user),
+    );
   } catch (error) {
     if (error instanceof Error) {
       return data(

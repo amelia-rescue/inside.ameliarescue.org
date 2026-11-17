@@ -8,6 +8,7 @@ import {
   UserStore,
 } from "~/lib/user-store";
 import { isRoot, requireAdmin } from "~/lib/authorize.server";
+import { logUserAudit } from "~/lib/user-audit.server";
 import { type } from "arktype";
 import { IoInformationCircle } from "react-icons/io5";
 import { useState } from "react";
@@ -122,7 +123,11 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   try {
     const store = UserStore.make();
-    await store.createUser(user);
+    const created = await store.createUser(user);
+    logUserAudit("user_created", ctx.user, created, {
+      website_role: { from: null, to: created.website_role },
+      membership_roles: { from: null, to: created.membership_roles },
+    });
   } catch (error) {
     if (error instanceof DeletedUserHasEmail) {
       return data(

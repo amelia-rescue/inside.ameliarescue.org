@@ -3,6 +3,7 @@ import type { Route } from "./+types/profile-picture.save";
 import { UserStore } from "~/lib/user-store";
 import { requireSelfOrAdmin } from "~/lib/authorize.server";
 import { log } from "~/lib/logger";
+import { diffUser, logUserAudit } from "~/lib/user-audit.server";
 
 export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
@@ -13,14 +14,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     return data({ error: "Missing required fields" }, { status: 400 });
   }
 
-  requireSelfOrAdmin(context, userId);
+  const ctx = requireSelfOrAdmin(context, userId);
 
   try {
     const userStore = UserStore.make();
-    await userStore.updateUser({
-      user_id: userId,
-      profile_picture_url: fileUrl,
-    });
+    const target = await userStore.getUser(userId);
+    const update = { user_id: userId, profile_picture_url: fileUrl };
+    await userStore.updateUser(update);
+    logUserAudit("user_updated", ctx.user, target, diffUser(target, update));
 
     return data({ success: true });
   } catch (error) {

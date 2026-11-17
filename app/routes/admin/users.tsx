@@ -22,6 +22,7 @@ import { appContext } from "~/context";
 import { EmailService } from "~/lib/email-service";
 import { EmailInUse, SignInAccountConflict, UserStore } from "~/lib/user-store";
 import { isRoot, requireAdmin } from "~/lib/authorize.server";
+import { logUserAudit } from "~/lib/user-audit.server";
 import { showToast } from "~/components/toaster";
 import { DateDisplay } from "~/components/date-display";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -186,6 +187,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         );
       }
       await userStore.softDelete(userId);
+      logUserAudit("user_deleted", ctx.user, target);
       return data({ success: true, intent: "delete" });
     } catch (error) {
       if (error instanceof Error) {
@@ -204,6 +206,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     try {
       const { user, temporaryPassword, temporaryPasswordExpiresAt } =
         await userStore.restoreUser(userId);
+      logUserAudit("user_restored", ctx.user, user);
       await EmailService.make().sendTemporaryPasswordEmail({
         user,
         temporaryPassword,
@@ -269,6 +272,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         );
       }
       await userStore.deletePermanently(userId);
+      logUserAudit("user_deleted_permanently", ctx.user, target);
       return data({
         success: true,
         intent: "delete-permanently",
@@ -295,6 +299,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     try {
       const { user, temporaryPassword, temporaryPasswordExpiresAt } =
         await userStore.setTemporaryPassword(userId);
+      logUserAudit("user_temporary_password_set", ctx.user, user);
       await emailService.sendTemporaryPasswordEmail({
         user,
         temporaryPassword,

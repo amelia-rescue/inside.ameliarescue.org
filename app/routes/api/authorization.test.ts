@@ -14,9 +14,15 @@ vi.mock("~/lib/s3-helper", () => ({
 }));
 
 const updateUser = vi.fn(async () => undefined);
+const getUser = vi.fn(async (user_id: string) => ({
+  user_id,
+  email: `${user_id}@example.com`,
+  first_name: "Test",
+  last_name: "Member",
+}));
 
 vi.mock("~/lib/user-store", () => ({
-  UserStore: { make: () => ({ updateUser }) },
+  UserStore: { make: () => ({ updateUser, getUser }) },
 }));
 
 const softDeletePreviousCertifications = vi.fn(async () => undefined);

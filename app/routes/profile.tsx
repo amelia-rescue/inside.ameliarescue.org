@@ -12,6 +12,7 @@ import { appContext } from "~/context";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { ArkErrors, type } from "arktype";
 import { UserStore } from "~/lib/user-store";
+import { diffUser, logUserAudit } from "~/lib/user-audit.server";
 import {
   CertificationTypeStore,
   type CertificationType,
@@ -147,11 +148,18 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (formData.get("intent") === "update-notification-preferences") {
     try {
-      await store.updateUser({
+      const update = {
         user_id: ctx.user.user_id,
         truck_check_issue_emails:
           formData.get("truck_check_issue_emails") === "on",
-      });
+      };
+      await store.updateUser(update);
+      logUserAudit(
+        "user_updated",
+        ctx.user,
+        ctx.user,
+        diffUser(ctx.user, update),
+      );
       return { success: true };
     } catch {
       return { errors: "Failed to update notification preferences" };
@@ -168,10 +176,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     };
   }
 
-  await store.updateUser({
-    user_id: ctx.user.user_id,
-    phone: contact.phone,
-  });
+  const update = { user_id: ctx.user.user_id, phone: contact.phone };
+  await store.updateUser(update);
+  logUserAudit("user_updated", ctx.user, ctx.user, diffUser(ctx.user, update));
 
   return { success: true };
 }
