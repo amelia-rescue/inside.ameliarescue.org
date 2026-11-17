@@ -77,6 +77,12 @@ Example Flow:
 - 🎉 TailwindCSS for styling
 - 📖 [React Router docs](https://reactrouter.com/)
 
+## Shelved Features
+
+Features that were prototyped and rolled back, documented so they can be rebuilt:
+
+- [Time tracking](docs/features/time-tracking.md): clock in/out to replace the paper duty hours log
+
 ## Getting Started
 
 ### Installation
