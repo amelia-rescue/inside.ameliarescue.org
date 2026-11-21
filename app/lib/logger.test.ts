@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getXrayTraceId, runWithLogContext } from "./logger-context.server";
-import { log } from "./logger";
+import { formatLogLine, log } from "./logger";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -51,6 +51,34 @@ describe("logger context", () => {
 
     log.info("outside");
     expect(output.at(-1)).not.toHaveProperty("requestId");
+  });
+
+  it("serializes Error objects instead of logging {}", () => {
+    const cause = new TypeError("fetch failed");
+    const error = Object.assign(
+      new Error("Token refresh failed: invalid_grant", { cause }),
+      { $metadata: { httpStatusCode: 400 } },
+    );
+
+    const line = JSON.parse(formatLogLine("error", "oops", { error }));
+
+    expect(line.error).toMatchObject({
+      name: "Error",
+      message: "Token refresh failed: invalid_grant",
+      $metadata: { httpStatusCode: 400 },
+      cause: { name: "TypeError", message: "fetch failed" },
+    });
+    expect(line.error.stack).toContain("Token refresh failed");
+  });
+
+  it("still logs the message when the payload can't be serialized", () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    const line = JSON.parse(formatLogLine("warn", "hello", { circular }));
+
+    expect(line).toMatchObject({ level: "warn", log_message: "hello" });
+    expect(line.log_serialization_error).toMatch(/circular/i);
   });
 
   it("extracts the root X-Ray trace ID", () => {
